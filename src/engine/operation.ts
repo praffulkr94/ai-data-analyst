@@ -1,0 +1,318 @@
+/** Executing an Operation against a ColumnStore. Pure, Node-callable, and the highest bug
+    density in the project after inference — which is why it is a seam.
+
+    Aggregation is the *cheapest* step here: a Map groupBy over 99,040 parsed rows is tens of
+    milliseconds. It is not the justification for the worker. See ADR-0004 before quoting a
+    number from this file. */
+import { bucketStart } from './time';
+import type { AnalysisResult, ChartSummary, ResultField, ResultRow } from './result';
+import { cellText, cellValue, type Column, type ColumnStore } from './types';
+import type { Aggregation, Filter, Operation } from '../spec/grammar';
+
+/** Groups shown before the rest collapse into one. `city` has 2,092 distinct values and
+    "matches by city" is a natural first Question, so this fires on day one. */
+export const FOLD_TOP_N = 15;
+export const FOLD_LABEL = 'Other';
+/** The protocol carries at most this many points, by construction. */
+export const POINT_CAP = 1000;
+
+/* ---- filters ------------------------------------------------------------------------- */
+
+/** A null never satisfies a comparison: a missing value is not greater or less than anything.
+    `isNull` is the only operator that selects one. */
+function passes(col: Column | undefined, row: number, f: Filter): boolean {
+  if (!col) return false;
+  const text = cellText(col, row);
+  if (f.op === 'isNull') return text === null;
+  if (f.op === 'isNotNull') return text !== null;
+  if (text === null) return false;
+
+  switch (f.op) {
+    case 'eq':
+      return text === String(booleanText(f.value));
+    case 'neq':
+      return text !== String(booleanText(f.value));
+    case 'in':
+      return f.values.includes(text);
+    case 'dateRange':
+      return text >= f.from && text <= f.to;
+    default: {
+      const v = cellValue(col, row);
+      if (typeof v !== 'number') return false;
+      switch (f.op) {
+        case 'gt':
+          return v > f.value;
+        case 'gte':
+          return v >= f.value;
+        case 'lt':
+          return v < f.value;
+        case 'lte':
+          return v <= f.value;
+        case 'between':
+          return v >= f.from && v <= f.to;
+      }
+    }
+  }
+}
+
+/** A boolean column reads as `TRUE`/`FALSE`, so a filter written against `true` must too. */
+const booleanText = (v: string | number | boolean) =>
+  typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : v;
+
+/* ---- aggregation --------------------------------------------------------------------- */
+
+/** One aggregation over the rows of one group. Row indices rather than values, because
+    `median` needs them all and the fold needs to re-aggregate a pooled set. */
+function aggregate(store: ColumnStore, rows: number[], a: Aggregation): number | null {
+  if (a.fn === 'count') return rows.length;
+  const col = a.column === null ? undefined : store.columns.get(a.column);
+  if (!col) return null;
+
+  if (a.fn === 'countDistinct') {
+    const seen = new Set<string>();
+    for (const r of rows) {
+      const t = cellText(col, r);
+      if (t !== null) seen.add(t);
+    }
+    return seen.size;
+  }
+
+  const values: number[] = [];
+  for (const r of rows) {
+    const v = cellValue(col, r);
+    if (typeof v === 'number') values.push(v);
+  }
+  if (values.length === 0) return null;
+
+  switch (a.fn) {
+    case 'sum':
+      return values.reduce((x, y) => x + y, 0);
+    // A rate is the share of true values, which over an Int8Array of 0 and 1 is the mean.
+    case 'avg':
+    case 'rate':
+      return values.reduce((x, y) => x + y, 0) / values.length;
+    case 'min':
+      return Math.min(...values);
+    case 'max':
+      return Math.max(...values);
+    case 'median': {
+      values.sort((x, y) => x - y);
+      const mid = values.length >> 1;
+      return values.length % 2 === 1 ? values[mid]! : (values[mid - 1]! + values[mid]!) / 2;
+    }
+  }
+}
+
+/* ---- grouping ------------------------------------------------------------------------ */
+
+type Dimension = { field: ResultField; read: (row: number) => string | number | null };
+
+function dimensions(store: ColumnStore, op: Operation): Dimension[] {
+  const out: Dimension[] = [];
+
+  // The temporal dimension comes first: it is the x-axis, which is the whole reason
+  // `timeBucket` is separate from `groupBy`.
+  if (op.timeBucket) {
+    const col = store.columns.get(op.timeBucket.column);
+    const unit = op.timeBucket.unit;
+    out.push({
+      field: {
+        name: op.timeBucket.column,
+        label: `${op.timeBucket.column} by ${unit}`,
+        role: 'dimension',
+        type: 'date',
+        temporal: true,
+      },
+      read: (row) => {
+        const v = col ? cellValue(col, row) : null;
+        return typeof v === 'number' ? bucketStart(v, unit) : null;
+      },
+    });
+  }
+
+  for (const name of op.groupBy) {
+    const col = store.columns.get(name);
+    out.push({
+      field: {
+        name,
+        label: name,
+        role: 'dimension',
+        type: store.schema.columns.find((c) => c.name === name)?.type ?? 'categorical',
+      },
+      read: (row) => (col ? cellText(col, row) : null),
+    });
+  }
+  return out;
+}
+
+type Group = { keys: (string | number | null)[]; rows: number[] };
+
+function groupRows(kept: number[], dims: Dimension[]): Group[] {
+  if (dims.length === 0) return [{ keys: [], rows: kept }];
+  const groups = new Map<string, Group>();
+  for (const row of kept) {
+    const keys = dims.map((d) => d.read(row));
+    // Each part is prefixed, so a null group and a cell holding the text "null" are different
+    // keys, and the tab separator cannot be confused with a value that holds one.
+    const key = keys.map((k) => (k === null ? '\u0000' : `=${k}`)).join('\t');
+    const existing = groups.get(key);
+    if (existing) existing.rows.push(row);
+    else groups.set(key, { keys, rows: [row] });
+  }
+  return [...groups.values()];
+}
+
+/* ---- ordering and folding ------------------------------------------------------------ */
+
+/** Nulls sort last in both directions — a group with no value is not the smallest one. */
+function compare(a: ResultRow, b: ResultRow, by: string, dir: 'asc' | 'desc'): number {
+  const va = a[by] ?? null;
+  const vb = b[by] ?? null;
+  if (va === null || vb === null) return va === null && vb === null ? 0 : va === null ? 1 : -1;
+  const sign = dir === 'asc' ? 1 : -1;
+  if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * sign;
+  return String(va).localeCompare(String(vb)) * sign;
+}
+
+/* ---- the executor -------------------------------------------------------------------- */
+
+export type ExecuteOptions = {
+  /** The measure the ChartSummary speaks about — the Visualization's `y`. Defaults to the
+      first aggregation, which is what a spec without a Visualization means. */
+  metric?: string;
+};
+
+export function executeOperation(
+  store: ColumnStore,
+  op: Operation,
+  { metric }: ExecuteOptions = {},
+): AnalysisResult {
+  const filterCols = op.filters.map((f) => store.columns.get(f.column));
+  const kept: number[] = [];
+  for (let row = 0; row < store.rowCount; row++) {
+    if (op.filters.every((f, i) => passes(filterCols[i], row, f))) kept.push(row);
+  }
+
+  const dims = dimensions(store, op);
+  const groups = groupRows(kept, dims);
+  const fields: ResultField[] = [
+    ...dims.map((d) => d.field),
+    ...op.aggregations.map((a) => ({
+      name: a.id,
+      label: a.label,
+      role: 'measure' as const,
+      type: 'number' as const,
+    })),
+    ...op.derived.map((d) => ({
+      name: d.id,
+      label: d.label,
+      role: 'measure' as const,
+      type: 'number' as const,
+    })),
+  ];
+
+  const measure = metric ?? op.aggregations[0]!.id;
+
+  /** Turn one group into an output row. The fold reuses this over a pooled row set. */
+  const toRow = (g: Group): ResultRow => {
+    const row: ResultRow = {};
+    dims.forEach((d, i) => {
+      row[d.field.name] = g.keys[i] ?? null;
+    });
+    for (const a of op.aggregations) row[a.id] = aggregate(store, g.rows, a);
+    for (const d of op.derived) {
+      const n = row[d.numerator];
+      const q = row[d.denominator];
+      row[d.id] =
+        typeof n === 'number' && typeof q === 'number' && q !== 0 ? n / q : null;
+    }
+    return row;
+  };
+
+  const totalGroups = groups.length;
+  const order = op.sort ?? { by: measure, dir: 'desc' as const };
+
+  // Top-by-metric decides *which* groups survive; the requested sort decides how the survivors
+  // are laid out. They differ when the model asked to sort by a dimension.
+  const ranked = groups
+    .map((g) => ({ g, row: toRow(g) }))
+    .sort((a, b) => compare(a.row, b.row, measure, 'desc'));
+
+  const shownCount = op.limit ?? Math.min(FOLD_TOP_N, totalGroups);
+  const shown = ranked.slice(0, shownCount);
+  const folded = ranked.slice(shownCount);
+
+  const rows = shown.map((s) => s.row).sort((a, b) => compare(a, b, order.by, order.dir));
+
+  // The fold is computed from the folded groups' rows pooled together, so an average over
+  // "Other" is the mean of those rows and not the mean of their group means. One rule, exact
+  // for every aggregation.
+  if (folded.length > 0 && op.limit === null && dims.length > 0) {
+    const pooled = toRow({
+      keys: dims.map((_, i) => (i === 0 ? FOLD_LABEL : null)),
+      rows: folded.flatMap((f) => f.g.rows),
+    });
+    rows.push(pooled);
+  }
+
+  const truncated = rows.length > POINT_CAP;
+  const capped = truncated ? rows.slice(0, POINT_CAP) : rows;
+
+  return {
+    fields,
+    rows: capped,
+    truncated,
+    summary: summarise({ store, op, kept, capped, dims, measure, totalGroups, folded: folded.length }),
+  };
+}
+
+function summarise({
+  store,
+  op,
+  kept,
+  capped,
+  dims,
+  measure,
+  totalGroups,
+  folded,
+}: {
+  store: ColumnStore;
+  op: Operation;
+  kept: number[];
+  capped: ResultRow[];
+  dims: Dimension[];
+  measure: string;
+  totalGroups: number;
+  folded: number;
+}): ChartSummary {
+  const agg = op.aggregations.find((a) => a.id === measure);
+  const derived = op.derived.find((d) => d.id === measure);
+  const metricColumn = agg?.column ?? null;
+  const col = metricColumn === null ? undefined : store.columns.get(metricColumn);
+
+  let nullExcluded = 0;
+  if (col) for (const row of kept) if (cellText(col, row) === null) nullExcluded++;
+
+  const dimension = dims[0];
+  const extreme = capped
+    .filter((r) => typeof r[measure] === 'number')
+    .reduce<{ label: string; value: number } | null>((best, r) => {
+      const value = r[measure] as number;
+      if (best && best.value >= value) return best;
+      const key = dimension ? r[dimension.field.name] : null;
+      return { label: key === null ? 'no value' : String(key), value };
+    }, null);
+
+  return {
+    metricLabel: agg?.label ?? derived?.label ?? measure,
+    aggregation: agg?.fn ?? 'ratio',
+    dimensionLabel: dimension?.field.label ?? null,
+    groupCount: capped.length,
+    totalGroups,
+    foldedCount: folded,
+    extreme,
+    nullExcluded,
+    rowsMatched: kept.length,
+    rowsTotal: store.rowCount,
+  };
+}
