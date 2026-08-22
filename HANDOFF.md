@@ -20,7 +20,7 @@ they win. Precedence is `DECISIONS.md` → `docs/adr/*` → `CONTEXT.md` → iss
   "store". RowSlice — never "window". ModelReply — never `SpecResponse`. Translator — never
   `SpecGenerator`. A concept you need that is missing from the glossary is a signal, not a
   licence to invent one.
-- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are nineteen.
+- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are twenty.
 - Issue #1 — the whole spec, and the only place the work is decomposed.
 
 ## The constraint that has to travel with you
@@ -58,9 +58,14 @@ else is wiring around them.
 - `src/engine/` — **`DataEngine`**. Pure, no DOM, no worker, no network, callable from Node.
   Parsing, inference, the ColumnStore, the RowIndex, the Operation executor, the ChartSummary.
   Tests in `tests/engine/`.
-- `src/workspace/` — **`Workspace`**, the facade the UI calls. **Does not exist yet**; it arrives
-  in M5 and owns the Request lifecycle. Tests go in `tests/workspace/`, which currently holds the
-  semantic validator and the SliceCache.
+- `src/workspace/` — **`Workspace`**, the facade the UI calls. Owns the Request lifecycle:
+  dispatch, the Translator call, structural then semantic validation, the single Repair, worker
+  execution, the staleness guards, and appending a Revision. Constructed with a Translator, which
+  is what makes it testable without HTTP. Tests in `tests/workspace/`.
+- `src/ai/` — the Translator seam and the Anthropic implementation behind it. `tool.ts` generates
+  the tool schemas from the Zod grammar, `prompt.ts` builds what is sent, `models.ts` holds the
+  two models and the per-model normalizer, `partial.ts` is the tolerant reader for the chip strip.
+  The API key lives in a module variable in `anthropic.ts` and nowhere else. ADR-0020.
 - `src/worker/kernel.ts` — everything the worker does, as a plain request-to-responses function.
   `dataset.worker.ts` adapts it to a real `Worker` in nine lines and `localPort.ts` adapts it
   in-process for the seam tests. One implementation, two adapters — do not fork it.
@@ -88,6 +93,8 @@ else is wiring around them.
   estimated — if you quote one, you ran it.
 - **Aggregation is the cheapest step and is not the justification for the worker.** Read ADR-0004
   before quoting a performance number.
+- **A Zustand component that destructures the whole store re-renders on every narration frame.**
+  Use selectors. `Header` did the former and had to be changed.
 
 ## Traps already paid for
 
@@ -108,9 +115,32 @@ else is wiring around them.
 - A band domain is a Set of strings. A two-dimension result has several rows per x value, so they
   collapse onto one band unless the domain is deduplicated, and `new Date(String(epochMs))` is an
   Invalid Date rather than the moment.
+- Strict tool use takes a narrower JSON Schema than Zod emits. `oneOf` must become `anyOf`, every
+  object needs `additionalProperties: false`, and `maxLength`, `maxItems`, `minItems` and the
+  numeric bounds are rejected. `toStrictSchema` in `src/ai/tool.ts` is the one place that knows,
+  and its allowlist is what to change when the subset moves.
+- `messages.parse()` is non-streaming, so it cannot be used here at all. `messages.stream()` plus
+  hand-validation with the same Zod schema at `message_stop` is the only path.
+- In the tolerant partial-JSON reader, whether an unterminated string is a key or a value depends
+  on the container it sits in, not just on the character before it: a comma inside `{` precedes a
+  key, the same comma inside `[` precedes a value.
+- The staleness guard that matters is the one after the worker responds, and testing it needs a
+  port that holds its answer. Three model calls resolving out of order pass with that guard
+  deleted; only a Request superseded *while its worker job runs* catches it.
 
 ## One thing known to be ahead of its tests
 
-Nothing, at the time of writing. `timeBucket` was the outstanding case and M4 tested it across the
-five units and the 1872–2026 span. If you leave a grammar field half-wired or an implementation
-ahead of its tests, say so here and leave its ledger item unticked.
+**Prompt caching is implemented and unverified.** The `cache_control` breakpoint is on the last
+system block and the readout shows `cache_read_input_tokens` as its own figure, but nobody has
+seen that number come back above zero, because doing so needs a live API key and this repository
+has none. Its ledger item in M5 is deliberately left unticked.
+
+What *is* tested is the property caching depends on: `tests/workspace/prompt.test.ts` asserts the
+tools + system prefix is byte-identical across two different Questions and across a Repair, so no
+silent invalidator has crept in. The minimum cacheable prefix is roughly 1,024 tokens and a shorter
+one fails to cache without saying so, which is the whole reason the figure is on screen. **First
+task for whoever has a key: ask two Questions in one session and assert
+`usage.cache_read_input_tokens > 0`, then tick the item.**
+
+Nothing else. If you leave a grammar field half-wired or an implementation ahead of its tests, say
+so here and leave its ledger item unticked.
