@@ -1,0 +1,107 @@
+/* Design tokens. Values are fixed by DECISIONS.md §A5 — take them from there, never re-derive.
+   Both themes exist from milestone 1; dark mode is not a later pass. */
+
+:root {
+  /* Accent — Linear's brand accent. Indigo-violet does no data duty, so it can never be
+     mistaken for a Series. It appears only on chrome, never inside a plot area. */
+  --accent: #5e6ad2;
+  --accent-hover: #4f5bd5; /* light mode hovers DARKER — see below */
+  --accent-focus-tint: #5e69d1;
+  --accent-on: #ffffff;
+
+  /* Surfaces */
+  --surface: #ffffff;
+  --surface-raised: #fbfbfc;
+  --surface-sunken: #f6f7f8;
+  --surface-overlay: #ffffff;
+
+  /* Hairline borders over shadows. */
+  --border: #e6e7eb;
+  --border-strong: #d0d2d9;
+
+  --text: #17181c;
+  --text-muted: #6b6f76;
+  --text-faint: #9a9ea6;
+
+  /* Categorical data palette — 6 slots, fixed order, never cycled. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+
+  /* Sequential (magnitude) and diverging. Never a rainbow. */
+  --seq-from: #cde2fb;
+  --seq-to: #0d366b;
+  --div-mid: #f0efec;
+
+  /* Status. Reserved — never a data Series, and never carries meaning alone. */
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+  --status-error: #e34948;
+
+  /* Geometry and motion — Linear: hairlines, 6–8px radii, restrained 120–180ms. */
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 8px;
+  --row-height: 30px;
+  --motion-fast: 120ms;
+  --motion: 160ms;
+  --motion-slow: 180ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --font: ui-sans-serif, -apple-system, 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Menlo', monospace;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-lg: 15px;
+}
+
+:root[data-theme='dark'] {
+  --accent: #5e6ad2;
+  --accent-hover: #828fff; /* dark mode hovers LIGHTER. #828fff on a light surface is 2.87:1
+                              with white text and fails AA — which is why this token splits. */
+  --accent-focus-tint: #5e69d1;
+  --accent-on: #ffffff;
+
+  --surface: #08090a;
+  --surface-raised: #101113;
+  --surface-sunken: #0c0d0f;
+  --surface-overlay: #16171a;
+
+  --border: #23252a;
+  --border-strong: #33363d;
+
+  --text: #f2f3f5;
+  --text-muted: #9ba0a8;
+  --text-faint: #6a6e76;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+
+  --seq-from: #0d366b;
+  --seq-to: #cde2fb;
+  --div-mid: #383835;
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+  --status-error: #e66767;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion: 0ms;
+    --motion-slow: 0ms;
+  }
+}
