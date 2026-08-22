@@ -18,7 +18,7 @@ export { NULL_TOKENS };
     every sampled value, null tokens included, exactly as the rule is written. */
 const NUMBER_THRESHOLD = 0.95;
 /** What the prompt budget allows per categorical column (Implementation Decisions, Prompt budget). */
-const TOP_VALUES = 8;
+export const TOP_VALUES = 8;
 
 export type InferOptions = {
   /** Rows read from the head of the file. */

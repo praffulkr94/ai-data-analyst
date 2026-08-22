@@ -1,7 +1,8 @@
 /** Encoding parsed rows into the ColumnStore. The store is the only copy of the rows in the
     application, so the layout choices here are load-bearing — see ADR-0003. */
 import { columnDateOrder } from './infer';
-import type { Column, ColumnStore, DatasetSchema } from './types';
+import { TOP_VALUES } from './infer';
+import type { Column, ColumnMeta, ColumnStore, DatasetSchema } from './types';
 import { isNullToken, parseBoolean, parseDate, parseNumber } from './values';
 
 /** A string column with distinct-to-rows below this dictionary-encodes. Measured against the
@@ -60,6 +61,52 @@ function encodeString(cells: string[]): Column {
   return { kind: 'dict', codes, values };
 }
 
+/** Exact statistics, read off the encoded column rather than the inference sample. Inference
+    only has to *decide the type* from a sample; the ranges and frequencies go into the prompt
+    and onto the screen, so a sampled `city` reading 352 distinct instead of 2,092 would be a
+    quietly wrong number in both places. */
+export function columnStats(col: Column): ColumnMeta['stats'] {
+  if (col.kind === 'number' || col.kind === 'date') {
+    let min = Infinity;
+    let max = -Infinity;
+    let sum = 0;
+    let n = 0;
+    for (const v of col.values) {
+      if (Number.isNaN(v)) continue;
+      if (v < min) min = v;
+      if (v > max) max = v;
+      sum += v;
+      n++;
+    }
+    return n === 0 ? null : { min, max, mean: sum / n };
+  }
+
+  const counts = new Map<string, number>();
+  if (col.kind === 'boolean') {
+    for (const v of col.values) {
+      if (v < 0) continue;
+      const key = v === 1 ? 'TRUE' : 'FALSE';
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  } else if (col.kind === 'dict') {
+    const tally = new Int32Array(col.values.length);
+    for (const code of col.codes) if (code >= 0) tally[code]!++;
+    col.values.forEach((v, i) => counts.set(v, tally[i]!));
+  } else {
+    for (const v of col.values) {
+      if (v === null) continue;
+      counts.set(v, (counts.get(v) ?? 0) + 1);
+    }
+  }
+  return {
+    distinct: counts.size,
+    top: [...counts]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, TOP_VALUES)
+      .map(([value, count]) => ({ value, count })),
+  };
+}
+
 function countNulls(col: Column): number {
   let n = 0;
   if (col.kind === 'number' || col.kind === 'date') {
@@ -94,7 +141,7 @@ export function buildColumnStore(
             ? encodeBoolean(cells)
             : encodeString(cells);
     columns.set(meta.name, col);
-    return { ...meta, nullCount: countNulls(col) };
+    return { ...meta, nullCount: countNulls(col), stats: columnStats(col) };
   });
   return { rowCount: rows.length, columns, schema: { columns: corrected } };
 }

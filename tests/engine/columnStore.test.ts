@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildColumnStore, DICT_MAX_RATIO } from '../../src/engine/columnStore';
 import { parseCsv as parse } from '../../src/engine/csv';
 import { inferSchema } from '../../src/engine/infer';
-import { cellText, cellValue } from '../../src/engine/types';
+import { cellText, cellValue, isCategoryStats, isNumberStats } from '../../src/engine/types';
 
 const build = (header: string[], rows: string[][]) =>
   buildColumnStore(header, rows, inferSchema(header, rows));
@@ -128,5 +128,45 @@ describe('CSV reading', () => {
   it('holds non-ASCII cells intact', () => {
     const { rows } = parse('team\nCuraçao\nRyūkyū\n');
     expect(rows.map((r) => r[0])).toEqual(['Curaçao', 'Ryūkyū']);
+  });
+});
+
+describe('exact statistics', () => {
+  /** Inference decides the type from a sample. The statistics must not be sampled: they go
+      into the prompt and onto the screen, where a wrong number is a wrong number. */
+  it('counts every distinct value, not only those in the inference sample', () => {
+    const rows = Array.from({ length: 3000 }, (_, i) => [`city-${i % 2092}`]);
+    const store = build(['city'], rows);
+    expect(isCategoryStats(store.schema.columns[0]!.stats) && store.schema.columns[0]!.stats)
+      .toMatchObject({ distinct: 2092 });
+  });
+
+  it('carries the full observed date range, not the range of the sample', () => {
+    const rows = [
+      ['1872-11-30'],
+      ...Array.from({ length: 3000 }, () => ['1990-01-01']),
+      ['2026-07-19'],
+    ];
+    const stats = build(['date'], rows).schema.columns[0]!.stats;
+    expect(isNumberStats(stats) && stats.min).toBe(Date.UTC(1872, 10, 30));
+    expect(isNumberStats(stats) && stats.max).toBe(Date.UTC(2026, 6, 19));
+  });
+
+  it('reports the true frequency of each of the eight most common values', () => {
+    const rows = [...Array.from({ length: 2000 }, () => ['a']), ...Array.from({ length: 5 }, () => ['b'])];
+    const stats = build(['c'], rows).schema.columns[0]!.stats;
+    expect(isCategoryStats(stats) && stats.top).toEqual([
+      { value: 'a', count: 2000 },
+      { value: 'b', count: 5 },
+    ]);
+  });
+
+  it('reports booleans as TRUE and FALSE with their counts', () => {
+    const rows = [...Array.from({ length: 7 }, () => ['TRUE']), ['FALSE'], ['NA']];
+    const stats = build(['neutral'], rows).schema.columns[0]!.stats;
+    expect(isCategoryStats(stats) && stats.top).toEqual([
+      { value: 'TRUE', count: 7 },
+      { value: 'FALSE', count: 1 },
+    ]);
   });
 });
