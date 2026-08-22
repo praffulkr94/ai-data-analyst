@@ -122,6 +122,7 @@ function dimensions(store: ColumnStore, op: Operation): Dimension[] {
         role: 'dimension',
         type: 'date',
         temporal: true,
+        unit,
       },
       read: (row) => {
         const v = col ? cellValue(col, row) : null;

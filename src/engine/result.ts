@@ -1,5 +1,6 @@
 /** The shape of an executed Operation. The chart layer, the accessible data table and the
     ChartSummary formatters all read this one value. */
+import type { TimeUnit } from '../spec/grammar';
 import type { ColumnType } from './types';
 
 /** One output column. `dimension` fields come from `groupBy` and the `timeBucket`; `measure`
@@ -13,6 +14,9 @@ export type ResultField = {
   type: ColumnType;
   /** Set on the dimension a `timeBucket` produced, so the x-axis knows it is temporal. */
   temporal?: boolean;
+  /** The TimeUnit that dimension was floored to. The axis formats at the bucket's resolution
+      rather than guessing one from the gaps between the buckets that happen to be occupied. */
+  unit?: TimeUnit;
 };
 
 export type ResultRow = Record<string, string | number | null>;
