@@ -11,7 +11,8 @@ import {
 } from '../engine/result';
 import type { Visualization } from '../spec/grammar';
 import { ChartFrame } from './ChartFrame';
-import { Area, Bars, Grid, Line, MARK_CAP, seriesColor, XAxis, YAxis } from './marks';
+import { Area, Bars, Grid, HoverArea, Line, MARK_CAP, seriesColor, XAxis, YAxis } from './marks';
+import { Tooltip, type Hover } from './Tooltip';
 import { ResultTable } from './ResultTable';
 import { chartCaption } from './summaryText';
 import { useChartDimensions } from './useChartDimensions';
@@ -48,6 +49,8 @@ export function AnalysisChart({
 }) {
   const [showTable, setShowTable] = useState(false);
   const [focusIndex, setFocusIndex] = useState(0);
+  /** One hover value for the whole chart. Marks report into it; nothing else subscribes. */
+  const [hover, setHover] = useState<Hover | null>(null);
   const tableId = useId();
 
   const xField = result.fields.find((f) => f.name === visualization.x);
@@ -95,6 +98,8 @@ export function AnalysisChart({
       dimensions,
       slot: i,
       label: named ? s.label : undefined,
+      onHover: (row: ResultRow | null, at: { x: number; y: number }) =>
+        setHover(row === null ? null : { row, ...at }),
     };
     switch (visualization.type) {
       case 'bar':
@@ -153,6 +158,15 @@ export function AnalysisChart({
           <YAxis scales={scales} dimensions={dimensions} />
           <XAxis scales={scales} dimensions={dimensions} field={xField} />
           {series.map(mark)}
+          {/* Above the marks, so it receives the pointer for all of them at once. */}
+          <HoverArea
+            rows={drawn.rows}
+            x={visualization.x}
+            y={visualization.y}
+            scales={scales}
+            dimensions={dimensions}
+            onHover={(row, at) => setHover(row === null ? null : { row, ...at })}
+          />
         </ChartFrame>
       ) : (
         <DegenerateState
@@ -169,6 +183,13 @@ export function AnalysisChart({
           {showTable ? 'Hide table' : 'View as table'}
         </button>
       </figcaption>
+
+      <Tooltip
+        hover={drawable ? hover : null}
+        xField={xField}
+        yField={yField}
+        seriesBy={visualization.seriesBy}
+      />
 
       <ResultTable result={result} id={tableId} hidden={!showTable} />
     </figure>

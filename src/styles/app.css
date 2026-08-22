@@ -505,6 +505,33 @@ h2 {
   border-radius: 2px;
 }
 
+/* One element, positioned from the pointer. `fixed` because it is portalled to the body, and
+   `pointer-events: none` so it can never be the thing under the cursor. */
+.chart-tooltip {
+  position: fixed;
+  z-index: 20;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  display: grid;
+  gap: 1px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.chart-tooltip .tooltip-at {
+  color: var(--text-muted);
+}
+
+.chart-tooltip .tooltip-value {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Direct labels are a palette requirement, so they must stay legible over any slot colour. */
 .mark-label {
   fill: var(--text);

@@ -338,6 +338,49 @@ export function Area({ rows, x, y, scales, slot = 0 }: MarkProps) {
   return <path d={path} fill={seriesColor(slot)} fillOpacity={0.16} stroke="none" />;
 }
 
+/* ---- the hover surface ---------------------------------------------------------------- */
+
+/** One transparent rectangle over the plot area, and the pointer position inverted through the
+    scale to find the row under it. A line has no mark to hover — it is one path — so the
+    alternative is an invisible target per point, which is hundreds of elements and hundreds of
+    listeners. A bar hands its own rect the pointer, so this returns nothing on a band scale. */
+export function HoverArea({ rows, x, y, scales, dimensions, onHover }: MarkProps) {
+  if (scales.x.kind === 'band' || !onHover) return null;
+  const invert = scales.x.scale.invert;
+  const ps = points(rows, x, y, scales).filter(defined);
+
+  const nearest = (px: number, py: number) => {
+    const target = Number(invert(px));
+    let best: Point | undefined;
+    let bestBy: [number, number] = [Infinity, Infinity];
+    for (const p of ps) {
+      // Nearest in the x domain first, and only then nearest in pixels — with several Series
+      // the pointer picks the line it is closest to, at the position it is over.
+      const by: [number, number] = [Math.abs(Number(p.row[x]) - target), Math.abs(p.value! - py)];
+      if (by[0] < bestBy[0] || (by[0] === bestBy[0] && by[1] < bestBy[1])) {
+        best = p;
+        bestBy = by;
+      }
+    }
+    return best;
+  };
+
+  return (
+    <rect
+      width={dimensions.innerWidth}
+      height={dimensions.innerHeight}
+      fill="transparent"
+      aria-hidden="true"
+      onPointerMove={(e) => {
+        const box = e.currentTarget.getBoundingClientRect();
+        const found = nearest(e.clientX - box.left, e.clientY - box.top);
+        onHover(found?.row ?? null, { x: e.clientX, y: e.clientY });
+      }}
+      onPointerLeave={() => onHover(null, { x: 0, y: 0 })}
+    />
+  );
+}
+
 /** Thin a category list until the labels have room. Returning every third label beats
     overlapping every one. */
 function thin<T>(items: T[], width: number): T[] {

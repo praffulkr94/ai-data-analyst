@@ -4,7 +4,7 @@
     never through SVG coordinates. Where a rule can only be observed in the path (a line that
     breaks at a gap rather than interpolating across it) the assertion is about the number of
     subpaths and never about where they are. */
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { AnalysisChart } from '../../src/chart/AnalysisChart';
 import { buildColumnStore } from '../../src/engine/columnStore';
@@ -233,6 +233,77 @@ describe('degenerate results', () => {
     render(<AnalysisChart result={many} visualization={viz()} />);
     expect(svg()).not.toBeNull();
     expect(paths()).toHaveLength(1);
+  });
+});
+
+describe('the tooltip', () => {
+  const result = run(
+    YEARLY([2020, 2021, 2022, 2023]),
+    op({ timeBucket: { column: 'date', unit: 'year' }, sort: { by: 'date', dir: 'asc' } }),
+  );
+
+  /** The transparent rectangle over the plot area. jsdom gives every element a zero bounding
+      box, so a pointer at clientX 0 is at the left edge of the plot and the inner width is the
+      right edge. */
+  const surface = () => document.querySelector('svg rect[fill="transparent"]')!;
+  const tip = () => document.querySelector('.chart-tooltip');
+  const INNER = 900 - 52 - 16;
+
+  it('is one element in the body, not one per mark', () => {
+    render(<AnalysisChart result={result} visualization={viz()} />);
+    fireEvent.pointerMove(surface(), { clientX: 4, clientY: 10 });
+    expect(document.querySelectorAll('.chart-tooltip')).toHaveLength(1);
+    expect(tip()!.parentElement).toBe(document.body);
+    // Never a `<title>` per mark either — the one `<title>` there is belongs to the figure.
+    expect(document.querySelectorAll('svg title')).toHaveLength(1);
+  });
+
+  it('names the point the pointer is nearest, found by inverting the scale', () => {
+    render(<AnalysisChart result={result} visualization={viz()} />);
+    fireEvent.pointerMove(surface(), { clientX: 2, clientY: 10 });
+    expect(tip()!.textContent).toContain('2020');
+    fireEvent.pointerMove(surface(), { clientX: INNER - 2, clientY: 10 });
+    expect(tip()!.textContent).toContain('2023');
+    expect(tip()!.textContent).toContain('1');
+  });
+
+  it('names the Series, so two lines at one x are told apart', () => {
+    const two = run(
+      [...YEARLY([2020, 2021], 'Brazil'), ...YEARLY([2020, 2021], 'Peru'), ...YEARLY([2021], 'Peru')],
+      op({
+        timeBucket: { column: 'date', unit: 'year' },
+        groupBy: ['team'],
+        sort: { by: 'date', dir: 'asc' },
+      }),
+    );
+    render(<AnalysisChart result={two} visualization={viz({ seriesBy: 'team' })} />);
+    // Peru has two matches in 2021 and Brazil one, so the pointer at the top of the chart is
+    // nearest Peru and at the bottom nearest Brazil.
+    fireEvent.pointerMove(surface(), { clientX: INNER - 2, clientY: 0 });
+    expect(tip()!.textContent).toContain('Peru');
+    fireEvent.pointerMove(surface(), { clientX: INNER - 2, clientY: 320 });
+    expect(tip()!.textContent).toContain('Brazil');
+  });
+
+  it('goes away when the pointer leaves the plot', () => {
+    render(<AnalysisChart result={result} visualization={viz()} />);
+    fireEvent.pointerMove(surface(), { clientX: 4, clientY: 10 });
+    expect(tip()).not.toBeNull();
+    fireEvent.pointerLeave(surface());
+    expect(tip()).toBeNull();
+  });
+
+  it('is hidden from the accessibility tree, which the data table serves instead', () => {
+    render(<AnalysisChart result={result} visualization={viz()} />);
+    fireEvent.pointerMove(surface(), { clientX: 4, clientY: 10 });
+    expect(tip()!.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('has no hover surface on a bar chart, where every bar is its own target', () => {
+    render(<AnalysisChart result={result} visualization={viz({ type: 'bar' })} />);
+    expect(document.querySelector('svg rect[fill="transparent"]')).toBeNull();
+    fireEvent.mouseEnter(document.querySelector('svg rect')!, { clientX: 40, clientY: 40 });
+    expect(tip()!.textContent).toContain('2020');
   });
 });
 
