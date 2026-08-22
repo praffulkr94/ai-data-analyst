@@ -4,10 +4,23 @@
 import { format } from 'd3-format';
 import { area, line } from 'd3-shape';
 import { utcFormat } from 'd3-time-format';
+import { POINT_CAP } from '../engine/operation';
 import type { ResultField, ResultRow } from '../engine/result';
-import type { TimeUnit } from '../spec/grammar';
+import type { ChartType, TimeUnit } from '../spec/grammar';
 import type { Scales } from './useScales';
 import type { ChartDimensions } from './useChartDimensions';
+
+/** What each chart type can draw and still be read. A bar has to be wide enough to compare and
+    to carry its own label, which is why its cap is two orders of magnitude below a line's: at
+    900px, 60 bands are 15px each and 800 would be under a pixel. A line needs one pixel per
+    point, so the point cap is its only limit. Scatter's cap is where SVG gives way to canvas in
+    M8. */
+export const MARK_CAP: Record<ChartType, number> = {
+  bar: 60,
+  line: POINT_CAP,
+  area: POINT_CAP,
+  scatter: 5_000,
+};
 
 /** Six slots, fixed order, never cycled. Read from the design tokens so light and dark agree. */
 export const SERIES_SLOTS = 6;

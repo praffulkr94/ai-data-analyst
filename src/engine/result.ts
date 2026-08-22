@@ -68,13 +68,34 @@ export type AnalysisResult = {
   truncated: boolean;
 };
 
-/** A result that is valid but awkward to draw. The chart layer renders a named state for each
-    rather than an empty SVG. */
-export type Degenerate = 'empty' | 'single' | 'all-null' | null;
+/** A result that is valid but awkward to draw: no rows, a single row, all-null values, or more
+    groups than can be shown. The chart layer renders a named state for each rather than an empty
+    or unreadable SVG.
 
-export function degeneracy(result: AnalysisResult, metric: string): Degenerate {
+    `single` is drawable — one bar is a legitimate answer — and is named so the caller can say
+    so; the other three are not. */
+export type Degenerate = 'empty' | 'single' | 'all-null' | 'too-many' | null;
+
+/** How much the chart type can draw. Omitted by a caller that only cares about the data
+    states — the guard needs to know which field is the x-axis to count what would be drawn. */
+export type Renderable = { x: string; marks: number };
+
+export function degeneracy(
+  result: AnalysisResult,
+  metric: string,
+  renderable?: Renderable,
+): Degenerate {
   if (result.rows.length === 0) return 'empty';
   if (result.rows.every((r) => r[metric] === null)) return 'all-null';
+  // Truncated means the point cap cut the answer short, so drawing it draws a fraction without
+  // saying which fraction. Refusing and offering a top-N is the honest move.
+  if (result.truncated) return 'too-many';
+  if (renderable && marksNeeded(result, renderable.x) > renderable.marks) return 'too-many';
   if (result.rows.length === 1) return 'single';
   return null;
 }
+
+/** Marks along the x-axis. Series share a position, so what decides readability is the number of
+    distinct x values and not the number of rows. */
+export const marksNeeded = (result: AnalysisResult, x: string) =>
+  new Set(result.rows.map((r) => String(r[x] ?? ''))).size;

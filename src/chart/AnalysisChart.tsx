@@ -1,11 +1,17 @@
 /** Composes the three layers into a chart for one AnalysisResult. Everything type-specific is
     the choice of mark; nothing else branches on the chart type. */
 import { useId, useMemo, useState } from 'react';
-import { FOLD_LABEL } from '../engine/operation';
-import { degeneracy, type AnalysisResult, type ResultRow } from '../engine/result';
+import { FOLD_LABEL, POINT_CAP } from '../engine/operation';
+import {
+  degeneracy,
+  marksNeeded,
+  type AnalysisResult,
+  type Degenerate,
+  type ResultRow,
+} from '../engine/result';
 import type { Visualization } from '../spec/grammar';
 import { ChartFrame } from './ChartFrame';
-import { Area, Bars, Grid, Line, seriesColor, XAxis, YAxis } from './marks';
+import { Area, Bars, Grid, Line, MARK_CAP, seriesColor, XAxis, YAxis } from './marks';
 import { ResultTable } from './ResultTable';
 import { chartCaption } from './summaryText';
 import { useChartDimensions } from './useChartDimensions';
@@ -70,9 +76,13 @@ export function AnalysisChart({
     [drawn.rows, visualization.seriesBy],
   );
 
-  // A single row is drawable — one bar is a legitimate answer — so only the two states that
-  // cannot honestly be drawn take the named-state path.
-  const state = degeneracy(result, visualization.y);
+  // A single row is drawable — one bar is a legitimate answer — so only the states that cannot
+  // honestly be drawn take the named-state path. `too-many` is the renderability guard: 800
+  // bars are not a chart, and a truncated result is not the whole answer.
+  const state = degeneracy(result, visualization.y, {
+    x: visualization.x,
+    marks: MARK_CAP[visualization.type],
+  });
   const drawable = state === null || state === 'single';
   const named = series.length > 1;
 
@@ -145,7 +155,12 @@ export function AnalysisChart({
           {series.map(mark)}
         </ChartFrame>
       ) : (
-        <DegenerateState state={state} />
+        <DegenerateState
+          state={state}
+          marks={marksNeeded(result, visualization.x)}
+          cap={MARK_CAP[visualization.type]}
+          truncated={result.truncated}
+        />
       )}
 
       <figcaption>
@@ -160,14 +175,34 @@ export function AnalysisChart({
   );
 }
 
-/** A result that cannot honestly be drawn gets a named state, never an empty SVG. */
-function DegenerateState({ state }: { state: 'empty' | 'all-null' }) {
+/** A result that cannot honestly be drawn gets a named state, never an empty or illegible SVG.
+    Each one names what happened and the nearest Question that would work — a refusal with no way
+    forward is a dead end, and the numbers behind it are still in the table below. */
+function DegenerateState({
+  state,
+  marks,
+  cap,
+  truncated,
+}: {
+  state: Exclude<Degenerate, null | 'single'>;
+  marks: number;
+  cap: number;
+  truncated: boolean;
+}) {
+  const n = (v: number) => v.toLocaleString('en-US');
   return (
-    <p className="notice notice-warning">
+    <p className="notice notice-warning" role="status">
       {state === 'empty'
         ? 'No rows matched. Remove a filter to widen the question.'
-        : 'Every group came back with no value. Drawn as zeros that would read as real zeros, ' +
-          'so it is not drawn.'}
+        : state === 'all-null'
+          ? 'Every group came back with no value. Drawn as zeros that would read as real zeros, ' +
+            'so it is not drawn.'
+          : truncated
+            ? `This result is longer than the ${n(POINT_CAP)} points the application draws, so ` +
+              'what came back is not the whole answer. Ask for a top-N, or bucket the dates by ' +
+              'a coarser unit.'
+            : `${n(marks)} categories is past the ${n(cap)} this chart can show without the ` +
+              'marks becoming unreadable. Ask for a top-N, or group by something coarser.'}
     </p>
   );
 }
