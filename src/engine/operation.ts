@@ -247,12 +247,15 @@ export function executeOperation(
   // The fold is computed from the folded groups' rows pooled together, so an average over
   // "Other" is the mean of those rows and not the mean of their group means. One rule, exact
   // for every aggregation.
+  let foldedValue: number | null = null;
   if (folded.length > 0 && op.limit === null && dims.length > 0) {
     const pooled = toRow({
       keys: dims.map((_, i) => (i === 0 ? FOLD_LABEL : null)),
       rows: folded.flatMap((f) => f.g.rows),
     });
     rows.push(pooled);
+    const v = pooled[measure];
+    foldedValue = typeof v === 'number' ? v : null;
   }
 
   const truncated = rows.length > POINT_CAP;
@@ -262,7 +265,17 @@ export function executeOperation(
     fields,
     rows: capped,
     truncated,
-    summary: summarise({ store, op, kept, capped, dims, measure, totalGroups, folded: folded.length }),
+    summary: summarise({
+      store,
+      op,
+      kept,
+      capped,
+      dims,
+      measure,
+      totalGroups,
+      folded: folded.length,
+      foldedValue,
+    }),
   };
 }
 
@@ -275,6 +288,7 @@ function summarise({
   measure,
   totalGroups,
   folded,
+  foldedValue,
 }: {
   store: ColumnStore;
   op: Operation;
@@ -284,6 +298,7 @@ function summarise({
   measure: string;
   totalGroups: number;
   folded: number;
+  foldedValue: number | null;
 }): ChartSummary {
   const agg = op.aggregations.find((a) => a.id === measure);
   const derived = op.derived.find((d) => d.id === measure);
@@ -294,7 +309,10 @@ function summarise({
   if (col) for (const row of kept) if (cellText(col, row) === null) nullExcluded++;
 
   const dimension = dims[0];
+  // "Other" is not a category, so it is not a candidate for the extreme. Naming it as the
+  // highest would point the reader at the bucket rather than at an answer.
   const extreme = capped
+    .filter((r) => !(dimension && r[dimension.field.name] === FOLD_LABEL))
     .filter((r) => typeof r[measure] === 'number')
     .reduce<{ label: string; value: number } | null>((best, r) => {
       const value = r[measure] as number;
@@ -310,6 +328,7 @@ function summarise({
     groupCount: capped.length,
     totalGroups,
     foldedCount: folded,
+    foldedValue,
     extreme,
     nullExcluded,
     rowsMatched: kept.length,

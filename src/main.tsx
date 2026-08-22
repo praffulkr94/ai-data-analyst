@@ -16,6 +16,6 @@ const cache = createSliceCache(port);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App loader={loader} cache={cache} />
+    <App loader={loader} cache={cache} port={port} />
   </StrictMode>,
 );

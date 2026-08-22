@@ -10,6 +10,7 @@ import { buildColumnStore } from '../engine/columnStore';
 import { emptyResult, foldRow, readHeader, ROW_LIMIT, type CsvResult } from '../engine/csv';
 import { makeHandle, type DatasetRef } from '../engine/handle';
 import { inferSchema } from '../engine/infer';
+import { executeOperation } from '../engine/operation';
 import { buildRowIndex, readSlice, type ViewState } from '../engine/rowIndex';
 import { cellText, type ColumnStore, type ColumnType } from '../engine/types';
 import type { WorkerRequest, WorkerResponse } from './protocol';
@@ -245,6 +246,18 @@ export function createKernel(post: Post) {
       case 'slice':
         sendSlice(req.jobId, req.offset, req.limit);
         return;
+      case 'analyze': {
+        if (!state.store) {
+          post({ type: 'error', jobId: req.jobId, code: 'no-dataset', message: 'No Dataset is loaded.' });
+          return;
+        }
+        post({
+          type: 'analyze:done',
+          jobId: req.jobId,
+          result: executeOperation(state.store, req.operation, { metric: req.metric }),
+        });
+        return;
+      }
     }
   };
 }

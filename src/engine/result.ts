@@ -30,6 +30,10 @@ export type ChartSummary = {
   totalGroups: number;
   /** Groups collapsed into "Other". Zero when nothing was folded. */
   foldedCount: number;
+  /** The metric's value for the folded groups, so the caption can say how much was set aside.
+      The fold is not drawn as a mark — an "Other" bar holding 87% of the Dataset flattens the
+      fifteen the Question was about — so this number is the only place its size appears. */
+  foldedValue: number | null;
   /** The largest group by the metric, or `null` when there is nothing to point at. */
   extreme: { label: string; value: number } | null;
   /** Rows the metric column was null in, and which the aggregation therefore left out. */

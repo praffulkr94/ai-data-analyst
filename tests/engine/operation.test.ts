@@ -412,3 +412,35 @@ describe('the result fields', () => {
     expect(r.summary).toMatchObject({ rowsMatched: 2, rowsTotal: 5 });
   });
 });
+
+describe('the extreme in the summary', () => {
+  it('names the largest real group, never the fold', () => {
+    const s = store(
+      ['k'],
+      [
+        // One dominant group, then twenty small ones whose pooled total beats it.
+        ...Array.from({ length: 30 }, () => ['big']),
+        ...Array.from({ length: 20 }, (_, i) => [`s${i}`]).flatMap((r) =>
+          Array.from({ length: 5 }, () => r),
+        ),
+      ],
+    );
+    const r = executeOperation(s, op({ groupBy: ['k'], sort: { by: 'm', dir: 'desc' } }));
+    // The Other row holds 30 rows, which exceeds `big`'s 30 only if it were counted — it is not.
+    expect(r.rows.at(-1)!.k).toBe(FOLD_LABEL);
+    expect(r.summary.extreme).toEqual({ label: 'big', value: 30 });
+  });
+
+  it('names the largest group when nothing folded', () => {
+    const r = executeOperation(hero(), op({ groupBy: ['team'], sort: { by: 'm', dir: 'desc' } }));
+    expect(r.summary.extreme).toEqual({ label: 'Brazil', value: 2 });
+  });
+
+  it('has no extreme to name when the result is empty', () => {
+    const r = executeOperation(
+      hero(),
+      op({ groupBy: ['team'], filters: [{ op: 'eq', column: 'team', value: 'Nowhere' }] }),
+    );
+    expect(r.summary.extreme).toBeNull();
+  });
+});

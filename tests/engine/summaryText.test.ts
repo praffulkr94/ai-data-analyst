@@ -9,6 +9,7 @@ const summary = (over: Partial<ChartSummary> = {}): ChartSummary => ({
   groupCount: 6,
   totalGroups: 6,
   foldedCount: 0,
+  foldedValue: null,
   extreme: { label: 'London', value: 412 },
   nullExcluded: 0,
   rowsMatched: 49_520,
@@ -62,6 +63,13 @@ describe('the visible caption', () => {
     expect(caption).toContain('Top 15 of 2,092 cities');
   });
 
+  it('says how large the folded remainder is, since the chart does not draw it', () => {
+    const caption = chartCaption(
+      summary({ groupCount: 16, totalGroups: 2092, foldedCount: 2076, foldedValue: 43_259 }),
+    );
+    expect(caption).toContain('Top 15 of 2,092 cities; the other 2,076 hold 43,259.');
+  });
+
   it('states the rows a filter kept', () => {
     expect(chartCaption(summary({ rowsMatched: 1_204 }))).toBe(
       'Counted over 1,204 of 49,520 rows.',
@@ -101,7 +109,7 @@ describe('the two formatters together', () => {
     const cases: Partial<ChartSummary>[] = [
       {},
       { groupCount: 0, extreme: null },
-      { foldedCount: 2076, totalGroups: 2092, groupCount: 16 },
+      { foldedCount: 2076, totalGroups: 2092, groupCount: 16, foldedValue: 43_259 },
       { dimensionLabel: null, groupCount: 1 },
       { nullExcluded: 254, aggregation: 'avg' },
     ];

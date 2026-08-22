@@ -3,8 +3,10 @@
     thing this file makes legible: which messages exist, what each carries, and the fact that
     rows never appear in any of them. */
 import type { DatasetHandle, DatasetRef, ParseReport } from '../engine/handle';
+import type { AnalysisResult } from '../engine/result';
 import type { ViewState } from '../engine/rowIndex';
 import type { ColumnType } from '../engine/types';
+import type { Operation } from '../spec/grammar';
 
 /** The correlation id. One per request, matched on the way back. */
 export type JobId = number;
@@ -18,6 +20,7 @@ export type WorkerRequest =
   | { type: 'retype'; jobId: JobId; column: string; columnType: ColumnType }
   | { type: 'view'; jobId: JobId; viewState: ViewState }
   | { type: 'slice'; jobId: JobId; offset: number; limit: number }
+  | { type: 'analyze'; jobId: JobId; operation: Operation; metric: string }
   | { type: 'cancel'; jobId: JobId };
 
 export type WorkerErrorCode = 'parse-failed' | 'no-dataset' | 'unknown-column' | 'internal';
@@ -37,6 +40,8 @@ export type WorkerResponse =
       columns: string[];
       rows: (string | null)[][];
     }
+  /** At most 1,000 points, by construction. */
+  | { type: 'analyze:done'; jobId: JobId; result: AnalysisResult }
   | { type: 'cancelled'; jobId: JobId }
   | { type: 'error'; jobId: JobId; code: WorkerErrorCode; message: string };
 

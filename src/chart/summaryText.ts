@@ -62,7 +62,13 @@ export function chartCaption(s: ChartSummary): string {
 
   const parts = [`${word} over ${over}.`];
   if (s.foldedCount > 0 && s.dimensionLabel) {
-    parts.push(`Top ${FOLD_TOP_N} of ${n(s.totalGroups)} ${plural(s.dimensionLabel)}, rest grouped.`);
+    // The fold is not drawn as a mark, so this is where its size is stated.
+    parts.push(
+      s.foldedValue === null
+        ? `Top ${FOLD_TOP_N} of ${n(s.totalGroups)} ${plural(s.dimensionLabel)}, rest grouped.`
+        : `Top ${FOLD_TOP_N} of ${n(s.totalGroups)} ${plural(s.dimensionLabel)}; the other ` +
+          `${n(s.foldedCount)} hold ${n(s.foldedValue)}.`,
+    );
   }
   if (s.nullExcluded > 0) {
     parts.push(`${n(s.nullExcluded)} rows excluded for having no value.`);
