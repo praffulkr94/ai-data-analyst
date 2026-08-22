@@ -2,7 +2,7 @@
 
 This is a portfolio artifact whose purpose is demonstrating specific engineering competencies, so
 several choices are more complex than a product would justify: the hand-rolled worker RPC
-(ADR-0005), d3 submodules with hand-rendered axes (ADR-0008), the columnar store (ADR-0003), and the
+(ADR-0005), d3 submodules with hand-rendered axes (ADR-0008), the ColumnStore (ADR-0003), and the
 absence of TanStack Query (ADR-0010). Each exists to make a competency visible and legible.
 
 **Consequences:** simplification passes — automated or human — should treat these as requirements

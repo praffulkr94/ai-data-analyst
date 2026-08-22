@@ -36,7 +36,7 @@ untrusted LLM output" is NOT the headline. The **semantic** validation layer is.
 
 Demo Mode is the **default first-run path**, not a fallback. Pre-captured real Claude
 SSE transcripts for ~12 canonical questions, replayed through the identical
-`SpecGenerator` seam with realistic chunk timing. Only the *transport* is faked —
+`Translator` seam with realistic chunk timing. Only the *transport* is faked —
 Zod validation, semantic validation, worker execution and D3 rendering are all real.
 
 The same fixture layer is the Playwright mock. Dual-use is why this beats a proxy.
@@ -94,11 +94,11 @@ const Operation = z.object({
 });
 
 const Visualization = z.discriminatedUnion('type', [
-  z.object({ type: z.enum(['bar','line','area']), x: z.string(), y: z.string(), series: z.string().nullable().default(null) }),
-  z.object({ type: z.literal('scatter'),          x: z.string(), y: z.string(), series: z.string().nullable().default(null) }),
+  z.object({ type: z.enum(['bar','line','area']), x: z.string(), y: z.string(), seriesBy: z.string().nullable().default(null) }),
+  z.object({ type: z.literal('scatter'),          x: z.string(), y: z.string(), seriesBy: z.string().nullable().default(null) }),
 ]);
 
-export const SpecResponse = z.discriminatedUnion('kind', [
+export const ModelReply = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('analysis'), intent: z.enum(['new','refine']), title: z.string().max(60),
              narration: z.string().max(160), operation: Operation, visualization: Visualization }),
   z.object({ kind: z.literal('clarification'), question: z.string(), options: z.array(z.string()).min(2).max(4) }),
@@ -138,7 +138,7 @@ hides the exact mechanism the project exists to demonstrate.
 ```
 → parse(jobId, file)            ← parse:progress(rows) / parse:done(handle)
 → view(jobId, viewState)        ← view:done({ viewVersion, rowCount })   // never rows
-→ window(jobId, offset, limit)  ← window:done({ rows, viewVersion })     // ≤ few hundred
+→ slice(jobId, offset, limit)   ← slice:done({ rows, viewVersion })     // ≤ few hundred
 → analyze(jobId, spec)          ← analyze:done({ result, truncated })    // ≤1000 points
 → cancel(jobId)
 ```
@@ -153,9 +153,9 @@ design doesn't need. Documented as considered-and-rejected.
 
 Riskiest part of the project and therefore the best interview story.
 
-- Worker computes an `Int32Array` **index vector** for sort/filter, returns only
+- Worker computes an `Int32Array` **RowIndex** for sort/filter, returns only
   `{ viewVersion, rowCount }`.
-- Main thread keeps an LRU of ~40 pages × 100 rows; renders synchronously against it;
+- Main thread keeps an SliceCache of ~40 slices × 100 rows; renders synchronously against it;
   a miss renders a skeleton row and enqueues a fetch.
 - **Fixed row height is mandatory** — dynamic measurement plus async data is where this
   design dies.
@@ -196,7 +196,7 @@ Three headline numbers:
 - **Structural (Zod, dataset-independent):** shapes, enums, required fields.
 - **Semantic (a pure TS function, `validateAgainstSchema(spec, datasetSchema)`):**
   column exists; metric is numeric; illegal aggregation for type; groupBy cardinality
-  cap; chart/result-shape compatibility; viz fields exist in the **output** of the
+  cap; Visualization/result-shape compatibility; Visualization fields exist in the **output** of the
   operation, not just the source columns.
 
 Not Zod refinements with a context object — this validator is the highest-value
@@ -218,15 +218,15 @@ the no-LangGraph decision.
    parseable (`region` → `revenue` → `avg` → `bar`), via a tolerant partial-JSON reader
    **for display only**. Never feed partial JSON to Zod.
 4. `message_stop` — parse → Zod → semantic → worker.
-5. +10–40ms — chart animates in; status collapses to a deterministic app-computed caption.
+5. +10–40ms — chart animates in; status collapses to a deterministic app-computed ChartSummary.
 
-**Cancellation/staleness: latest-wins, one monotonic `gen` counter spanning both async
-boundaries. No queue.** Per-boundary cancellation produces the invisible bug where turn
-2's LLM call aborts but turn 1's worker job still lands and overwrites the chart. Every
-continuation opens with `if (turn.gen !== currentGen) return` — after LLM resolve, after
-validation, after worker resolve. Worker cancel is best-effort; the gen guard is what
-makes correctness independent of it. History appends **only on success**, so an aborted
-turn never poisons the next request's context.
+**Cancellation/staleness: latest-wins, one monotonic `requestId` counter spanning both async
+boundaries. No queue.** Per-boundary cancellation produces the invisible bug where the second
+Request's model call aborts but the first Request's worker job still lands and overwrites the chart. Every
+continuation opens with `if (request.requestId !== currentRequestId) return` — after LLM resolve, after
+validation, after worker resolve. Worker cancel is best-effort; the staleness guard is what
+makes correctness independent of it. History appends **only on success**, so an abandoned
+Request never poisons the next Request's context.
 
 Three questions in four seconds → exactly one chart renders.
 
@@ -276,11 +276,11 @@ axis/field pickers (that's a chart builder).
 ## 12. State
 
 Zustand, one small store, ~5 slices, no middleware zoo. Justified specifically because
-the worker RPC layer and the turn controller write state from outside the React tree, and
+the worker RPC layer and the Request dispatcher write state from outside the React tree, and
 selector subscriptions let the chart re-render without re-rendering the table.
 
-- **Zustand:** `datasetHandle`, `columns`, `turns[]`, `activeTurnId`, `viewState`, `chartOverrides`
-- **Worker module (outside React):** rows, index vectors, page LRU — exposed via `useRows(range)`
+- **Zustand:** `datasetHandle`, `columns`, `analyses[]`, `activeAnalysisId`, `viewState`, `chartOverrides`
+- **Worker module (outside React):** rows, RowIndexs, SliceCache — exposed via `useRowSlice(range)`
 - **React local:** dialogs, composer input, hover, dropdowns, tooltip position
 
 **TanStack Query: rejected.** No server cache, no refetch, no invalidation, and its
@@ -289,7 +289,7 @@ the dependency — write the ADR.
 
 **Re-render storms:** stream deltas into a ref, flush on `requestAnimationFrame` at
 ≤60fps into a narrow slice only the streaming bubble subscribes to. Chips update on field
-completion, not per delta. Never put per-token text in the same slice as `turns[]`.
+completion, not per delta. Never put per-token text in the same slice as `analyses[]`.
 
 ## 13. Performance evidence
 
@@ -307,7 +307,7 @@ version; never report a single run.
 
 ## 14. Testing
 
-- **Unit seam:** a `SpecGenerator` interface injected at app root. Real impl wraps the
+- **Unit seam:** a `Translator` interface injected at app root. Real impl wraps the
   Anthropic SDK; tests inject a scripted fake. Vitest never touches HTTP. This is a
   *test* seam, not a provider abstraction.
 - **E2E:** Playwright `page.route('**/v1/messages')` returning canned **SSE** bodies with
@@ -347,7 +347,7 @@ Each leaves a working app and adds one ADR.
 
 1. **Shell + sample dataset + schema inference.** Done: loads `sales.csv` in a worker,
    shows inferred schema with type overrides. No chart yet.
-2. **Virtualized table over worker-resident columnar store.** Done: 150k rows scroll at
+2. **Virtualized table over worker-resident ColumnStore.** Done: 150k rows scroll at
    60fps, sort/filter worker-side, skeletons on fling, `viewVersion` drops stale windows.
 3. **Spec → worker → bar chart, hardcoded spec, no AI.** Done: a hand-typed spec in a dev
    panel renders a correct bar chart. *This milestone proves the pipeline is app-owned.*
@@ -421,7 +421,7 @@ the ADR log · the explicit "not a chatbot" non-goal.
    explicit rules, a confidence notion, sampled inference (first N + random N, **never**
    first 100), and the visible override.
 2. **Nobody costed the prompt.** What's in the system prompt, how many sample values per
-   column go to the model (and are they PII?), tokens per turn, `max_tokens`. A BYOK app
+   column go to the model (and are they PII?), tokens per Question, `max_tokens`. A BYOK app
    that silently burns the user's key is a product bug — and the prompt is the artifact
    that determines whether the intent-translation thesis actually works at all.
 3. **Refresh semantics undefined.** In-memory-only key means refresh loses it; the brief
@@ -442,9 +442,9 @@ No open items remain. The plan is complete.
 
 # Addendum — author decisions (2026-08-22, second round)
 
-## A1. Demo/Live toggle (replaces the one-way demo-mode entry)
+## A1. Demo/BYOK toggle (replaces the one-way demo-mode entry)
 
-A persistent segmented control in the header: **`Demo` | `Your API key`**. Switchable at any
+A persistent segmented control in the header: **`Demo` | `Your API key`** (modes: `demo` | `byok`). Switchable at any
 time in either direction, not a one-way door at first load.
 
 - Defaults to `Demo` on first visit.
@@ -454,7 +454,7 @@ time in either direction, not a one-way door at first load.
 - Switching back to `Demo` **keeps the key in memory** for the rest of the session, so a
   visitor can toggle freely without re-pasting.
 - The dataset, analysis cards and revision history survive the switch untouched — mode
-  affects only which `SpecGenerator` implementation is injected. This falls out of the seam
+  affects only which `Translator` implementation is injected. This falls out of the seam
   design for free.
 - In `Demo`, suggested-question chips are live and free-text is disabled with an inline
   hint naming the 12 available questions. In `Your API key`, free-text is enabled and a
@@ -740,7 +740,7 @@ write tests at an unconfirmed one.
 
 | Seam | What it is | Where it runs | Covers |
 |---|---|---|---|
-| **`DataEngine`** | Pure module: parse, infer types, build index vector, aggregate | Node, fast | Type inference incl. the `NA` rule and boolean detection; aggregation with nulls; time bucketing; top-N folding; sort/filter |
+| **`DataEngine`** | Pure module: parse, infer types, build RowIndex, aggregate | Node, fast | Type inference incl. the `NA` rule and boolean detection; aggregation with nulls; time bucketing; top-N folding; sort/filter |
 | **`Workspace`** | The facade the UI calls: `loadDataset`, `ask`, `selectCard` | jsdom, scripted fake generator | Structural + semantic validation, the single repair retry, cancellation, staleness, card revisions |
 
 Not seams, but required checks: one worker-transport integration test in `vitest --browser`
@@ -765,9 +765,77 @@ So the answer is documentation, not machinery. **This paragraph goes verbatim in
 
 > The following are deliberate, spec-mandated choices, not oversights, and must not be simplified
 > away: the hand-rolled worker RPC (not Comlink), d3 submodules with hand-rendered axes (not a
-> charting library), the columnar worker-resident store (not array-of-objects), and the absence of
+> charting library), the worker-resident ColumnStore (not array-of-objects), and the absence of
 > TanStack Query. Each exists to make a specific engineering competency visible. See ADR-0013 and
 > the individual ADRs for the reasoning. Accidental complexity elsewhere remains fair game.
 
 Then run `/ponytail-audit` after implementation as a separate critique pass. The distinction —
 complexity chosen versus complexity removed — is itself worth writing up.
+
+---
+
+# Addendum 4 — domain model (2026-08-22)
+
+`CONTEXT.md` is now the project's vocabulary and is authoritative over the wording used anywhere
+else, including this document. 37 terms. A terminology audit of this file found three genuine
+collisions worth naming here, because each was a latent source of confusion rather than mere
+inconsistency:
+
+- **`turns[]` and `turn.gen` were the same word for opposite lifetimes** — a persisted list of
+  results versus ephemeral in-flight state. Now **Analysis** (persisted, holds Revisions) and
+  **Request** (one in-flight submission). "Turn" is banned outright: it imports the chat framing
+  ADR-0001 exists to reject. "Card" survives only as a component name.
+- **"store" meant two unrelated things** — the worker's row storage and the UI state container. Now
+  **ColumnStore** and `useWorkspaceStore`; bare "store" is banned.
+- **`window` was a triple collision** — the row-range request, SQL window functions (explicitly out
+  of scope), and the browser global. Now **RowSlice**.
+
+Also: `SpecResponse` was actively wrong (two of its three variants contain no spec) → **ModelReply**.
+`SpecGenerator` → **Translator**. The `Visualization.series` field held a *column name*, not a
+series → **`seriesBy`**, parallel to `groupBy`.
+
+## A10. Four modeling decisions the design had not made
+
+**1. `clarification` and `unsupported` replies are transient notices, never Analyses.** They have no
+spec and no result, so modelling them as zero-Revision Analyses would force every consumer — the
+revision stepper, undo, hash state, the accessible table — to special-case an Analysis with nothing
+in it. Three unanswerable questions in a row must not leave three permanent dead ends in the rail;
+the rail lists things you can return to, and a refusal is not one. The PM panel's "all three are
+card variants" was a remark about card-shaped chrome, not a claim about state.
+
+*Subtlety worth keeping:* the notice must **not** live inside the Request object. If it did, a
+staleness-guard early-return would blank the user's explanation mid-read. It lives in a single
+`pendingNotice` slot, cleared on next submit or explicit dismiss. Clarification options and
+unsupported suggestions are chips that start a *new* Request — so a refusal is a fork in the flow,
+not a node in the history.
+
+**2. `intent` is dispatch metadata and is discarded, not persisted on the Revision.** It is fully
+derivable — Revision index 0 came from `new`, any later index from `refine`. Worse, a persisted copy
+can disagree with reality, because the dispatcher overrides the model: `refine` with no Analysis
+selected must become `new`. The model *proposes*; the dispatcher *decides*. Recording the model's
+claim alongside the dispatcher's action creates a field that later gets read as authoritative and
+isn't.
+
+**3. The `requestId` counter is app-global, and switching Analyses cancels nothing.** There is one
+composer, so submits are global; per-Analysis counters would permit two concurrent in-flight
+Requests, reintroducing exactly the interleaving ADR-0006 eliminates. Browsing while a slow Request
+completes is normal, and discarding work the user asked for to service a navigation is hostile.
+
+*Consequence, and the real bug this prevents:* a Revision can land on an Analysis the user is not
+looking at. So the staleness guard must capture **both** `requestId` and `targetAnalysisId` at
+dispatch and write to the captured target — never to "the active Analysis" read at resolve time.
+Reading active-at-resolve is the defect this decision exists to rule out. The rail needs a quiet
+"updated" marker on that row, or the result is silently invisible. `Workspace` seam test: submit
+against A, switch to B, assert the Revision lands on A, B is untouched, A shows the marker.
+
+**4. ChartSummary is one computation with two formatters, not one string used twice.** The facts are
+identical; the framing must differ. A sighted reader under a visible bar chart does not need "Bar
+chart, 6 categories" — that restates what they can see. A screen-reader user needs exactly that
+orientation. Byte-identical text forces one audience to read text written for the other; two
+independent computations drift until caption and label disagree.
+
+So `DataEngine` returns a structured summary — metric, aggregation, dimension, groupCount,
+foldedCount, extreme, nullExcludedCount — and the chart layer owns both formatters. The cardinality
+fold and null-exclusion counts ("showing top 15 of 2,092 cities") belong in the structured value, so
+both formatters are testable at the `DataEngine` seam with no DOM, which keeps them clear of the
+SVG-geometry trap ADR-0011 rules out.
