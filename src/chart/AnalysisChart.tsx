@@ -2,14 +2,36 @@
     the choice of mark; nothing else branches on the chart type. */
 import { useId, useMemo, useState } from 'react';
 import { FOLD_LABEL } from '../engine/operation';
-import { degeneracy, type AnalysisResult } from '../engine/result';
+import { degeneracy, type AnalysisResult, type ResultRow } from '../engine/result';
 import type { Visualization } from '../spec/grammar';
 import { ChartFrame } from './ChartFrame';
-import { Bars, Grid, XAxis, YAxis } from './marks';
+import { Area, Bars, Grid, Line, seriesColor, XAxis, YAxis } from './marks';
 import { ResultTable } from './ResultTable';
 import { chartCaption } from './summaryText';
 import { useChartDimensions } from './useChartDimensions';
 import { useScales } from './useScales';
+
+/** One Series and the rows that belong to it. A chart with no `seriesBy` is one Series holding
+    every row, so the marks never need a special case for the single-Series chart. */
+type Series = { key: string; label: string; rows: ResultRow[] };
+
+/** Split in first-appearance order, with the fold last. Slots are handed out by position, so
+    what matters is that the order is a function of the data and nothing else. */
+function splitSeries(rows: ResultRow[], by: string | null): Series[] {
+  if (!by) return [{ key: '', label: '', rows }];
+  const out = new Map<string, Series>();
+  for (const row of rows) {
+    const key = String(row[by] ?? '');
+    const existing = out.get(key);
+    if (existing) existing.rows.push(row);
+    else out.set(key, { key, label: key === '' ? 'no value' : key, rows: [row] });
+  }
+  const series = [...out.values()];
+  return [
+    ...series.filter((s) => s.key !== FOLD_LABEL),
+    ...series.filter((s) => s.key === FOLD_LABEL),
+  ];
+}
 
 export function AnalysisChart({
   result,
@@ -27,7 +49,10 @@ export function AnalysisChart({
 
   /** The fold is in the result, the table and the caption, but not among the marks: an "Other"
       bar holding most of the Dataset flattens the fifteen groups the Question was about, and a
-      reader cannot compare what they cannot see. The caption states its size instead. */
+      reader cannot compare what they cannot see. The caption states its size instead.
+
+      A folded *Series* is different and is drawn — it is one more line on a shared scale, not a
+      bar that swallows the axis. */
   const drawn = useMemo(
     () =>
       xField
@@ -40,14 +65,72 @@ export function AnalysisChart({
   const scales = useScales(drawn, xField, yField, dimensions, {
     banded: visualization.type === 'bar',
   });
+  const series = useMemo(
+    () => splitSeries(drawn.rows, visualization.seriesBy),
+    [drawn.rows, visualization.seriesBy],
+  );
 
   // A single row is drawable — one bar is a legitimate answer — so only the two states that
   // cannot honestly be drawn take the named-state path.
   const state = degeneracy(result, visualization.y);
   const drawable = state === null || state === 'single';
+  const named = series.length > 1;
+
+  const mark = (s: Series, i: number) => {
+    const common = {
+      rows: s.rows,
+      x: visualization.x,
+      y: visualization.y,
+      scales,
+      dimensions,
+      slot: i,
+      label: named ? s.label : undefined,
+    };
+    switch (visualization.type) {
+      case 'bar':
+        return (
+          <Bars
+            key={s.key}
+            {...common}
+            subIndex={i}
+            subCount={series.length}
+            // ponytail: one focusable bar per Series, which is reachable but not ordered.
+            // Roving tabindex across marks is M9's item.
+            focusIndex={focusIndex}
+            onFocusIndex={setFocusIndex}
+          />
+        );
+      case 'line':
+        return <Line key={s.key} {...common} />;
+      case 'area':
+        // An area chart is the fill plus the line, composed — not a third mark that knows both.
+        return (
+          <g key={s.key}>
+            <Area {...common} />
+            <Line {...common} />
+          </g>
+        );
+      default:
+        // Scatter arrives with `<Points>` in M8.
+        return null;
+    }
+  };
 
   return (
     <figure className="analysis-chart">
+      {/* Bars carry their Series only in colour, so grouped bars need the names spelled out.
+          A line says its own name at its end, which is why this is bar-only. */}
+      {drawable && named && visualization.type === 'bar' && (
+        <ul className="chart-legend">
+          {series.map((s, i) => (
+            <li key={s.key}>
+              <span className="swatch" style={{ background: seriesColor(i) }} aria-hidden="true" />
+              {s.label}
+            </li>
+          ))}
+        </ul>
+      )}
+
       {drawable ? (
         <ChartFrame
           dimensions={dimensions}
@@ -59,15 +142,7 @@ export function AnalysisChart({
           <Grid scales={scales} dimensions={dimensions} />
           <YAxis scales={scales} dimensions={dimensions} />
           <XAxis scales={scales} dimensions={dimensions} field={xField} />
-          <Bars
-            rows={drawn.rows}
-            x={visualization.x}
-            y={visualization.y}
-            scales={scales}
-            dimensions={dimensions}
-            focusIndex={focusIndex}
-            onFocusIndex={setFocusIndex}
-          />
+          {series.map(mark)}
         </ChartFrame>
       ) : (
         <DegenerateState state={state} />

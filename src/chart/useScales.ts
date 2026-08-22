@@ -9,10 +9,28 @@ import type { ChartDimensions } from './useChartDimensions';
 
 /** The x-axis is one of three things, and which one is decided by the field, not by the chart
     type — which is why `timeBucket` is separate from `groupBy` in the grammar. */
+/** `at` is where a mark starts — the left edge of a band — and `mid` is where it is centred. A
+    bar needs the first, a line joining its points needs the second, and on a continuous scale
+    they are the same place. */
 export type XScale =
-  | { kind: 'band'; scale: ScaleBand<string>; at: (v: unknown) => number | undefined }
-  | { kind: 'time'; scale: ScaleTime<number, number>; at: (v: unknown) => number | undefined }
-  | { kind: 'linear'; scale: ScaleLinear<number, number>; at: (v: unknown) => number | undefined };
+  | {
+      kind: 'band';
+      scale: ScaleBand<string>;
+      at: (v: unknown) => number | undefined;
+      mid: (v: unknown) => number | undefined;
+    }
+  | {
+      kind: 'time';
+      scale: ScaleTime<number, number>;
+      at: (v: unknown) => number | undefined;
+      mid: (v: unknown) => number | undefined;
+    }
+  | {
+      kind: 'linear';
+      scale: ScaleLinear<number, number>;
+      at: (v: unknown) => number | undefined;
+      mid: (v: unknown) => number | undefined;
+    };
 
 export type Scales = {
   x: XScale;
@@ -49,9 +67,23 @@ export function useScales(
     const categories = xName ? rows.map((r) => String(r[xName] ?? '')) : [];
 
     if (banded || !xField) {
-      const scale = scaleBand<string>().domain(categories).range([0, innerWidth]).padding(0.18);
+      // A band domain is a Set, so duplicate x values — which a two-dimension result has, one
+      // row per (x, Series) pair — collapse to one band rather than widening the scale.
+      const scale = scaleBand<string>()
+        .domain([...new Set(categories)])
+        .range([0, innerWidth])
+        .padding(0.18);
+      const at = (v: unknown) => scale(String(v ?? ''));
       return {
-        x: { kind: 'band', scale, at: (v) => scale(String(v ?? '')) },
+        x: {
+          kind: 'band',
+          scale,
+          at,
+          mid: (v) => {
+            const left = at(v);
+            return left === undefined ? undefined : left + scale.bandwidth() / 2;
+          },
+        },
         y,
         categories,
       };
@@ -65,10 +97,12 @@ export function useScales(
       const scale = scaleTime()
         .domain([new Date(domain[0]), new Date(domain[1])])
         .range([0, innerWidth]);
-      return { x: { kind: 'time', scale, at: (v) => (typeof v === 'number' ? scale(new Date(v)) : undefined) }, y, categories };
+      const at = (v: unknown) => (typeof v === 'number' ? scale(new Date(v)) : undefined);
+      return { x: { kind: 'time', scale, at, mid: at }, y, categories };
     }
 
     const scale = scaleLinear().domain(domain).nice().range([0, innerWidth]);
-    return { x: { kind: 'linear', scale, at: (v) => (typeof v === 'number' ? scale(v) : undefined) }, y, categories };
+    const at = (v: unknown) => (typeof v === 'number' ? scale(v) : undefined);
+    return { x: { kind: 'linear', scale, at, mid: at }, y, categories };
   }, [result, xField, xName, yName, innerWidth, innerHeight, banded]);
 }

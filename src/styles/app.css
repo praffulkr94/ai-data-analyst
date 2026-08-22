@@ -476,6 +476,35 @@ h2 {
   stroke: var(--border);
 }
 
+/* A Series names itself at the end of its line, so the reader never matches a colour to a key. */
+.series-label {
+  fill: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chart-legend .swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
 /* Direct labels are a palette requirement, so they must stay legible over any slot colour. */
 .mark-label {
   fill: var(--text);
