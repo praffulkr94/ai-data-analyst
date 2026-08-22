@@ -175,6 +175,67 @@ describe('several Series', () => {
   });
 });
 
+describe('degenerate results', () => {
+  const bar = (over: Partial<Viz> = {}) => viz({ type: 'bar', x: 'team', ...over });
+  const svg = () => document.querySelector('svg');
+
+  it('draws one bar for one row, because one bar is a legitimate answer', () => {
+    const one = run(YEARLY([2020]), op({ groupBy: ['team'] }));
+    render(<AnalysisChart result={one} visualization={bar()} />);
+    expect(document.querySelectorAll('svg rect')).toHaveLength(1);
+  });
+
+  it('says no rows matched rather than drawing an axis around nothing', () => {
+    const none = run(
+      YEARLY([2020]),
+      op({ groupBy: ['team'], filters: [{ op: 'eq', column: 'team', value: 'Nowhere' }] }),
+    );
+    render(<AnalysisChart result={none} visualization={bar()} />);
+    expect(svg()).toBeNull();
+    expect(screen.getByRole('status').textContent).toContain('No rows matched');
+    // The accessible representation is still there, empty and honest.
+    expect(screen.getByRole('table')).toBeTruthy();
+  });
+
+  it('refuses an all-null result rather than drawing zeros that read as real zeros', () => {
+    const allNull = run(
+      [
+        ['2020-06-15', 'Brazil', 'NA'],
+        ['2021-06-15', 'Peru', 'NA'],
+      ],
+      op({ groupBy: ['team'], aggregations: [{ id: 'm', fn: 'sum', column: 'goals', label: 'goals' }] }),
+    );
+    render(<AnalysisChart result={allNull} visualization={bar()} />);
+    expect(svg()).toBeNull();
+    expect(screen.getByRole('status').textContent).toContain('no value');
+  });
+
+  it('refuses 800 bars and says what to ask for instead', () => {
+    const many = run(
+      Array.from({ length: 800 }, (_, i) => [`2020-06-15`, `t${i}`, '1']),
+      op({ groupBy: ['team'], limit: 1000 }),
+    );
+    expect(many.rows).toHaveLength(800);
+    render(<AnalysisChart result={many} visualization={bar()} />);
+    expect(svg()).toBeNull();
+    const notice = screen.getByRole('status').textContent!;
+    expect(notice).toContain('800 categories');
+    expect(notice).toContain('top-N');
+    // 800 rows are readable one at a time, so the table keeps them.
+    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(801);
+  });
+
+  it('draws those same 800 as a line, where a point needs one pixel', () => {
+    const many = run(
+      Array.from({ length: 800 }, (_, i) => [`${1200 + i}-06-15`, 'Brazil', '1']),
+      op({ timeBucket: { column: 'date', unit: 'year' }, limit: 1000 }),
+    );
+    render(<AnalysisChart result={many} visualization={viz()} />);
+    expect(svg()).not.toBeNull();
+    expect(paths()).toHaveLength(1);
+  });
+});
+
 describe('the Series budget on screen', () => {
   it('draws six lines at most, each in a slot of its own, the fold among them', () => {
     const rows = Array.from({ length: 30 }, (_, i) => [
