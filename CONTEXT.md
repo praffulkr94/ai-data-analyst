@@ -38,6 +38,12 @@ The main thread's description of a Dataset — its size, its DatasetSchema, and 
 no rows.
 _Avoid_: dataset reference, dataset info
 
+**DatasetRef**:
+A hash-encodable pointer to a Dataset — either a built-in sample's id or a description of an uploaded
+file. Carries no rows, no DatasetSchema and no sample, so it survives a page reload when a
+DatasetHandle cannot.
+_Avoid_: dataset id, source ref, dataset pointer
+
 ### Asking and answering
 
 **Question**:
