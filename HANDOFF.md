@@ -20,7 +20,7 @@ they win. Precedence is `DECISIONS.md` → `docs/adr/*` → `CONTEXT.md` → iss
   "store". RowSlice — never "window". ModelReply — never `SpecResponse`. Translator — never
   `SpecGenerator`. A concept you need that is missing from the glossary is a signal, not a
   licence to invent one.
-- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are eighteen.
+- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are nineteen.
 - Issue #1 — the whole spec, and the only place the work is decomposed.
 
 ## The constraint that has to travel with you
@@ -76,7 +76,11 @@ else is wiring around them.
 - **TDD at the seams.** Expectations must come from an independent source — a hand-worked example
   or the naive reference implementation in `tests/engine/reference.ts`. A test that recomputes an
   aggregation the way the code under test computes it asserts only self-consistency.
-- **Charts are tested through their accessible data table, never through SVG geometry.**
+- **Charts are tested through their accessible data table, never through SVG geometry.** The
+  harness is `tests/workspace/analysisChart.test.tsx`: real `DataEngine`, real marks, and a
+  `ResizeObserver` stub reporting a fixed 900px, because `useChartDimensions` takes its width from
+  an observer and nowhere else and jsdom has none. Where a rule is only observable in the path — a
+  line breaking at a gap — count subpaths, never coordinates.
 - **Tests that care about a ColumnType state it.** A small fixture falls under the 95% numeric
   threshold and infers categorical; `tests/engine/operation.test.ts` has the helper for this.
   Inference has its own tests and does not need testing again through the executor.
@@ -97,10 +101,16 @@ else is wiring around them.
   number rather than assuming either.
 - A plain `Omit` over a discriminated union collapses it. `src/worker/port.ts` uses a
   distributive one.
+- d3's `timeFormat` renders in **local** time and a bucket start is a UTC midnight, so it relabels
+  every boundary west of Greenwich — 1872-11-30 reads 1872-11-29 in New York. Use `utcFormat`. The
+  engine suite is expected to pass under `TZ=America/Los_Angeles` as well as UTC; run it both ways
+  after touching anything that formats a date.
+- A band domain is a Set of strings. A two-dimension result has several rows per x value, so they
+  collapse onto one band unless the domain is deduplicated, and `new Date(String(epochMs))` is an
+  Invalid Date rather than the moment.
 
 ## One thing known to be ahead of its tests
 
-`timeBucket` is implemented — `src/engine/time.ts` and the executor's temporal dimension — because
-leaving a grammar field half-wired is the class of bug this project exists to avoid. It has **no
-tests yet**. Its ledger item is in M4 and stays unticked until the five units are tested across the
-1872–2026 span. Start there.
+Nothing, at the time of writing. `timeBucket` was the outstanding case and M4 tested it across the
+five units and the 1872–2026 span. If you leave a grammar field half-wired or an implementation
+ahead of its tests, say so here and leave its ledger item unticked.
