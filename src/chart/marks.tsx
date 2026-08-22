@@ -2,8 +2,9 @@
     `<Chart type="bar">` mega-component with forty props — a chart is composed of these under
     `<ChartFrame>`, which is what keeps them dumb. */
 import { format } from 'd3-format';
-import { timeFormat } from 'd3-time-format';
-import type { ResultRow } from '../engine/result';
+import { utcFormat } from 'd3-time-format';
+import type { ResultField, ResultRow } from '../engine/result';
+import type { TimeUnit } from '../spec/grammar';
 import type { Scales } from './useScales';
 import type { ChartDimensions } from './useChartDimensions';
 
@@ -26,16 +27,54 @@ export function formatValue(v: number): string {
 export const formatAxisValue = (v: number) =>
   Math.abs(v) >= 10_000 ? si(v) : formatValue(v);
 
+/* ---- temporal labels ----------------------------------------------------------------- */
+
+/** One format per TimeUnit, because a bucket should be labelled at the resolution it was
+    bucketed to: "01 Mar 2020" under a monthly bucket invites the reader to believe the point
+    describes that day. Built once — `utcFormat` compiles its pattern.
+
+    `utcFormat` and never `timeFormat`: a bucket start is a UTC midnight, and rendering it in
+    local time relabels every bucket boundary for every visitor west of Greenwich. The Dataset's
+    first match would read 1872-11-29 in New York. */
+const UNIT_FORMAT: Record<TimeUnit, string> = {
+  day: '%d %b %Y',
+  week: '%d %b %Y',
+  month: '%b %Y',
+  quarter: 'Q%q %Y',
+  year: '%Y',
+};
+
+const FORMATTERS = {
+  ...(Object.fromEntries(
+    Object.entries(UNIT_FORMAT).map(([unit, pattern]) => [unit, utcFormat(pattern)]),
+  ) as Record<TimeUnit, (d: Date) => string>),
+  /** A date column that was never bucketed — a raw timestamp on the x-axis. */
+  none: utcFormat('%d %b %Y'),
+};
+
+/** Label one temporal tick. The value arrives as a Date from a time scale and as a stringified
+    epoch from a band scale, because a band domain is strings — so both are accepted here rather
+    than at two call sites. */
+export function temporalLabel(unit: TimeUnit | undefined, v: number | string | Date): string {
+  // `Number('')` is 0, so an empty band key would otherwise be labelled 1970.
+  if (v === '') return 'no value';
+  const d = v instanceof Date ? v : new Date(Number(v));
+  if (Number.isNaN(d.valueOf())) return 'no value';
+  return FORMATTERS[unit ?? 'none'](d);
+}
+
 /* ---- axes and grid, from scale.ticks() as React elements ----------------------------- */
 
 export function XAxis({
   scales,
   dimensions,
-  temporal,
+  field,
 }: {
   scales: Scales;
   dimensions: ChartDimensions;
-  temporal: boolean;
+  /** The result field on the x-axis. It carries whether the axis is temporal and, if it came
+      from a `timeBucket`, at what resolution — so the axis never has to guess either. */
+  field: ResultField | undefined;
 }) {
   const { x } = scales;
   const { innerHeight, innerWidth } = dimensions;
@@ -52,8 +91,9 @@ export function XAxis({
           at: x.kind === 'time' ? x.scale(v as Date) : (x.scale as (n: number) => number)(v as number),
         }));
 
+  const temporal = field?.temporal === true || field?.type === 'date' || x.kind === 'time';
   const label = (v: number | Date | string) =>
-    temporal || x.kind === 'time' ? timeFormat('%Y')(new Date(v as number | Date)) : String(v);
+    temporal ? temporalLabel(field?.unit, v) : String(v);
 
   // How many characters fit in one band, at roughly 6.2px per character at 11px. Truncating to a
   // fixed length instead lets neighbouring labels collide as soon as the bands narrow.

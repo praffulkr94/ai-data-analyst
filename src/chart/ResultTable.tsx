@@ -5,11 +5,13 @@
     feature everybody uses, so it cannot silently rot; it is the second of the two reliefs the
     light-mode palette obliges (ADR-0012); and it doubles as the chart test harness, which is why
     charts are tested through it and never through SVG geometry. */
-import { timeFormat } from 'd3-time-format';
+import { utcFormat } from 'd3-time-format';
 import type { AnalysisResult } from '../engine/result';
 import { formatValue } from './marks';
 
-const isoDay = timeFormat('%Y-%m-%d');
+/** UTC, like every other reading of a bucket start: `timeFormat` here would print a different
+    day to the one the bucket names for anyone west of Greenwich. */
+const isoDay = utcFormat('%Y-%m-%d');
 
 export function ResultTable({
   result,

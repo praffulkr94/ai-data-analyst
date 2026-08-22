@@ -58,7 +58,7 @@ export function AnalysisChart({
         >
           <Grid scales={scales} dimensions={dimensions} />
           <YAxis scales={scales} dimensions={dimensions} />
-          <XAxis scales={scales} dimensions={dimensions} temporal={xField?.temporal ?? false} />
+          <XAxis scales={scales} dimensions={dimensions} field={xField} />
           <Bars
             rows={drawn.rows}
             x={visualization.x}
