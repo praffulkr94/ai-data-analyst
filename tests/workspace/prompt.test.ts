@@ -10,6 +10,7 @@ import { MAX_TOKENS, describeSchema, systemBlocks, userMessages } from '../../sr
 import { inferSchema } from '../../src/engine/infer';
 import type { DatasetSchema } from '../../src/engine/types';
 import type { AnalysisSpec } from '../../src/spec/grammar';
+import type { TranslateRequest } from '../../src/ai/translator';
 import type { SpecViolation } from '../../src/spec/validate';
 
 /** Ten teams, of which nine are frequent and `Vanuatu` appears once — so it ranks tenth and is
@@ -68,6 +69,38 @@ describe('the request', () => {
     expect(blocks[1]!.cache_control).toEqual({ type: 'ephemeral' });
     // The volatile part sits after the breakpoint, in messages, so the cached prefix is stable.
     expect(blocks[1]!.text).not.toContain('how many matches per team');
+  });
+
+  it('sends a byte-identical cached prefix for every Question in a session', () => {
+    // Caching is a prefix match: one changed byte anywhere in tools + system invalidates it, and
+    // the invalidators that bite are silent ones — a timestamp, a re-ordered tool list, a
+    // question that leaked into the system prompt. This asserts the prefix rather than the
+    // caching, because the caching itself cannot be observed without a key.
+    const prefix = (question: string, repair?: TranslateRequest['repair']) => {
+      const body = buildRequest({ ...req, question, repair });
+      return JSON.stringify({ tools: body.tools, system: body.system });
+    };
+    const first = prefix('how many matches per team');
+    expect(prefix('goals per year, as a line')).toBe(first);
+    // A Repair adds turns to `messages`, which sit after the breakpoint. The prefix must not move.
+    expect(
+      prefix('how many matches per team', {
+        attempt: {
+          reply: null,
+          failure: null,
+          usage: { model: 'smart', recorded: false, inputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 },
+          input: {},
+          echo: { id: 'toolu_1', name: 'submit_analysis', input: {} },
+        },
+        problem: { message: 'try again' },
+      }),
+    ).toBe(first);
+
+    // The minimum cacheable prefix is roughly 1,024 tokens and a shorter one silently fails to
+    // cache. At the conservative end of the usual ratio this is comfortably past it — but the
+    // real check is `usage.cache_read_input_tokens > 0` against a live key, which is the reason
+    // the readout shows that figure at all.
+    expect(first.length / 4).toBeGreaterThan(1024);
   });
 
   it('caps the reply at 2,048 tokens and offers all three tools', () => {
