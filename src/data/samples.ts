@@ -18,6 +18,13 @@ export const SAMPLES: Sample[] = [
     rowCount: 49_520,
     note: 'Every international result from 1872 to 2026.',
   },
+  {
+    id: 'team_matches',
+    label: 'Team-match results',
+    filename: 'team_matches.csv.gz',
+    rowCount: 99_040,
+    note: 'One row per team per match, derived from the same source by a committed script.',
+  },
 ];
 
 export const sampleById = (id: string): Sample | undefined => SAMPLES.find((s) => s.id === id);

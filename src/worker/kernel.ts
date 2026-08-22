@@ -10,6 +10,7 @@ import { buildColumnStore } from '../engine/columnStore';
 import { emptyResult, foldRow, readHeader, ROW_LIMIT, type CsvResult } from '../engine/csv';
 import { makeHandle, type DatasetRef } from '../engine/handle';
 import { inferSchema } from '../engine/infer';
+import { buildRowIndex, readSlice, type ViewState } from '../engine/rowIndex';
 import { cellText, type ColumnStore, type ColumnType } from '../engine/types';
 import type { WorkerRequest, WorkerResponse } from './protocol';
 
@@ -43,11 +44,62 @@ export function createKernel(post: Post) {
 
   /** The single ColumnStore. Rows exist here and nowhere else — the raw parsed strings are
       released as soon as they are encoded, so this is genuinely the only copy. */
-  const state: { store: ColumnStore | null; ref: DatasetRef | null; label: string } = {
+  const state: {
+    store: ColumnStore | null;
+    ref: DatasetRef | null;
+    label: string;
+    /** The current RowIndex, and the version that identifies it. A RowSlice arriving from an
+        older version is dropped by the main thread on arrival rather than cancelled. */
+    index: Int32Array;
+    view: ViewState;
+    viewVersion: number;
+  } = {
     store: null,
     ref: null,
     label: '',
+    index: new Int32Array(0),
+    view: { sort: null, hidden: [] },
+    viewVersion: 0,
   };
+
+  /** Visible columns, in schema order. The slice carries their names so the main thread never
+      has to infer the shape of a row it is handed. */
+  const visible = (): string[] =>
+    state.store
+      ? state.store.schema.columns.map((c) => c.name).filter((n) => !state.view.hidden.includes(n))
+      : [];
+
+  function setView(jobId: number, viewState: ViewState): void {
+    if (!state.store) {
+      post({ type: 'error', jobId, code: 'no-dataset', message: 'No Dataset is loaded.' });
+      return;
+    }
+    state.view = viewState;
+    state.index = buildRowIndex(state.store, viewState);
+    state.viewVersion++;
+    post({
+      type: 'view:done',
+      jobId,
+      viewVersion: state.viewVersion,
+      rowCount: state.index.length,
+    });
+  }
+
+  function sendSlice(jobId: number, offset: number, limit: number): void {
+    if (!state.store) {
+      post({ type: 'error', jobId, code: 'no-dataset', message: 'No Dataset is loaded.' });
+      return;
+    }
+    const columns = visible();
+    post({
+      type: 'slice:done',
+      jobId,
+      viewVersion: state.viewVersion,
+      offset,
+      columns,
+      rows: readSlice(state.store, state.index, offset, limit, columns),
+    });
+  }
 
   function parse(req: Extract<WorkerRequest, { type: 'parse' }>): void {
     const { jobId, source, ref, label } = req;
@@ -97,6 +149,9 @@ export function createKernel(post: Post) {
       const schema = inferSchema(result.header, result.rows);
       const store = buildColumnStore(result.header, result.rows, schema);
       Object.assign(state, { store, ref, label });
+      state.view = { sort: null, hidden: [] };
+      state.index = buildRowIndex(store, state.view);
+      state.viewVersion++;
       post({
         type: 'parse:done',
         jobId,
@@ -166,6 +221,10 @@ export function createKernel(post: Post) {
     );
     const next = buildColumnStore(header, rows, { columns });
     state.store = next;
+    // A type change reorders nothing by itself, but it changes every cell's text, so the
+    // RowIndex is rebuilt and the version bumped: RowSlices in flight are now stale.
+    state.index = buildRowIndex(next, state.view);
+    state.viewVersion++;
     post({ type: 'retype:done', jobId, handle: makeHandle(next, state.ref, state.label) });
   }
 
@@ -179,6 +238,12 @@ export function createKernel(post: Post) {
         return;
       case 'retype':
         retype(req.jobId, req.column, req.columnType);
+        return;
+      case 'view':
+        setView(req.jobId, req.viewState);
+        return;
+      case 'slice':
+        sendSlice(req.jobId, req.offset, req.limit);
         return;
     }
   };

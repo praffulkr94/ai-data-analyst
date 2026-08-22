@@ -3,9 +3,10 @@
     is tested where a real `Worker` exists. */
 import type { JobId, WorkerRequest, WorkerResponse } from './protocol';
 
-/** A request minus its correlation id — the transport assigns that. */
-export type PortRequest = Omit<Extract<WorkerRequest, { type: 'parse' }>, 'jobId'>
-  | Omit<Extract<WorkerRequest, { type: 'retype' }>, 'jobId'>;
+/** A request minus its correlation id — the transport assigns that. Distributive, so the union
+    survives: a plain `Omit` over a union collapses it into one unusable shape. */
+type WithoutJobId<T> = T extends unknown ? Omit<T, 'jobId'> : never;
+export type PortRequest = WithoutJobId<Exclude<WorkerRequest, { type: 'cancel' }>>;
 
 export type PortCall = {
   jobId: JobId;

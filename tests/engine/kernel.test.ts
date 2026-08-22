@@ -99,3 +99,75 @@ describe('the kernel, driven through a port', () => {
     expect(a.jobId).not.toBe(b.jobId);
   });
 });
+
+describe('view and slice', () => {
+  const rows = Array.from({ length: 500 }, (_, i) => `1990-01-0${(i % 9) + 1},Team${i % 7},${i}`);
+  const big = ['date,team,n', ...rows].join('\n');
+
+  const loaded = async () => {
+    const port = createLocalPort();
+    await port.send({ type: 'parse', source: { text: big }, ref, label: 'big' }).done;
+    return port;
+  };
+
+  it('answers a view with a row count and a version, and never with rows', async () => {
+    const port = await loaded();
+    const res = await port.send({
+      type: 'view',
+      viewState: { sort: { column: 'n', dir: 'desc' }, hidden: [] },
+    }).done;
+    expect(res.type).toBe('view:done');
+    if (res.type !== 'view:done') return;
+    expect(res.rowCount).toBe(500);
+    expect(Object.keys(res).sort()).toEqual(['jobId', 'rowCount', 'type', 'viewVersion']);
+  });
+
+  it('answers a slice with the requested run of rows in the current view order', async () => {
+    const port = await loaded();
+    await port.send({ type: 'view', viewState: { sort: { column: 'n', dir: 'desc' }, hidden: [] } })
+      .done;
+    const res = await port.send({ type: 'slice', offset: 0, limit: 3 }).done;
+    if (res.type !== 'slice:done') throw new Error('expected slice:done');
+    expect(res.rows.map((r) => r[2])).toEqual(['499', '498', '497']);
+    expect(res.columns).toEqual(['date', 'team', 'n']);
+  });
+
+  it('bumps the view version on every view, so a slice in flight can be recognised as stale', async () => {
+    const port = await loaded();
+    const first = await port.send({
+      type: 'view',
+      viewState: { sort: { column: 'n', dir: 'asc' }, hidden: [] },
+    }).done;
+    const second = await port.send({
+      type: 'view',
+      viewState: { sort: { column: 'n', dir: 'desc' }, hidden: [] },
+    }).done;
+    if (first.type !== 'view:done' || second.type !== 'view:done') throw new Error('bad');
+    expect(second.viewVersion).toBe(first.viewVersion + 1);
+  });
+
+  it('omits hidden columns from the slice', async () => {
+    const port = await loaded();
+    await port.send({ type: 'view', viewState: { sort: null, hidden: ['team'] } }).done;
+    const res = await port.send({ type: 'slice', offset: 0, limit: 1 }).done;
+    if (res.type !== 'slice:done') throw new Error('expected slice:done');
+    expect(res.columns).toEqual(['date', 'n']);
+    expect(res.rows[0]).toHaveLength(2);
+  });
+
+  it('has a view ready as soon as the Dataset lands, without being asked', async () => {
+    const port = await loaded();
+    const res = await port.send({ type: 'slice', offset: 0, limit: 2 }).done;
+    if (res.type !== 'slice:done') throw new Error('expected slice:done');
+    expect(res.viewVersion).toBe(1);
+    expect(res.rows).toHaveLength(2);
+  });
+
+  it('refuses a view before any Dataset is loaded', async () => {
+    const res = await createLocalPort().send({
+      type: 'view',
+      viewState: { sort: null, hidden: [] },
+    }).done;
+    expect(res).toMatchObject({ type: 'error', code: 'no-dataset' });
+  });
+});
