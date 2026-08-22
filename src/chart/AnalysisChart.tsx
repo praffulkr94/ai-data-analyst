@@ -11,11 +11,23 @@ import {
 } from '../engine/result';
 import type { Visualization } from '../spec/grammar';
 import { ChartFrame } from './ChartFrame';
-import { Area, Bars, Grid, HoverArea, Line, MARK_CAP, seriesColor, XAxis, YAxis } from './marks';
+import {
+  Area,
+  Bars,
+  Grid,
+  HoverArea,
+  lastPoint,
+  Line,
+  MARK_CAP,
+  seriesColor,
+  XAxis,
+  YAxis,
+} from './marks';
 import { Tooltip, type Hover } from './Tooltip';
 import { ResultTable } from './ResultTable';
 import { chartCaption } from './summaryText';
 import { useChartDimensions } from './useChartDimensions';
+import { useReveal } from './useReveal';
 import { useScales } from './useScales';
 
 /** One Series and the rows that belong to it. A chart with no `seriesBy` is one Series holding
@@ -70,7 +82,10 @@ export function AnalysisChart({
     [result, xField],
   );
 
-  const [containerRef, dimensions] = useChartDimensions();
+  const named = visualization.seriesBy !== null;
+  const labelled = named && visualization.type !== 'bar';
+  // Room on the right for the direct labels, and only when there are some.
+  const [containerRef, dimensions] = useChartDimensions(labelled ? { right: 92 } : {});
   const scales = useScales(drawn, xField, yField, dimensions, {
     banded: visualization.type === 'bar',
   });
@@ -78,6 +93,8 @@ export function AnalysisChart({
     () => splitSeries(drawn.rows, visualization.seriesBy),
     [drawn.rows, visualization.seriesBy],
   );
+  // Keyed on the result, so a new answer draws itself in and a hover does not.
+  const reveal = useReveal(result);
 
   // A single row is drawable — one bar is a legitimate answer — so only the states that cannot
   // honestly be drawn take the named-state path. `too-many` is the renderability guard: 800
@@ -87,7 +104,26 @@ export function AnalysisChart({
     marks: MARK_CAP[visualization.type],
   });
   const drawable = state === null || state === 'single';
-  const named = series.length > 1;
+
+  /** Direct labels land at the end of their own line, which puts two of them on top of each
+      other whenever two Series finish at a similar value. Spread down the ones that collide:
+      a label a few pixels off its line still reads as belonging to it, and two labels sharing
+      a pixel read as neither. */
+  const labelYs = useMemo(() => {
+    if (!labelled) return null;
+    const ends = series.map((s, i) => ({
+      i,
+      y: lastPoint(s.rows, visualization.x, visualization.y, scales)?.value ?? null,
+    }));
+    const out = new Array<number | undefined>(series.length);
+    let previous = -Infinity;
+    for (const end of ends.filter((e) => e.y !== null).sort((a, b) => a.y! - b.y!)) {
+      const y = Math.max(end.y!, previous + 12);
+      out[end.i] = y;
+      previous = y;
+    }
+    return out;
+  }, [labelled, series, scales, visualization.x, visualization.y]);
 
   const mark = (s: Series, i: number) => {
     const common = {
@@ -97,7 +133,7 @@ export function AnalysisChart({
       scales,
       dimensions,
       slot: i,
-      label: named ? s.label : undefined,
+      label: named && series.length > 1 ? s.label : undefined,
       onHover: (row: ResultRow | null, at: { x: number; y: number }) =>
         setHover(row === null ? null : { row, ...at }),
     };
@@ -116,13 +152,13 @@ export function AnalysisChart({
           />
         );
       case 'line':
-        return <Line key={s.key} {...common} />;
+        return <Line key={s.key} {...common} reveal={reveal} labelY={labelYs?.[i]} />;
       case 'area':
         // An area chart is the fill plus the line, composed — not a third mark that knows both.
         return (
           <g key={s.key}>
             <Area {...common} />
-            <Line {...common} />
+            <Line {...common} reveal={reveal} labelY={labelYs?.[i]} />
           </g>
         );
       default:
@@ -135,7 +171,7 @@ export function AnalysisChart({
     <figure className="analysis-chart">
       {/* Bars carry their Series only in colour, so grouped bars need the names spelled out.
           A line says its own name at its end, which is why this is bar-only. */}
-      {drawable && named && visualization.type === 'bar' && (
+      {drawable && series.length > 1 && visualization.type === 'bar' && (
         <ul className="chart-legend">
           {series.map((s, i) => (
             <li key={s.key}>

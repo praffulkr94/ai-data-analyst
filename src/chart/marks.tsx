@@ -173,6 +173,9 @@ export type MarkProps = {
   /** Roving tabindex support: which mark is focusable, and what to call when it is entered. */
   focusIndex?: number;
   onFocusIndex?: (index: number) => void;
+  /** Where to put the direct label, when the chart has moved it off the line's own end to keep
+      it clear of another Series' label. */
+  labelY?: number;
   /** How much of a line to draw, 0 to 1. Driven by the transition hook, which returns 1 at
       once when the visitor asked for reduced motion. */
   reveal?: number;
@@ -290,18 +293,35 @@ const PATH = (ps: Point[], y0: number, filled: boolean) =>
         .x((p) => p.at)
         .y((p) => p.value!)(ps);
 
-/** Dots are drawn when the Series is short enough for them to be read, and always on a point
-    with no neighbour — an isolated value between two gaps is otherwise drawn as nothing at all,
-    which is how a one-row line chart comes out empty. */
-const DOT_LIMIT = 40;
+/** Dots are drawn when the points have room for them, and always on a point with no neighbour —
+    an isolated value between two gaps is otherwise drawn as nothing at all, which is how a
+    one-row line chart comes out empty.
+
+    Room is measured in pixels between points and not in their number, so every Series in one
+    chart makes the same choice: a 20-point Series spread over the same 152 years as a 155-point
+    one is just as dense, and dotting one but not the other reads as two kinds of line. */
+const DOT_GAP = 12;
 const isolated = (ps: Point[], i: number) => !defined(ps[i - 1]) && !defined(ps[i + 1]);
 
-export function Line({ rows, x, y, scales, slot = 0, label, reveal = 1 }: MarkProps) {
+/** The rightmost drawn point of a Series — where its direct label goes. Exported so the chart
+    can space several labels apart without re-deriving where each one lands. */
+export function lastPoint(
+  rows: ResultRow[],
+  x: string,
+  y: string,
+  scales: Scales,
+): { at: number; value: number } | undefined {
+  const found = [...points(rows, x, y, scales)].reverse().find(defined);
+  return found === undefined ? undefined : { at: found.at, value: found.value! };
+}
+
+export function Line({ rows, x, y, scales, slot = 0, label, labelY, reveal = 1 }: MarkProps) {
   const ps = points(rows, x, y, scales);
   const path = PATH(ps, 0, false);
   if (path === null) return null;
   const last = [...ps].reverse().find(defined);
-  const dots = ps.filter((p, i) => defined(p) && (ps.length <= DOT_LIMIT || isolated(ps, i)));
+  const span = ps.length < 2 ? Infinity : (ps.at(-1)!.at - ps[0]!.at) / (ps.length - 1);
+  const dots = ps.filter((p, i) => defined(p) && (span >= DOT_GAP || isolated(ps, i)));
 
   return (
     <g>
@@ -321,8 +341,8 @@ export function Line({ rows, x, y, scales, slot = 0, label, reveal = 1 }: MarkPr
       ))}
       {/* The Series named on the line itself, so the reader never has to match a colour. */}
       {label && last && (
-        <text className="series-label" x={last.at + 5} y={last.value!} dy="0.32em">
-          {label}
+        <text className="series-label" x={last.at + 6} y={labelY ?? last.value!} dy="0.32em">
+          {truncate(label, 13)}
         </text>
       )}
     </g>

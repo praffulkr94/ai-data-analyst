@@ -5,7 +5,7 @@
     breaks at a gap rather than interpolating across it) the assertion is about the number of
     subpaths and never about where they are. */
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AnalysisChart } from '../../src/chart/AnalysisChart';
 import { buildColumnStore } from '../../src/engine/columnStore';
 import { inferSchema } from '../../src/engine/infer';
@@ -340,5 +340,59 @@ describe('the area mark', () => {
     expect(fill!.getAttribute('fill')).not.toBe('none');
     expect(stroke!.getAttribute('fill')).toBe('none');
     expect(stroke!.getAttribute('stroke')).toBe(fill!.getAttribute('fill'));
+  });
+});
+
+describe('the reveal transition', () => {
+  const result = run(
+    YEARLY([2020, 2021, 2022]),
+    op({ timeBucket: { column: 'date', unit: 'year' }, sort: { by: 'date', dir: 'asc' } }),
+  );
+
+  /** jsdom has no `matchMedia`, so both branches have to be asked for explicitly. */
+  const asking = (reduce: boolean) => {
+    window.matchMedia = ((media: string) => ({
+      media,
+      matches: reduce,
+      onchange: null,
+      addListener() {},
+      removeListener() {},
+      addEventListener() {},
+      removeEventListener() {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  };
+
+  afterEach(() => {
+    // @ts-expect-error putting jsdom back the way it was
+    delete window.matchMedia;
+    vi.restoreAllMocks();
+  });
+
+  const line = () => document.querySelector('svg path')!;
+
+  it('draws the line whole and schedules no frame when reduced motion is asked for', () => {
+    asking(true);
+    const frame = vi.spyOn(globalThis, 'requestAnimationFrame');
+    render(<AnalysisChart result={result} visualization={viz()} />);
+    expect(line().getAttribute('stroke-dasharray')).toBeNull();
+    expect(frame).not.toHaveBeenCalled();
+  });
+
+  it('draws it in when motion is allowed', () => {
+    asking(false);
+    render(<AnalysisChart result={result} visualization={viz()} />);
+    // `pathLength` is 1, so the dash covers the whole line and the offset is how much of it is
+    // still hidden. At the first paint that is all of it.
+    expect(line().getAttribute('pathLength')).toBe('1');
+    expect(line().getAttribute('stroke-dasharray')).toBe('1');
+    expect(Number(line().getAttribute('stroke-dashoffset'))).toBeGreaterThan(0);
+  });
+
+  it('treats a browser that will not say as having asked for less motion', () => {
+    // No `matchMedia` at all. Animating on the assumption that nobody minds is the wrong
+    // default; the chart is legible either way.
+    render(<AnalysisChart result={result} visualization={viz()} />);
+    expect(line().getAttribute('stroke-dasharray')).toBeNull();
   });
 });
