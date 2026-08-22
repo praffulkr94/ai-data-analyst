@@ -5,13 +5,17 @@
     milliseconds. It is not the justification for the worker. See ADR-0004 before quoting a
     number from this file. */
 import { bucketStart } from './time';
-import type { AnalysisResult, ChartSummary, ResultField, ResultRow } from './result';
+import type { AnalysisResult, ChartSummary, Fold, ResultField, ResultRow } from './result';
 import { cellText, cellValue, type Column, type ColumnStore } from './types';
 import type { Aggregation, Filter, Operation } from '../spec/grammar';
 
-/** Groups shown before the rest collapse into one. `city` has 2,092 distinct values and
-    "matches by city" is a natural first Question, so this fires on day one. */
+/** Categories shown on an axis before the rest collapse into one. `city` has 2,092 distinct
+    values and "matches by city" is a natural first Question, so this fires on day one. */
 export const FOLD_TOP_N = 15;
+/** Series drawn at once, the fold included. The palette has six slots, assigned in fixed order
+    and never cycled (ADR-0012), so a seventh Series would have to reuse a colour — which is why
+    this budget counts the "Other" Series against itself and `FOLD_TOP_N` does not. */
+export const SERIES_BUDGET = 6;
 export const FOLD_LABEL = 'Other';
 /** The protocol carries at most this many points, by construction. */
 export const POINT_CAP = 1000;
@@ -147,20 +151,35 @@ function dimensions(store: ColumnStore, op: Operation): Dimension[] {
 }
 
 type Group = { keys: (string | number | null)[]; rows: number[] };
+type Key = string | number | null;
+
+/** Each part is prefixed, so a null group and a cell holding the text "null" are different keys,
+    and the tab separator cannot be confused with a value that holds one. */
+const keyOf = (keys: Key[]) => keys.map((k) => (k === null ? '\u0000' : `=${k}`)).join('\t');
 
 function groupRows(kept: number[], dims: Dimension[]): Group[] {
   if (dims.length === 0) return [{ keys: [], rows: kept }];
   const groups = new Map<string, Group>();
   for (const row of kept) {
     const keys = dims.map((d) => d.read(row));
-    // Each part is prefixed, so a null group and a cell holding the text "null" are different
-    // keys, and the tab separator cannot be confused with a value that holds one.
-    const key = keys.map((k) => (k === null ? '\u0000' : `=${k}`)).join('\t');
+    const key = keyOf(keys);
     const existing = groups.get(key);
     if (existing) existing.rows.push(row);
     else groups.set(key, { keys, rows: [row] });
   }
   return [...groups.values()];
+}
+
+/** Merge groups that agree on every key. The fold produces several groups with the same keys —
+    one per folded value of the folded dimension — and they have to become one row. */
+function mergeByKeys(groups: Group[]): Group[] {
+  const out = new Map<string, Group>();
+  for (const g of groups) {
+    const existing = out.get(keyOf(g.keys));
+    if (existing) existing.rows.push(...g.rows);
+    else out.set(keyOf(g.keys), { keys: g.keys, rows: [...g.rows] });
+  }
+  return [...out.values()];
 }
 
 /* ---- ordering and folding ------------------------------------------------------------ */
@@ -181,12 +200,32 @@ export type ExecuteOptions = {
   /** The measure the ChartSummary speaks about — the Visualization's `y`. Defaults to the
       first aggregation, which is what a spec without a Visualization means. */
   metric?: string;
+  /** The Visualization's `seriesBy`, which decides *which* dimension the fold collapses and to
+      how many groups. The executor otherwise cannot tell a Series from an x-axis. */
+  seriesBy?: string | null;
 };
+
+/** Which dimension the fold collapses, and how many of its values survive.
+
+    A temporal dimension is never folded. It is the x-axis, its order is its meaning, and
+    keeping "the fifteen months with the most matches" out of a 152-year series is not an
+    answer to the Question — the point cap is what bounds it instead.
+
+    A Series folds to the palette's six slots. Anything else folds to the top fifteen. */
+function foldPlan(
+  dims: Dimension[],
+  seriesBy: string | null | undefined,
+): { index: number; budget: number } | null {
+  const series = dims.findIndex((d) => d.field.name === seriesBy);
+  if (series >= 0) return { index: series, budget: SERIES_BUDGET };
+  const first = dims.findIndex((d) => !d.field.temporal);
+  return first >= 0 ? { index: first, budget: FOLD_TOP_N + 1 } : null;
+}
 
 export function executeOperation(
   store: ColumnStore,
   op: Operation,
-  { metric }: ExecuteOptions = {},
+  { metric, seriesBy }: ExecuteOptions = {},
 ): AnalysisResult {
   const filterCols = op.filters.map((f) => store.columns.get(f.column));
   const kept: number[] = [];
@@ -231,53 +270,91 @@ export function executeOperation(
   };
 
   const totalGroups = groups.length;
-  const order = op.sort ?? { by: measure, dir: 'desc' as const };
+  // A temporal result reads left to right unless the spec says otherwise. Ranked by the metric
+  // instead, a line chart is a scribble.
+  const temporal = dims.find((d) => d.field.temporal);
+  const order =
+    op.sort ??
+    (temporal
+      ? { by: temporal.field.name, dir: 'asc' as const }
+      : { by: measure, dir: 'desc' as const });
 
-  // Top-by-metric decides *which* groups survive; the requested sort decides how the survivors
-  // are laid out. They differ when the model asked to sort by a dimension.
-  const ranked = groups
-    .map((g) => ({ g, row: toRow(g) }))
-    .sort((a, b) => compare(a.row, b.row, measure, 'desc'));
+  const laid = (rows: ResultRow[]) => rows.sort((a, b) => compare(a, b, order.by, order.dir));
 
-  const shownCount = op.limit ?? Math.min(FOLD_TOP_N, totalGroups);
-  const shown = ranked.slice(0, shownCount);
-  const folded = ranked.slice(shownCount);
-
-  const rows = shown.map((s) => s.row).sort((a, b) => compare(a, b, order.by, order.dir));
-
-  // The fold is computed from the folded groups' rows pooled together, so an average over
-  // "Other" is the mean of those rows and not the mean of their group means. One rule, exact
-  // for every aggregation.
-  let foldedValue: number | null = null;
-  if (folded.length > 0 && op.limit === null && dims.length > 0) {
-    const pooled = toRow({
-      keys: dims.map((_, i) => (i === 0 ? FOLD_LABEL : null)),
-      rows: folded.flatMap((f) => f.g.rows),
-    });
-    rows.push(pooled);
-    const v = pooled[measure];
-    foldedValue = typeof v === 'number' ? v : null;
+  // An explicit limit is the model asking for a top-N, so it replaces the fold rather than
+  // stacking with it: rank the groups by the metric and keep that many.
+  if (op.limit !== null) {
+    const ranked = groups
+      .map(toRow)
+      .sort((a, b) => compare(a, b, measure, 'desc'))
+      .slice(0, op.limit);
+    return finish(laid(ranked), null);
   }
 
-  const truncated = rows.length > POINT_CAP;
-  const capped = truncated ? rows.slice(0, POINT_CAP) : rows;
+  const plan = foldPlan(dims, seriesBy);
+  if (plan === null) return finish(laid(groups.map(toRow)), null);
 
-  return {
-    fields,
-    rows: capped,
-    truncated,
-    summary: summarise({
-      store,
-      op,
-      kept,
-      capped,
-      dims,
-      measure,
-      totalGroups,
-      folded: folded.length,
-      foldedValue,
-    }),
-  };
+  // Rank the folded dimension's *values*, each scored over all of its rows pooled rather than
+  // by the largest cell it contains — a Series that is second everywhere outranks one that
+  // spikes once.
+  const values = new Map<string, { key: Key; rows: number[] }>();
+  for (const g of groups) {
+    const key = g.keys[plan.index] ?? null;
+    const id = keyOf([key]);
+    const existing = values.get(id);
+    if (existing) existing.rows.push(...g.rows);
+    else values.set(id, { key, rows: [...g.rows] });
+  }
+
+  if (values.size <= plan.budget) return finish(laid(groups.map(toRow)), null);
+
+  const scored = [...values.values()].map((v) => ({
+    v,
+    row: toRow({ keys: dims.map((_, i) => (i === plan.index ? v.key : null)), rows: v.rows }),
+  }));
+  // One slot goes to "Other", so the budget keeps one fewer than it allows on screen.
+  const keptValues = scored
+    .sort((a, b) => compare(a.row, b.row, measure, 'desc'))
+    .slice(0, plan.budget - 1);
+  const keptIds = new Set(keptValues.map((s) => keyOf([s.v.key])));
+
+  const isKept = (g: Group) => keptIds.has(keyOf([g.keys[plan.index] ?? null]));
+  const shown = laid(groups.filter(isKept).map(toRow));
+
+  // The folded rows are pooled per remaining dimension, so a folded Series keeps one row per
+  // x rather than collapsing 152 years into one. Pooled from the rows and not from the values,
+  // so an average over "Other" is the mean of those rows and not the mean of their means. One
+  // rule, exact for every aggregation.
+  const foldedGroups = groups.filter((g) => !isKept(g));
+  const pooled = mergeByKeys(
+    foldedGroups.map((g) => ({
+      keys: g.keys.map((k, i) => (i === plan.index ? FOLD_LABEL : k)),
+      rows: g.rows,
+    })),
+  );
+  const everything = toRow({
+    keys: dims.map((_, i) => (i === plan.index ? FOLD_LABEL : null)),
+    rows: foldedGroups.flatMap((g) => g.rows),
+  })[measure];
+
+  return finish([...shown, ...laid(pooled.map(toRow))], {
+    dimensionLabel: dims[plan.index]!.field.label,
+    kept: keptValues.length,
+    folded: values.size - keptValues.length,
+    value: typeof everything === 'number' ? everything : null,
+  });
+
+  /** The point cap and the ChartSummary, which every path above needs. */
+  function finish(rows: ResultRow[], fold: Fold | null): AnalysisResult {
+    const truncated = rows.length > POINT_CAP;
+    const capped = truncated ? rows.slice(0, POINT_CAP) : rows;
+    return {
+      fields,
+      rows: capped,
+      truncated,
+      summary: summarise({ store, op, kept, capped, dims, measure, totalGroups, fold }),
+    };
+  }
 }
 
 function summarise({
@@ -288,8 +365,7 @@ function summarise({
   dims,
   measure,
   totalGroups,
-  folded,
-  foldedValue,
+  fold,
 }: {
   store: ColumnStore;
   op: Operation;
@@ -298,8 +374,7 @@ function summarise({
   dims: Dimension[];
   measure: string;
   totalGroups: number;
-  folded: number;
-  foldedValue: number | null;
+  fold: Fold | null;
 }): ChartSummary {
   const agg = op.aggregations.find((a) => a.id === measure);
   const derived = op.derived.find((d) => d.id === measure);
@@ -313,7 +388,7 @@ function summarise({
   // "Other" is not a category, so it is not a candidate for the extreme. Naming it as the
   // highest would point the reader at the bucket rather than at an answer.
   const extreme = capped
-    .filter((r) => !(dimension && r[dimension.field.name] === FOLD_LABEL))
+    .filter((r) => !dims.some((d) => r[d.field.name] === FOLD_LABEL))
     .filter((r) => typeof r[measure] === 'number')
     .reduce<{ label: string; value: number } | null>((best, r) => {
       const value = r[measure] as number;
@@ -328,8 +403,7 @@ function summarise({
     dimensionLabel: dimension?.field.label ?? null,
     groupCount: capped.length,
     totalGroups,
-    foldedCount: folded,
-    foldedValue,
+    fold,
     extreme,
     nullExcluded,
     rowsMatched: kept.length,

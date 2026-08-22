@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { buildColumnStore } from '../../src/engine/columnStore';
 import { inferSchema } from '../../src/engine/infer';
-import { executeOperation, FOLD_LABEL, FOLD_TOP_N } from '../../src/engine/operation';
+import {
+  executeOperation,
+  FOLD_LABEL,
+  FOLD_TOP_N,
+  SERIES_BUDGET,
+} from '../../src/engine/operation';
 import type { ColumnType } from '../../src/engine/types';
 import type { Operation } from '../../src/spec/grammar';
 import { referenceAggregate, type Obj } from './reference';
@@ -286,13 +291,17 @@ describe('the cardinality fold', () => {
 
   it('names what it folded in the summary', () => {
     const r = executeOperation(many, op({ groupBy: ['city'], sort: { by: 'm', dir: 'desc' } }));
-    expect(r.summary).toMatchObject({ totalGroups: 40, foldedCount: 25, groupCount: 16 });
+    expect(r.summary).toMatchObject({
+      totalGroups: 40,
+      groupCount: 16,
+      fold: { dimensionLabel: 'city', kept: 15, folded: 25 },
+    });
   });
 
   it('folds nothing when the groups fit', () => {
     const r = executeOperation(hero(), op({ groupBy: ['team'] }));
     expect(r.rows.some((x) => x.team === FOLD_LABEL)).toBe(false);
-    expect(r.summary.foldedCount).toBe(0);
+    expect(r.summary.fold).toBeNull();
   });
 
   it('honours an explicit limit instead of folding, because the model asked for a top-N', () => {
@@ -442,5 +451,133 @@ describe('the extreme in the summary', () => {
       op({ groupBy: ['team'], filters: [{ op: 'eq', column: 'team', value: 'Nowhere' }] }),
     );
     expect(r.summary.extreme).toBeNull();
+  });
+});
+
+describe('the temporal dimension is never folded', () => {
+  /** 40 years, one match each. Folded to the top fifteen this would answer "which fifteen years
+      had the most matches" — a question nobody asked — and a line chart of it would be a
+      scribble. The point cap is what bounds a time axis. */
+  const yearly = store(
+    ['date'],
+    Array.from({ length: 40 }, (_, i) => [`${1980 + i}-06-15`]),
+  );
+  const byYear = op({ timeBucket: { column: 'date', unit: 'year' } });
+
+  it('keeps every bucket, past the fifteen an axis of categories would fold at', () => {
+    const r = executeOperation(yearly, byYear);
+    expect(r.rows).toHaveLength(40);
+    expect(r.summary.fold).toBeNull();
+    expect(r.rows.some((x) => x.date === FOLD_LABEL)).toBe(false);
+  });
+
+  it('lays a temporal result out left to right when the spec asks for no sort', () => {
+    const r = executeOperation(yearly, byYear);
+    const dates = r.rows.map((x) => x.date as number);
+    expect(dates).toEqual([...dates].sort((a, b) => a - b));
+    expect(new Date(dates[0]!).toISOString()).toBe('1980-01-01T00:00:00.000Z');
+  });
+
+  it('still obeys a sort the spec did ask for', () => {
+    const r = executeOperation(yearly, { ...byYear, sort: { by: 'date', dir: 'desc' } });
+    expect(new Date(r.rows[0]!.date as number).toISOString()).toBe('2019-01-01T00:00:00.000Z');
+  });
+
+  it('folds the categorical dimension of a two-dimension result, not the temporal one', () => {
+    // 20 teams over three years: past the fifteen an axis of categories folds at.
+    const both = store(
+      ['date', 'team'],
+      Array.from({ length: 60 }, (_, i) => [`${2000 + (i % 3)}-06-15`, `t${i % 20}`]),
+    );
+    const r = executeOperation(
+      both,
+      op({ timeBucket: { column: 'date', unit: 'year' }, groupBy: ['team'] }),
+    );
+    expect(r.summary.fold).toMatchObject({ dimensionLabel: 'team', kept: FOLD_TOP_N, folded: 5 });
+    expect(new Set(r.rows.map((x) => x.date)).size).toBe(3);
+  });
+});
+
+describe('the Series budget', () => {
+  /** Ten teams over three years. Six palette slots exist and are never cycled, so five Series
+      are kept and the rest become one. */
+  const many = store(
+    ['date', 'team'],
+    Array.from({ length: 30 }, (_, i) => [`${2000 + (i % 3)}-06-15`, `t${i % 10}`]),
+  );
+  const spec = op({ timeBucket: { column: 'date', unit: 'year' }, groupBy: ['team'] });
+  const withSeries = (o = spec) => executeOperation(many, o, { seriesBy: 'team' });
+
+  it('keeps one Series fewer than the budget and folds the rest into one', () => {
+    const r = withSeries();
+    expect(SERIES_BUDGET).toBe(6);
+    const series = new Set(r.rows.map((x) => x.team));
+    expect(series.size).toBe(SERIES_BUDGET);
+    expect(series.has(FOLD_LABEL)).toBe(true);
+    expect(r.summary.fold).toMatchObject({ dimensionLabel: 'team', kept: 5, folded: 5 });
+  });
+
+  it('folds the Series to one row per x, not to one row in total', () => {
+    // Five folded teams across three years pool into three "Other" rows, one per year, so the
+    // folded Series is still a line.
+    const r = withSeries();
+    const other = r.rows.filter((x) => x.team === FOLD_LABEL);
+    expect(other).toHaveLength(3);
+    expect(other.map((x) => x.m)).toEqual([5, 5, 5]);
+  });
+
+  it('keeps every Series when they fit', () => {
+    const few = store(
+      ['date', 'team'],
+      Array.from({ length: 18 }, (_, i) => [`${2000 + (i % 3)}-06-15`, `t${i % 6}`]),
+    );
+    const r = executeOperation(few, spec, { seriesBy: 'team' });
+    expect(new Set(r.rows.map((x) => x.team)).size).toBe(6);
+    expect(r.summary.fold).toBeNull();
+  });
+
+  it('ranks a Series by its whole run and not by its best single point', () => {
+    // Hand-worked: six steady teams score 40 a year for three years — 120 each. `spike` plays
+    // once, for 100. Ranked cell by cell `spike` holds the largest number in the result and
+    // would survive; ranked over its rows it is seventh of seven and folds.
+    const rows = [
+      ...Array.from({ length: 6 }, (_, t) =>
+        [2000, 2001, 2002].map((y) => [`${y}-06-15`, `steady${t}`, '40']),
+      ).flat(),
+      ['2000-06-15', 'spike', '100'],
+    ];
+    const s = store(['date', 'team', 'goals'], rows, { goals: 'number' });
+    const r = executeOperation(
+      s,
+      op({
+        timeBucket: { column: 'date', unit: 'year' },
+        groupBy: ['team'],
+        aggregations: [agg('m', 'sum', 'goals')],
+      }),
+      { seriesBy: 'team', metric: 'm' },
+    );
+    expect(r.rows.some((x) => x.team === 'spike')).toBe(false);
+    // One steady team folds alongside it, so 2000 pools 40 + 100 and the other two years hold
+    // that team's 40 alone. Pooled per x, and pooled from rows rather than from group totals.
+    expect(r.rows.filter((x) => x.team === FOLD_LABEL).map((x) => x.m)).toEqual([140, 40, 40]);
+    expect(r.summary.fold).toMatchObject({ kept: 5, folded: 2, value: 220 });
+  });
+
+  it('never names a folded Series as the extreme', () => {
+    const r = withSeries();
+    expect(r.summary.extreme?.label).not.toBe(FOLD_LABEL);
+  });
+
+  it('honours an explicit limit instead of the budget, because the model asked for a top-N', () => {
+    const r = withSeries({ ...spec, limit: 4 });
+    expect(r.rows).toHaveLength(4);
+    expect(r.rows.some((x) => x.team === FOLD_LABEL)).toBe(false);
+  });
+
+  it('folds the first dimension when no Series was named, as it always did', () => {
+    const r = executeOperation(many, op({ groupBy: ['team'] }));
+    expect(FOLD_TOP_N).toBe(15);
+    expect(r.summary.fold).toBeNull();
+    expect(r.rows).toHaveLength(10);
   });
 });

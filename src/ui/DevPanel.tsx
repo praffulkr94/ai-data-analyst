@@ -74,6 +74,7 @@ export function DevPanel({ port }: { port: DataPort }) {
       type: 'analyze',
       operation: spec.operation,
       metric: spec.visualization.y,
+      seriesBy: spec.visualization.seriesBy,
     }).done;
     if (res.type === 'analyze:done') setOutcome({ state: 'done', spec, result: res.result });
     else if (res.type === 'error') setOutcome({ state: 'structural', message: res.message });

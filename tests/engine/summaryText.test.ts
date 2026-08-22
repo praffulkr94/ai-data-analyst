@@ -8,13 +8,20 @@ const summary = (over: Partial<ChartSummary> = {}): ChartSummary => ({
   dimensionLabel: 'city',
   groupCount: 6,
   totalGroups: 6,
-  foldedCount: 0,
-  foldedValue: null,
+  fold: null,
   extreme: { label: 'London', value: 412 },
   nullExcluded: 0,
   rowsMatched: 49_520,
   rowsTotal: 49_520,
   ...over,
+});
+
+/** The hero Dataset's own fold: 2,092 cities, the top fifteen drawn. */
+const cityFold = (value: number | null = null) => ({
+  dimensionLabel: 'city',
+  kept: 15,
+  folded: 2077,
+  value,
 });
 
 /** One computation, two formatters. They are deliberately not the same string: a sighted reader
@@ -44,7 +51,7 @@ describe('the screen-reader label', () => {
   });
 
   it('says how many groups were folded, because the fold is part of what is on screen', () => {
-    expect(chartLabel(summary({ groupCount: 16, totalGroups: 2092, foldedCount: 2076 }), 'bar')).toBe(
+    expect(chartLabel(summary({ groupCount: 16, totalGroups: 2092, fold: cityFold() }), 'bar')).toBe(
       'Bar chart. matches by city, showing the top 15 of 2,092 with the rest grouped as Other. ' +
         'Highest: London, 412.',
     );
@@ -58,16 +65,16 @@ describe('the visible caption', () => {
   });
 
   it('never names the chart type or the category count, which the reader can see', () => {
-    const caption = chartCaption(summary({ groupCount: 16, totalGroups: 2092, foldedCount: 2076 }));
+    const caption = chartCaption(summary({ groupCount: 16, totalGroups: 2092, fold: cityFold() }));
     expect(caption).not.toMatch(/chart|categories/i);
     expect(caption).toContain('Top 15 of 2,092 cities');
   });
 
   it('says how large the folded remainder is, since the chart does not draw it', () => {
     const caption = chartCaption(
-      summary({ groupCount: 16, totalGroups: 2092, foldedCount: 2076, foldedValue: 43_259 }),
+      summary({ groupCount: 16, totalGroups: 2092, fold: cityFold(43_259) }),
     );
-    expect(caption).toContain('Top 15 of 2,092 cities; the other 2,076 hold 43,259.');
+    expect(caption).toContain('Top 15 of 2,092 cities; the other 2,077 hold 43,259.');
   });
 
   it('states the rows a filter kept', () => {
@@ -109,7 +116,7 @@ describe('the two formatters together', () => {
     const cases: Partial<ChartSummary>[] = [
       {},
       { groupCount: 0, extreme: null },
-      { foldedCount: 2076, totalGroups: 2092, groupCount: 16, foldedValue: 43_259 },
+      { fold: cityFold(43_259), totalGroups: 2092, groupCount: 16 },
       { dimensionLabel: null, groupCount: 1 },
       { nullExcluded: 254, aggregation: 'avg' },
     ];

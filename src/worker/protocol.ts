@@ -20,7 +20,9 @@ export type WorkerRequest =
   | { type: 'retype'; jobId: JobId; column: string; columnType: ColumnType }
   | { type: 'view'; jobId: JobId; viewState: ViewState }
   | { type: 'slice'; jobId: JobId; offset: number; limit: number }
-  | { type: 'analyze'; jobId: JobId; operation: Operation; metric: string }
+  /** `metric` and `seriesBy` are the Visualization's `y` and `seriesBy`: the executor needs them
+      to know what the ChartSummary speaks about and which dimension the fold collapses. */
+  | { type: 'analyze'; jobId: JobId; operation: Operation; metric: string; seriesBy: string | null }
   | { type: 'cancel'; jobId: JobId };
 
 export type WorkerErrorCode = 'parse-failed' | 'no-dataset' | 'unknown-column' | 'internal';

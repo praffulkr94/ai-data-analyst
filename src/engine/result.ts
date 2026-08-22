@@ -32,12 +32,8 @@ export type ChartSummary = {
   groupCount: number;
   /** Distinct groups the Operation produced before folding. */
   totalGroups: number;
-  /** Groups collapsed into "Other". Zero when nothing was folded. */
-  foldedCount: number;
-  /** The metric's value for the folded groups, so the caption can say how much was set aside.
-      The fold is not drawn as a mark — an "Other" bar holding 87% of the Dataset flattens the
-      fifteen the Question was about — so this number is the only place its size appears. */
-  foldedValue: number | null;
+  /** The fold that happened, or `null` when everything fit. */
+  fold: Fold | null;
   /** The largest group by the metric, or `null` when there is nothing to point at. */
   extreme: { label: string; value: number } | null;
   /** Rows the metric column was null in, and which the aggregation therefore left out. */
@@ -46,6 +42,22 @@ export type ChartSummary = {
   rowsMatched: number;
   /** Rows in the Dataset. */
   rowsTotal: number;
+};
+
+/** What the cardinality fold collapsed. One object rather than four loose fields, because every
+    reader of it needs all four or none of them, and because the formatters must never hardcode
+    the kept count: it is 15 categories on the x-axis and 5 Series in the palette. */
+export type Fold = {
+  /** The dimension that folded, named as the axis names it. */
+  dimensionLabel: string;
+  /** Distinct values of that dimension kept, and collapsed into "Other". */
+  kept: number;
+  folded: number;
+  /** The metric over the folded rows pooled, so the caption can say how much was set aside.
+      A folded x-axis category is not drawn as a mark — an "Other" bar holding 87% of the
+      Dataset flattens the fifteen the Question was about — so for that fold this number is the
+      only place its size appears. */
+  value: number | null;
 };
 
 export type AnalysisResult = {

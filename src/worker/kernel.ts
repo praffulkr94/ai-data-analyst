@@ -254,7 +254,10 @@ export function createKernel(post: Post) {
         post({
           type: 'analyze:done',
           jobId: req.jobId,
-          result: executeOperation(state.store, req.operation, { metric: req.metric }),
+          result: executeOperation(state.store, req.operation, {
+            metric: req.metric,
+            seriesBy: req.seriesBy,
+          }),
         });
         return;
       }

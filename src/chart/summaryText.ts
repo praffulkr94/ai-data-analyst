@@ -6,7 +6,7 @@
     two byte-identical forces one audience to read text written for the other; computing them
     independently lets caption and label drift apart until they disagree. One computation, two
     formatters. Both are pure, so both are tested at the `DataEngine` seam with no DOM. */
-import { FOLD_LABEL, FOLD_TOP_N } from '../engine/operation';
+import { FOLD_LABEL } from '../engine/operation';
 import type { ChartSummary } from '../engine/result';
 import type { ChartType } from '../spec/grammar';
 
@@ -27,8 +27,9 @@ export function chartLabel(s: ChartSummary, type: ChartType): string {
   const scale =
     s.groupCount === 0
       ? 'no results'
-      : s.foldedCount > 0
-        ? `showing the top ${FOLD_TOP_N} of ${n(s.totalGroups)} with the rest grouped as ${FOLD_LABEL}`
+      : s.fold
+        ? `showing the top ${n(s.fold.kept)} of ${n(s.fold.kept + s.fold.folded)} ` +
+          `with the rest grouped as ${FOLD_LABEL}`
         : s.dimensionLabel === null
           ? 'a single value'
           : `${n(s.groupCount)} categories`;
@@ -61,13 +62,14 @@ export function chartCaption(s: ChartSummary): string {
       : `${n(s.rowsMatched)} of ${n(s.rowsTotal)} rows`;
 
   const parts = [`${word} over ${over}.`];
-  if (s.foldedCount > 0 && s.dimensionLabel) {
-    // The fold is not drawn as a mark, so this is where its size is stated.
+  if (s.fold) {
+    // A folded x-axis category is not drawn as a mark, so this is where its size is stated. The
+    // kept count comes from the fold and is never hardcoded: it is fifteen categories on an
+    // axis and five Series in the palette.
+    const { dimensionLabel, kept, folded, value } = s.fold;
+    const of = `Top ${n(kept)} of ${n(kept + folded)} ${plural(dimensionLabel)}`;
     parts.push(
-      s.foldedValue === null
-        ? `Top ${FOLD_TOP_N} of ${n(s.totalGroups)} ${plural(s.dimensionLabel)}, rest grouped.`
-        : `Top ${FOLD_TOP_N} of ${n(s.totalGroups)} ${plural(s.dimensionLabel)}; the other ` +
-          `${n(s.foldedCount)} hold ${n(s.foldedValue)}.`,
+      value === null ? `${of}, rest grouped.` : `${of}; the other ${n(folded)} hold ${n(value)}.`,
     );
   }
   if (s.nullExcluded > 0) {

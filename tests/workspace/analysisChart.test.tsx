@@ -120,16 +120,11 @@ describe('the line mark', () => {
     expect(document.querySelectorAll('svg circle')).toHaveLength(1);
   });
 
-  it('draws the points in x order whatever order the result arrived in', () => {
-    // Sorted by the metric descending, which is what a spec with no sort asks for.
-    const unsorted = run(
-      [...YEARLY([2020]), ...YEARLY([2021]), ...YEARLY([2021]), ...YEARLY([2022])],
-      op({ timeBucket: { column: 'date', unit: 'year' } }),
-    );
-    expect(unsorted.rows.map((r) => r.m)).toEqual([2, 1, 1]);
-    render(<AnalysisChart result={unsorted} visualization={viz()} />);
-    // One unbroken run: drawn in metric order the line would still be one path, but the x
-    // coordinates would go backwards. They are read off the path in order here.
+  it('draws the points in x order whatever order the rows arrived in', () => {
+    // Reversed on purpose. The executor orders a temporal result ascending, so this is the mark
+    // defending itself rather than the case the executor produces.
+    const reversed = { ...result, rows: [...result.rows].reverse() };
+    render(<AnalysisChart result={reversed} visualization={viz()} />);
     const xs = [...paths()[0]!.getAttribute('d')!.matchAll(/[ML]([\d.]+),/g)].map((m) =>
       Number(m[1]),
     );
@@ -177,6 +172,28 @@ describe('several Series', () => {
     expect(within(legend).getByText('Peru')).toBeTruthy();
     // Grouped, not overdrawn: two Series share each band, so every bar is its own rect.
     expect(document.querySelectorAll('svg rect')).toHaveLength(4);
+  });
+});
+
+describe('the Series budget on screen', () => {
+  it('draws six lines at most, each in a slot of its own, the fold among them', () => {
+    const rows = Array.from({ length: 30 }, (_, i) => [
+      `${2000 + (i % 3)}-06-15`,
+      `t${i % 10}`,
+      '2',
+    ]);
+    const schema = inferSchema(HEADER, rows);
+    const store = buildColumnStore(HEADER, rows, schema);
+    const result = executeOperation(
+      store,
+      op({ timeBucket: { column: 'date', unit: 'year' }, groupBy: ['team'] }),
+      { metric: 'm', seriesBy: 'team' },
+    );
+
+    render(<AnalysisChart result={result} visualization={viz({ seriesBy: 'team' })} />);
+    expect(paths()).toHaveLength(6);
+    expect(new Set(paths().map((p) => p.getAttribute('stroke'))).size).toBe(6);
+    expect(document.querySelector('svg')!.textContent).toContain('Other');
   });
 });
 
