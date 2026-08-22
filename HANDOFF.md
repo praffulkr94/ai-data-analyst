@@ -128,12 +128,14 @@ else is wiring around them.
   port that holds its answer. Three model calls resolving out of order pass with that guard
   deleted; only a Request superseded *while its worker job runs* catches it.
 
-## One thing known to be ahead of its tests
+## Known to be ahead of its tests
+
+Two entries, at the time of writing. Both have their ledger items deliberately left unticked.
 
 **Prompt caching is implemented and unverified.** The `cache_control` breakpoint is on the last
 system block and the readout shows `cache_read_input_tokens` as its own figure, but nobody has
 seen that number come back above zero, because doing so needs a live API key and this repository
-has none. Its ledger item in M5 is deliberately left unticked.
+has none.
 
 What *is* tested is the property caching depends on: `tests/workspace/prompt.test.ts` asserts the
 tools + system prefix is byte-identical across two different Questions and across a Repair, so no
@@ -142,5 +144,30 @@ one fails to cache without saying so, which is the whole reason the figure is on
 task for whoever has a key: ask two Questions in one session and assert
 `usage.cache_read_input_tokens > 0`, then tick the item.**
 
-Nothing else. If you leave a grammar field half-wired or an implementation ahead of its tests, say
-so here and leave its ledger item unticked.
+**Three of M6's unticked items already have their code.** M5 could not land a Revision without
+deciding where it goes, so the parts of the Analysis model that the Request lifecycle needed were
+built with it. Read these before writing M6, or you will build a second dispatcher beside the
+first:
+
+- *Analysis and Revision model; Revisions immutable* — `src/store.ts`. A Revision is the
+  AnalysisSpec, the AnalysisResult and the model choice, and nothing else. The Question that
+  produced it is **not** on the Revision: it is dispatch context, so it lives in the `exchanges`
+  map inside `createWorkspace` alongside `intent`. Exercised throughout the Workspace tests.
+- *Dispatcher decides new-versus-refine; `intent` consumed and never persisted* — one line in
+  `workspace.ts`: `reply.intent === 'refine' ? target : null`, where `target` is the Analysis
+  captured at dispatch, so `refine` with nothing captured becomes a new Analysis. Tested by
+  "appends a Revision when the model refines, and starts an Analysis when it does not".
+- *`targetAnalysisId` captured at dispatch* — implemented, **untested**. `ask` reads
+  `activeAnalysisId` once at the top and never again; every write goes to that captured value.
+  M6's captured-target test is what proves it, and it does not exist yet.
+- *Quiet "updated" marker* — implemented in `landRevision` and rendered by the `Rail`,
+  **untested**. It falls out of the captured target: a Revision can land on an Analysis the
+  visitor navigated away from, and `selectAnalysis` clears the marker on arrival.
+
+What M6 still owns in full: the Revision stepper and Cmd+Z, the manual chart-type and aggregation
+controls, the table filter chip, Analysis deletion, and the ADR. Analysis deletion has **no**
+code — a store action for it was written during M5 and then deleted unused, because scaffolding
+for later is what M6 is for.
+
+If you leave a grammar field half-wired or an implementation ahead of its tests, add it here and
+leave its ledger item unticked.

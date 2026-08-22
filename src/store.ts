@@ -98,7 +98,6 @@ export type AppState = {
   setMode: (mode: Mode) => void;
   setModel: (model: ModelChoice) => void;
   selectAnalysis: (id: string | null) => void;
-  deleteAnalysis: (id: string) => void;
   startRequest: (id: number, question: string) => void;
   appendNarration: (id: number, text: string) => void;
   setChips: (id: number, chips: string[]) => void;
@@ -146,12 +145,6 @@ export const useApp = create<AppState>((set) => ({
     set((s) => ({
       activeAnalysisId: id,
       analyses: s.analyses.map((a) => (a.id === id ? { ...a, updated: false } : a)),
-    })),
-
-  deleteAnalysis: (id) =>
-    set((s) => ({
-      analyses: s.analyses.filter((a) => a.id !== id),
-      activeAnalysisId: s.activeAnalysisId === id ? null : s.activeAnalysisId,
     })),
 
   startRequest: (id, question) =>
