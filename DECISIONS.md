@@ -706,3 +706,68 @@ pull public-domain domestic-league data — never synthesise rows.
 
 Bonus: the data includes the 2026 World Cup (423 rows in 2026), so the demo reads as current
 rather than a museum piece.
+
+---
+
+# Addendum 3 — build protocol (2026-08-22)
+
+## A7. One spec, one run, handoffs when context fills
+
+**Author's flow, fixed:** a single spec covering the whole feature, executed in one `/implement`
+run rather than split into tickets. When context is over-consumed the session is cut with
+`/handoff` and a fresh agent resumes. TDD applies inside the run.
+
+`/handoff` deliberately writes a *thin* document — it refuses to duplicate anything already
+captured in specs, ADRs, or commits, and it saves outside the repo. It therefore cannot carry
+project state. Two consequences, both requirements:
+
+1. **The spec carries a progress ledger.** A checkable task list the implementing agent ticks off
+   and commits as it goes. A fresh agent must be able to answer "where are we?" from the spec +
+   `git log` + a passing test suite alone, with no access to the originating conversation.
+2. **Commit per completed chunk, not per milestone.** `/implement` commits to the current branch;
+   frequent commits are what make an unplanned handoff cheap. A handoff landing mid-chunk should
+   leave at most one incomplete unit of work.
+
+Durable artifacts, in precedence order: `DECISIONS.md` (architecture) → `docs/adr/*` (individual
+decisions, and the guard against a future agent "fixing" a deliberate choice) → `CONTEXT.md`
+(vocabulary) → the spec (what to build + progress) → commits. Handoff documents are transient and
+authoritative for nothing.
+
+## A8. Test seams — exactly two
+
+Recorded as ADR-0011. Restated here because `/implement` requires pre-agreed seams and will not
+write tests at an unconfirmed one.
+
+| Seam | What it is | Where it runs | Covers |
+|---|---|---|---|
+| **`DataEngine`** | Pure module: parse, infer types, build index vector, aggregate | Node, fast | Type inference incl. the `NA` rule and boolean detection; aggregation with nulls; time bucketing; top-N folding; sort/filter |
+| **`Workspace`** | The facade the UI calls: `loadDataset`, `ask`, `selectCard` | jsdom, scripted fake generator | Structural + semantic validation, the single repair retry, cancellation, staleness, card revisions |
+
+Not seams, but required checks: one worker-transport integration test in `vitest --browser`
+(correlation ids, cancel mid-job, out-of-order replies — Node has no real `Worker`), and two
+Playwright flows (ask → chart; cancel mid-stream → resubmit succeeds).
+
+Charts are tested through their **accessible data table**, never through SVG path geometry —
+geometry assertions are implementation-coupled and break on refactors while the chart still works.
+The accessibility feature is the chart test harness.
+
+Expected values in engine tests must come from an independent source — a hand-worked example or a
+naive reference implementation — never recomputed the way the code computes them.
+
+## A9. Deliberate complexity — the simplification guard
+
+The Ponytail plugin (code-minimisation, `full` mode) is installed and will run during
+implementation. It is welcome: finding *accidental* complexity is genuinely useful here.
+
+But its ladder starts at "does this need to exist?", and it **prevents** more than it deletes — a
+choice it talks the agent out of leaves no diff to review and no record that an alternative existed.
+So the answer is documentation, not machinery. **This paragraph goes verbatim into the spec:**
+
+> The following are deliberate, spec-mandated choices, not oversights, and must not be simplified
+> away: the hand-rolled worker RPC (not Comlink), d3 submodules with hand-rendered axes (not a
+> charting library), the columnar worker-resident store (not array-of-objects), and the absence of
+> TanStack Query. Each exists to make a specific engineering competency visible. See ADR-0013 and
+> the individual ADRs for the reasoning. Accidental complexity elsewhere remains fair game.
+
+Then run `/ponytail-audit` after implementation as a separate critique pass. The distinction —
+complexity chosen versus complexity removed — is itself worth writing up.
