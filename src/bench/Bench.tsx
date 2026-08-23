@@ -10,11 +10,11 @@
  * warmed: run one of a path pays for a cold module and a cold worker, which is why N ≥ 7 and
  * why the median and not the mean is the figure. */
 import { useEffect, useRef, useState } from 'react';
-import { SAMPLES, sampleUrl } from '../data/samples';
+import { sampleById, sampleUrl } from '../data/samples';
 import { createTransport } from '../worker/transport';
 import type { DataPort } from '../worker/port';
-import { PATHS, type PathName, type Run } from './paths';
-import { summarise, type Stat } from './stats';
+import { PATHS, QUESTIONS, type PathName, type Run } from './paths';
+import { summarise, totalOf, type Stat } from './stats';
 
 /** Long tasks and slow interactions seen while one path ran. The first is the money number in
     §7 — the naive path blocks the main thread for hundreds of milliseconds and the worker path
@@ -43,7 +43,7 @@ function environment() {
 }
 
 export default function Bench() {
-  const [sample, setSample] = useState(SAMPLES[1]!.id);
+  const [question, setQuestion] = useState(0);
   const [n, setN] = useState(9);
   const [results, setResults] = useState<Result[]>([]);
   const [running, setRunning] = useState<string | null>(null);
@@ -58,7 +58,8 @@ export default function Bench() {
   }, []);
 
   async function run(): Promise<void> {
-    const found = SAMPLES.find((s) => s.id === sample);
+    const q = QUESTIONS[question]!;
+    const found = sampleById(q.sample);
     if (!found || !port.current) return;
     const url = sampleUrl(found);
     setResults([]);
@@ -100,7 +101,7 @@ export default function Bench() {
         // A frame between runs, so the observers flush and the page repaints its progress.
         await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
         try {
-          runs.push(await PATHS[path](port.current, url, found.id));
+          runs.push(await PATHS[path](port.current, url, found.id, q));
         } catch (e) {
           error = e instanceof Error ? e.message : String(e);
           break;
@@ -115,16 +116,16 @@ export default function Bench() {
 
   const json = JSON.stringify(
     {
-      dataset: sample,
+      question: QUESTIONS[question]!.label,
+      dataset: QUESTIONS[question]!.sample,
       rows: results[0]?.runs[0]?.rows ?? null,
       n,
-      operation: 'count and sum of home_score by home_team, ranked',
       environment: environment(),
       paths: results.map((r) => ({
         path: r.path,
         error: r.error ?? null,
         phases: summarise(r.runs),
-        totalMs: summarise(r.runs).reduce((sum, p) => sum + p.stat.median, 0),
+        totalMs: totalOf(r.runs),
         observed: r.observed,
         columnarBytes: r.runs[0]?.bytes ?? null,
         groups: r.runs[0]?.groups ?? null,
@@ -147,11 +148,11 @@ export default function Bench() {
 
         <div className="dev-actions">
           <label>
-            Dataset{' '}
-            <select value={sample} onChange={(e) => setSample(e.target.value)}>
-              {SAMPLES.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label} · {s.rowCount.toLocaleString('en-US')} rows
+            Question{' '}
+            <select value={question} onChange={(e) => setQuestion(Number(e.target.value))}>
+              {QUESTIONS.map((q, i) => (
+                <option key={q.label} value={i}>
+                  {q.label} · {q.sample}
                 </option>
               ))}
             </select>
@@ -193,15 +194,15 @@ export default function Bench() {
                 </tr>
               </thead>
               <tbody>
-                {summarise(r.runs).map(({ phase, stat }) => (
-                  <tr key={phase}>
+                {summarise(r.runs).map(({ phase, nested, stat }) => (
+                  <tr key={phase} className={nested ? 'muted' : undefined}>
                     <th scope="row">{phase}</th>
                     <td>{range(stat)}</td>
                   </tr>
                 ))}
                 <tr>
                   <th scope="row">total of the medians</th>
-                  <td>{ms(summarise(r.runs).reduce((sum, p) => sum + p.stat.median, 0))}</td>
+                  <td>{ms(totalOf(r.runs))}</td>
                 </tr>
               </tbody>
             </table>

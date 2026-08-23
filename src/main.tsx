@@ -9,6 +9,7 @@ import { readSession, resumeSession, trackSession } from './data/session';
 import { createSliceCache } from './table/sliceCache';
 import { createTransport } from './worker/transport';
 import { useApp } from './store';
+import { watchPerformance } from './perf';
 import { createWorkspace } from './workspace/workspace';
 import './styles/tokens.css';
 import './styles/app.css';
@@ -27,6 +28,11 @@ if (location.hash === '#bench') {
     </StrictMode>,
   );
 } else {
+  /** Both observers, for the life of the page: long tasks on the main thread — the number §7
+      rests on — and Event Timing over 16ms, which is INP. Installed before anything else runs,
+      so a scripted scroll and submit is inside the window they cover. */
+  watchPerformance();
+
   /** One worker for the life of the tab, and a loader and a SliceCache over it. All three live
       outside React: the transport writes application state, and the cache holds rows that must
       not re-render the tree when they arrive. */

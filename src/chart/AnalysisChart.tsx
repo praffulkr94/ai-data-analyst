@@ -9,6 +9,7 @@ import {
   type Degenerate,
   type ResultRow,
 } from '../engine/result';
+import { since } from '../perf';
 import type { Visualization } from '../spec/grammar';
 import { ChartFrame } from './ChartFrame';
 import {
@@ -75,6 +76,11 @@ export function AnalysisChart({
   useEffect(() => {
     setPan(NO_PAN);
     setFocusKey(null);
+    /** Time to a chart on screen, measured from the Request that asked for it: the effect after
+        the commit that drew it. Null for a chart that arrived without a Request behind it — a
+        restored link, or the dev panel — and a measure against a mark that is not there throws,
+        which is why `since` checks. */
+    since('chart:paint', 'request:start');
   }, [result]);
   /** One hover value for the whole chart. Marks report into it; nothing else subscribes. */
   const [hover, setHover] = useState<Hover | null>(null);

@@ -7,6 +7,7 @@ import { area, line } from 'd3-shape';
 import { useEffect, useMemo, useRef } from 'react';
 import { CHART_BUDGET } from '../engine/operation';
 import { temporalLabel } from '../engine/time';
+import { timed } from '../perf';
 import { useApp } from '../store';
 import { dimensionText, type ResultField, type ResultRow } from '../engine/result';
 import type { ChartType } from '../spec/grammar';
@@ -500,10 +501,13 @@ export function PointsCanvas({
       '#8a8a85';
     // Squares, not arcs: at two and a half pixels the difference is invisible and `fillRect` is
     // the difference between a smooth drag and a stuttering one at a hundred thousand points.
+    // Measured, because a pan is this loop once per frame and M8 shipped it unmeasured.
     const size = POINT_RADIUS * 2;
-    for (const p of ps) {
-      ctx.fillRect(p.at + pan.x - POINT_RADIUS, p.value! + pan.y - POINT_RADIUS, size, size);
-    }
+    timed('canvas:draw', () => {
+      for (const p of ps) {
+        ctx.fillRect(p.at + pan.x - POINT_RADIUS, p.value! + pan.y - POINT_RADIUS, size, size);
+      }
+    });
   }, [ps, innerWidth, innerHeight, pan, slot, theme]);
 
   return (

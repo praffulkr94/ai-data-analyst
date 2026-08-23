@@ -8,6 +8,12 @@ import type { ViewState } from '../engine/rowIndex';
 import type { ColumnType } from '../engine/types';
 import type { ChartType, Operation } from '../spec/grammar';
 
+/** What one phase inside the worker cost, in milliseconds, keyed by phase. Measured on the
+    worker's own performance timeline and posted back with the response it belongs to: the main
+    thread can time a round trip but cannot see inside one, and the difference between the two is
+    the structured clone — which ADR-0023 accepted on reasoning alone and `/bench` now measures. */
+export type Timings = Record<string, number>;
+
 /** The correlation id. One per request, matched on the way back. */
 export type JobId = number;
 
@@ -37,7 +43,7 @@ export type WorkerErrorCode = 'parse-failed' | 'no-dataset' | 'unknown-column' |
 
 export type WorkerResponse =
   | { type: 'parse:progress'; jobId: JobId; rows: number }
-  | { type: 'parse:done'; jobId: JobId; handle: DatasetHandle; report: ParseReport }
+  | { type: 'parse:done'; jobId: JobId; handle: DatasetHandle; report: ParseReport; timings: Timings }
   | { type: 'retype:done'; jobId: JobId; handle: DatasetHandle }
   /** Never rows. The main thread learns how many there are and nothing else. */
   | { type: 'view:done'; jobId: JobId; viewVersion: number; rowCount: number }
@@ -52,7 +58,7 @@ export type WorkerResponse =
     }
   /** At most the chart type's point budget: a thousand for an aggregate chart, 100,000 for a
       scatter, where one point per row is the shape asked for (ADR-0023). */
-  | { type: 'analyze:done'; jobId: JobId; result: AnalysisResult }
+  | { type: 'analyze:done'; jobId: JobId; result: AnalysisResult; timings: Timings }
   | { type: 'cancelled'; jobId: JobId }
   | { type: 'error'; jobId: JobId; code: WorkerErrorCode; message: string };
 

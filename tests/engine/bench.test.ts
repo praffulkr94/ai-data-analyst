@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildColumnStore, storeBytes } from '../../src/engine/columnStore';
 import { inferSchema } from '../../src/engine/infer';
-import { stat, summarise } from '../../src/bench/stats';
+import { stat, summarise, totalOf } from '../../src/bench/stats';
 
 describe('the median of a set of runs', () => {
   it('takes the middle value of an odd number of runs', () => {
@@ -15,6 +15,23 @@ describe('the median of a set of runs', () => {
 
   it('averages the two middle values of an even number of runs', () => {
     expect(stat([1, 2, 3, 10])).toEqual({ n: 4, median: 2.5, min: 1, max: 10 });
+  });
+
+  /** A phase measured inside another phase is reported beside it and never added to it: the
+      worker's own aggregate happens within the round trip that already counted it. */
+  it('leaves nested phases out of the total', () => {
+    const runs = [
+      {
+        phases: [
+          { name: 'round trip', ms: 10 },
+          { name: 'in the worker', ms: 7, nested: true },
+        ],
+        rows: 1,
+        groups: 1,
+        bytes: null,
+      },
+    ];
+    expect(totalOf(runs)).toBe(10);
   });
 
   /** The reason the median is the figure at all: one GC pause in nine runs moves a mean by tens
@@ -29,13 +46,14 @@ describe('the median of a set of runs', () => {
 
   it('keeps the phases in the order they ran, one stat each', () => {
     const runs = [
-      { phases: [['parse', 10] as [string, number], ['aggregate', 2] as [string, number]], rows: 1, groups: 1, bytes: null },
-      { phases: [['parse', 20] as [string, number], ['aggregate', 4] as [string, number]], rows: 1, groups: 1, bytes: null },
+      { phases: [{ name: 'parse', ms: 10 }, { name: 'aggregate', ms: 2 }], rows: 1, groups: 1, bytes: null },
+      { phases: [{ name: 'parse', ms: 20 }, { name: 'aggregate', ms: 4 }], rows: 1, groups: 1, bytes: null },
     ];
     expect(summarise(runs).map((p) => [p.phase, p.stat.median])).toEqual([
       ['parse', 15],
       ['aggregate', 3],
     ]);
+    expect(totalOf(runs)).toBe(18);
   });
 });
 

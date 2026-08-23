@@ -19,9 +19,17 @@ export function stat(xs: number[]): Stat {
 }
 
 /** Every phase of a path, across its runs, in the order the phases ran. */
-export function summarise(runs: Run[]): { phase: string; stat: Stat }[] {
-  return (runs[0]?.phases ?? []).map(([phase], i) => ({
-    phase,
-    stat: stat(runs.map((r) => r.phases[i]![1])),
+export function summarise(runs: Run[]): { phase: string; nested: boolean; stat: Stat }[] {
+  return (runs[0]?.phases ?? []).map((phase, i) => ({
+    phase: phase.name,
+    nested: phase.nested === true,
+    stat: stat(runs.map((r) => r.phases[i]!.ms)),
   }));
 }
+
+/** The total a path cost: the medians of its own phases, and never the nested ones — those
+    happened inside a phase already counted. */
+export const totalOf = (runs: Run[]): number =>
+  summarise(runs)
+    .filter((p) => !p.nested)
+    .reduce((sum, p) => sum + p.stat.median, 0);

@@ -11,6 +11,7 @@ import { AnalysisChart } from '../chart/AnalysisChart';
 import type { AnalysisResult } from '../engine/result';
 import { ModelReply, specFromReply, type AnalysisSpec } from '../spec/grammar';
 import { validateSpec, type SpecViolation } from '../spec/validate';
+import { perfReadings } from '../perf';
 import { useApp } from '../store';
 import type { DataPort } from '../worker/port';
 import type { Workspace } from '../workspace/workspace';
@@ -156,7 +157,42 @@ export function DevPanel({
       )}
 
       <FailurePanel workspace={workspace} onWantKey={onWantKey} />
+      <Instrumentation />
     </details>
+  );
+}
+
+/** What the two observers have seen this session, and the last chart's time to paint. Read on
+    demand rather than subscribed to: an observer readout that re-rendered on every long task
+    would be a long task.
+
+    The numbers are the same ones `/bench` reports, over a real session instead of a scripted
+    one — which is the only way an INP reading happens at all, since Event Timing only ever
+    times a real interaction. */
+function Instrumentation() {
+  const [readings, setReadings] = useState(perfReadings);
+  const paint = performance.getEntriesByName('chart:paint', 'measure').at(-1);
+  /** The canvas draw loop, which is what a pan costs per frame at 98,899 points. */
+  const draws = performance.getEntriesByName('canvas:draw', 'measure');
+  return (
+    <section className="dev-failures">
+      <h3>Instrumentation</h3>
+      <p className="muted">
+        {readings.longTasks} long tasks on the main thread, {readings.blockedMs.toFixed(0)} ms in
+        all
+        {readings.worstInteractionMs > 0
+          ? ` · slowest interaction ${readings.worstInteractionMs.toFixed(0)} ms (${readings.worstInteraction})`
+          : ' · no interaction over one frame yet'}
+        {paint && ` · last chart on screen ${paint.duration.toFixed(0)} ms after its Request`}
+        {draws.length > 0 &&
+          ` · ${draws.length} canvas draws, the last ${draws.at(-1)!.duration.toFixed(1)} ms`}
+      </p>
+      <div className="dev-actions">
+        <button type="button" className="ghost" onClick={() => setReadings(perfReadings())}>
+          Read again
+        </button>
+      </div>
+    </section>
   );
 }
 

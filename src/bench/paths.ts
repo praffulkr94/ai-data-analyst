@@ -16,13 +16,16 @@ import { emptyResult, foldRow, readHeader, ROW_LIMIT } from '../engine/csv';
 import { inferSchema } from '../engine/infer';
 import { executeOperation } from '../engine/operation';
 import { buildRowIndex } from '../engine/rowIndex';
-import type { Operation } from '../spec/grammar';
+import type { ChartType, Operation } from '../spec/grammar';
 import { fetchDataset } from '../worker/kernel';
 import type { DataPort } from '../worker/port';
 
-/** One phase of one run, in milliseconds, keyed by phase name in the order they ran. */
+/** One phase of one run. `nested` phases happened *inside* another phase — the worker's own
+    measures inside a round trip — so they are reported beside it and left out of the total. */
+export type Phase = { name: string; ms: number; nested?: boolean };
+
 export type Run = {
-  phases: [string, number][];
+  phases: Phase[];
   rows: number;
   groups: number;
   /** The bytes the columnar encoding occupies, counted exactly. Null on the paths that hold no
@@ -43,64 +46,108 @@ async function measure<T>(name: string, fn: () => T | Promise<T>): Promise<[T, n
   return [value, m.duration];
 }
 
-/** The question all three paths answer: matches per host team, and the goals with them. Group
-    by a categorical column of a few thousand values, count, sum, rank. */
-export const OPERATION: Operation = {
-  filters: [],
-  groupBy: ['home_team'],
-  timeBucket: null,
-  aggregations: [
-    { id: 'm', fn: 'count', column: null, label: 'matches' },
-    { id: 'g', fn: 'sum', column: 'home_score', label: 'goals' },
-  ],
-  derived: [],
-  sort: { by: 'm', dir: 'desc' },
-  limit: null,
+/** The two questions, each naming the Dataset whose columns it reads. Not a free choice of
+    sample and a fixed Operation: the columns belong to the file.
+
+    The second one is the M8 number nobody measured. 98,899 (date, team) pairs is a result the
+    same size as the Dataset, and the whole of ADR-0023's reasoning about the structured clone —
+    accepted there without a measurement — is about that message. */
+export type Question = {
+  label: string;
+  sample: string;
+  operation: Operation;
+  metric: string;
+  chartType: ChartType;
 };
+
+export const QUESTIONS: Question[] = [
+  {
+    label: 'matches and goals by host team — 16 bars',
+    sample: 'matches',
+    metric: 'm',
+    chartType: 'bar',
+    operation: {
+      filters: [],
+      groupBy: ['home_team'],
+      timeBucket: null,
+      aggregations: [
+        { id: 'm', fn: 'count', column: null, label: 'matches' },
+        { id: 'g', fn: 'sum', column: 'home_score', label: 'goals' },
+      ],
+      derived: [],
+      sort: { by: 'm', dir: 'desc' },
+      limit: null,
+    },
+  },
+  {
+    label: 'goals for against goals against, by team and date — 98,899 points',
+    sample: 'team_matches',
+    metric: 'gf',
+    chartType: 'scatter',
+    operation: {
+      filters: [],
+      groupBy: ['date', 'team'],
+      timeBucket: null,
+      aggregations: [
+        { id: 'gf', fn: 'sum', column: 'goals_for', label: 'goals for' },
+        { id: 'ga', fn: 'sum', column: 'goals_against', label: 'goals against' },
+      ],
+      derived: [],
+      sort: null,
+      limit: null,
+    },
+  },
+];
 
 /** Path one. Papa with `header: true`, which is what an application reaches for first: one
     object per row, every value a string, coerced at read time. */
-async function naive(url: string): Promise<Run> {
-  const phases: [string, number][] = [];
+async function naive(url: string, q: Question): Promise<Run> {
+  const phases: Phase[] = [];
   const [blob, fetched] = await measure('naive:fetch', () => fetchDataset(url));
-  phases.push(['fetch and gunzip', fetched]);
+  phases.push({ name: 'fetch and gunzip', ms: fetched });
 
   const [text, read] = await measure('naive:read', () => blob.text());
-  phases.push(['read as text', read]);
+  phases.push({ name: 'read as text', ms: read });
 
   const [rows, parsed] = await measure(
     'naive:parse',
     () => Papa.parse<Record<string, string>>(text, { header: true, skipEmptyLines: 'greedy' }).data,
   );
-  phases.push(['parse to row objects', parsed]);
+  phases.push({ name: 'parse to row objects', ms: parsed });
 
+  /** The naive aggregate: a `Map` keyed on the grouping columns joined, counting and summing
+      whatever the question asks for, coercing every number at read time because that is what a
+      row of strings costs. Not the executor with a flag flipped — see the module comment. */
+  const group = q.operation.groupBy;
+  const sums = q.operation.aggregations.filter((a) => a.fn === 'sum');
   const [groups, aggregated] = await measure('naive:aggregate', () => {
-    const out = new Map<string, { m: number; g: number }>();
+    const out = new Map<string, { n: number; sums: number[] }>();
     for (const row of rows) {
-      const key = row['home_team'] ?? '';
-      const at = out.get(key) ?? { m: 0, g: 0 };
-      at.m++;
-      // The naive coercion: a number that lives as a string is a `Number()` per row per read.
-      const goals = Number(row['home_score']);
-      if (Number.isFinite(goals)) at.g += goals;
-      out.set(key, at);
+      const key = group.map((c) => row[c] ?? '').join('\u0000');
+      let at = out.get(key);
+      if (!at) out.set(key, (at = { n: 0, sums: sums.map(() => 0) }));
+      at.n++;
+      sums.forEach((a, i) => {
+        const v = Number(row[a.column!]);
+        if (Number.isFinite(v)) at!.sums[i]! += v;
+      });
     }
-    return [...out.entries()].sort((a, b) => b[1].m - a[1].m);
+    return [...out.entries()].sort((a, b) => b[1].n - a[1].n);
   });
-  phases.push(['aggregate over objects', aggregated]);
+  phases.push({ name: 'aggregate over objects', ms: aggregated });
 
   return { phases, rows: rows.length, groups: groups.length, bytes: null };
 }
 
 /** Path two. The engine, on the main thread: the same parse, inference, encoding, index and
     aggregation the worker runs, with nothing between it and the interface it is blocking. */
-async function columnar(url: string): Promise<Run> {
-  const phases: [string, number][] = [];
+async function columnar(url: string, q: Question): Promise<Run> {
+  const phases: Phase[] = [];
   const [blob, fetched] = await measure('columnar:fetch', () => fetchDataset(url));
-  phases.push(['fetch and gunzip', fetched]);
+  phases.push({ name: 'fetch and gunzip', ms: fetched });
 
   const [text, read] = await measure('columnar:read', () => blob.text());
-  phases.push(['read as text', read]);
+  phases.push({ name: 'read as text', ms: read });
 
   const [parsedRows, parsed] = await measure('columnar:parse', () => {
     const data = Papa.parse<string[]>(text, { skipEmptyLines: 'greedy' }).data;
@@ -108,27 +155,27 @@ async function columnar(url: string): Promise<Run> {
     for (let i = 1; i < data.length; i++) foldRow(out, data[i]!, i, ROW_LIMIT);
     return out;
   });
-  phases.push(['parse to rows of cells', parsed]);
+  phases.push({ name: 'parse to rows of cells', ms: parsed });
 
   const [schema, inferred] = await measure('columnar:infer', () =>
     inferSchema(parsedRows.header, parsedRows.rows),
   );
-  phases.push(['infer types', inferred]);
+  phases.push({ name: 'infer types', ms: inferred });
 
   const [store, built] = await measure('columnar:encode', () =>
     buildColumnStore(parsedRows.header, parsedRows.rows, schema),
   );
-  phases.push(['encode columns', built]);
+  phases.push({ name: 'encode columns', ms: built });
 
   const [, indexed] = await measure('columnar:index', () =>
     buildRowIndex(store, { sort: null, filters: [], hidden: [] }),
   );
-  phases.push(['build the RowIndex', indexed]);
+  phases.push({ name: 'build the RowIndex', ms: indexed });
 
   const [result, aggregated] = await measure('columnar:aggregate', () =>
-    executeOperation(store, OPERATION, { metric: 'm' }),
+    executeOperation(store, q.operation, { metric: q.metric, chartType: q.chartType }),
   );
-  phases.push(['aggregate over columns', aggregated]);
+  phases.push({ name: 'aggregate over columns', ms: aggregated });
 
   return { phases, rows: store.rowCount, groups: result.rows.length, bytes: storeBytes(store) };
 }
@@ -136,21 +183,45 @@ async function columnar(url: string): Promise<Run> {
 /** Path three, and the one that ships. The same work, in the worker, over the real transport —
     so what is measured includes the two things the other paths do not pay: the structured clone
     of the result, and the fact that none of it is on the main thread. */
-async function worker(port: DataPort, url: string, id: string): Promise<Run> {
-  const phases: [string, number][] = [];
+async function worker(port: DataPort, url: string, id: string, q: Question): Promise<Run> {
+  const phases: Phase[] = [];
 
   const [handled, parsed] = await measure('worker:parse', () =>
     port.send({ type: 'parse', source: { url }, ref: { kind: 'sample', id }, label: id }).done,
   );
   if (handled.type !== 'parse:done') throw new Error(`the worker said ${handled.type}`);
-  phases.push(['fetch, parse, infer, encode, index', parsed]);
+  phases.push({ name: 'parse: the whole round trip', ms: parsed });
+  // What the worker measured on its own timeline, inside that round trip.
+  const named: Record<string, string> = {
+    readAndParse: 'fetch, gunzip and parse',
+    infer: 'infer types',
+    encode: 'encode columns',
+    index: 'build the RowIndex',
+  };
+  let inside = 0;
+  for (const [key, ms] of Object.entries(handled.timings)) {
+    phases.push({ name: `  in the worker: ${named[key] ?? key}`, ms, nested: true });
+    inside += ms;
+  }
+  phases.push({ name: '  the round trip minus all of it', ms: parsed - inside, nested: true });
 
   const [answered, aggregated] = await measure('worker:analyze', () =>
-    port.send({ type: 'analyze', operation: OPERATION, metric: 'm', seriesBy: null, chartType: 'bar' })
-      .done,
+    port.send({
+      type: 'analyze',
+      operation: q.operation,
+      metric: q.metric,
+      seriesBy: null,
+      chartType: q.chartType,
+    }).done,
   );
   if (answered.type !== 'analyze:done') throw new Error(`the worker said ${answered.type}`);
-  phases.push(['aggregate and clone the result back', aggregated]);
+  phases.push({ name: 'analyze: the whole round trip', ms: aggregated });
+  const aggregate = answered.timings['aggregate'] ?? 0;
+  phases.push({ name: '  in the worker: aggregate', ms: aggregate, nested: true });
+  /** The number ADR-0023 accepted on reasoning alone: everything the round trip cost that the
+      worker did not spend computing is the structured clone of the result and the two
+      postMessages around it. At a thousand rows it is noise; at 98,899 it is the figure. */
+  phases.push({ name: '  the clone of the result, and the two hops', ms: aggregated - aggregate, nested: true });
 
   return {
     phases,
@@ -162,8 +233,11 @@ async function worker(port: DataPort, url: string, id: string): Promise<Run> {
   };
 }
 
-export const PATHS: Record<PathName, (port: DataPort, url: string, id: string) => Promise<Run>> = {
-  'naive rows, main thread': (_port, url) => naive(url),
-  'columnar, main thread': (_port, url) => columnar(url),
-  'columnar, worker': (port, url, id) => worker(port, url, id),
+export const PATHS: Record<
+  PathName,
+  (port: DataPort, url: string, id: string, q: Question) => Promise<Run>
+> = {
+  'naive rows, main thread': (_port, url, _id, q) => naive(url, q),
+  'columnar, main thread': (_port, url, _id, q) => columnar(url, q),
+  'columnar, worker': (port, url, id, q) => worker(port, url, id, q),
 };

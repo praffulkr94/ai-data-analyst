@@ -8,6 +8,7 @@
     Everything else in the application is wiring around this and the `DataEngine`. There is no
     third seam. */
 import { validateSpec, type SpecViolation } from '../spec/validate';
+import { mark } from '../perf';
 import { specFromReply, type AnalysisSpec } from '../spec/grammar';
 import type { Sample } from '../data/samples';
 import type { Loader } from '../data/loader';
@@ -155,6 +156,9 @@ export function createWorkspace({
 
   async function ask(question: string): Promise<void> {
     const id = ++requestId;
+    // Where a chart's time-to-paint is measured from. Latest-wins, like the Request it marks:
+    // a superseded Request's chart is never drawn, so its mark is never measured against.
+    mark('request:start');
     const state = store.getState();
     const schema = { columns: state.columns };
     /** Captured at dispatch, not read at resolve. Selecting a different Analysis mid-Request
@@ -281,6 +285,7 @@ export function createWorkspace({
       flight supersedes that Question rather than racing it. */
   async function revise(spec: AnalysisSpec): Promise<void> {
     const id = ++requestId;
+    mark('request:start');
     const state = store.getState();
     const target = state.activeAnalysisId;
     const analysis = state.analyses.find((a) => a.id === target);

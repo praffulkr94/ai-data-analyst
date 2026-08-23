@@ -13,6 +13,7 @@ import { inferSchema } from '../engine/infer';
 import { executeOperation } from '../engine/operation';
 import { buildRowIndex, readSlice, type ViewState } from '../engine/rowIndex';
 import { cellText, type ColumnStore, type ColumnType } from '../engine/types';
+import { timed } from '../perf';
 import type { WorkerRequest, WorkerResponse } from './protocol';
 
 export type Post = (m: WorkerResponse) => void;
@@ -105,6 +106,10 @@ export function createKernel(post: Post) {
 
   function parse(req: Extract<WorkerRequest, { type: 'parse' }>): void {
     const { jobId, source, ref, label } = req;
+    // The parse is asynchronous and chunked, so it is a mark and a measure rather than a
+    // `timed` call: the callbacks return long before the file is read. For a URL source the
+    // measure covers the fetch and the gunzip as well, which is why the key says so.
+    performance.mark(`worker:parse:${jobId}`);
     let out: CsvResult | null = null;
     let rowNumber = 0;
     let sinceCheck = 0;
@@ -143,21 +148,31 @@ export function createKernel(post: Post) {
         post({ type: 'cancelled', jobId });
         return;
       }
+      const parsed = performance.measure('worker:parse', `worker:parse:${jobId}`).duration;
       const result = out;
       if (!result) {
         post({ type: 'error', jobId, code: 'parse-failed', message: 'The file held no rows.' });
         return;
       }
-      const schema = inferSchema(result.header, result.rows);
-      const store = buildColumnStore(result.header, result.rows, schema);
+      // Each phase is a named band on the worker's own timeline as well as a number posted
+      // back: what the main thread can time is the round trip, and the round trip does not say
+      // which of these four cost what.
+      const [schema, inferred] = timed('worker:infer', () =>
+        inferSchema(result.header, result.rows),
+      );
+      const [store, encoded] = timed('worker:encode', () =>
+        buildColumnStore(result.header, result.rows, schema),
+      );
       Object.assign(state, { store, ref, label });
       state.view = { sort: null, filters: [], hidden: [] };
-      state.index = buildRowIndex(store, state.view);
+      const [index, indexed] = timed('worker:index', () => buildRowIndex(store, state.view));
+      state.index = index;
       state.viewVersion++;
       post({
         type: 'parse:done',
         jobId,
         handle: makeHandle(store, ref, label),
+        timings: { readAndParse: parsed, infer: inferred, encode: encoded, index: indexed },
         report: {
           totalRows: result.rows.length + result.skipped,
           skipped: result.skipped,
@@ -252,15 +267,16 @@ export function createKernel(post: Post) {
           post({ type: 'error', jobId: req.jobId, code: 'no-dataset', message: 'No Dataset is loaded.' });
           return;
         }
-        post({
-          type: 'analyze:done',
-          jobId: req.jobId,
-          result: executeOperation(state.store, req.operation, {
+        const [result, aggregated] = timed('worker:aggregate', () =>
+          executeOperation(state.store!, req.operation, {
             metric: req.metric,
             seriesBy: req.seriesBy,
             chartType: req.chartType,
           }),
-        });
+        );
+        // The clone is not measurable from in here — it happens after `post` returns — so what
+        // travels is the aggregate alone, and the main thread subtracts it from the round trip.
+        post({ type: 'analyze:done', jobId: req.jobId, result, timings: { aggregate: aggregated } });
         return;
       }
     }
