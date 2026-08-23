@@ -233,7 +233,7 @@ else is wiring around them.
 
 ## Where M9 stands
 
-Eight of the fifteen ledger items are ticked, one commit each, and `npm test` is green at 419.
+Nine of the fifteen ledger items are ticked, one commit each, and `npm test` is green at 419.
 `npm run test:e2e` is now real — `scripts/e2e-run.mjs`, a plain `.mjs` with `assert`, no
 `@playwright/test`, needing the app up the way `bench-run.mjs` does. It routes `**/v1/messages`
 for both calls the application makes (the one-token key check and the streamed tool use) and
@@ -243,15 +243,16 @@ coalesces the narration into a single render, and the cancel therefore lands mid
 than between two frames — the abort path is the same either way. What the transient strip showed
 is recorded by a `MutationObserver` inside the page rather than polled for from outside.
 
-What is left, in the order it wants doing:
+`README.md` is written, and it is the public face: the honest performance framing (the last column
+first — 0 ms of main-thread blocking against 2,627 ms — and the worker path 23 ms *slower* end to
+end), the proxy trade-off quoted verbatim from §3, the grammar ceiling and why it is a consequence
+of not sending rows, and the three outstanding items named rather than faked. Two numbers in it are
+worth knowing before quoting them anywhere else: `blockedMs` in `docs/bench/` is the **sum over all
+nine runs** of a path, not one run, and columnar aggregation is *slower* than the object path on the
+98,899-group question — 122 ms against 34 ms — so §7's "measurably tighter loop" did not survive
+measurement and the README says so.
 
-**README.** The honest performance framing, the proxy trade-off, the grammar ceiling, the model
-comparison. Every number it needs is in `docs/bench/` already; the framing is §7 and ADR-0004, and
-the sentence that has to survive an interviewer is *aggregation is the cheapest step and is not the
-justification*. Lead with the last column — 0 ms of main-thread blocking against 2,627 ms — and say
-plainly that the worker path is 23 ms *slower* end to end on the 98,899-point question. Say 98,899
-and 99,040, never "100k". The scatter's shape is two small-integer measures overplotting onto a
-grid, because nothing in that Dataset is continuous.
+What is left, in the order it wants doing:
 
 **The three that need something this repository does not have.** A live API key: the model
 comparison over the same 20 Questions, and with it the two entries below that are ahead of their

@@ -12,6 +12,7 @@ anything.
 
 | Document | What it holds |
 |---|---|
+| `README.md` | The public face: what it is, the honest performance framing, the grammar ceiling, what is outstanding. |
 | `DECISIONS.md` | Architecture and the full decision record. Canonical. |
 | `CONTEXT.md` | The project's vocabulary. Authoritative over wording everywhere else. |
 | `docs/adr/` | Individual decisions that are hard to reverse. Read before changing the area. |
