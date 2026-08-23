@@ -226,7 +226,7 @@ Two modules carry the testable behaviour; everything else is wiring around them
 
 `DECISIONS.md` is the architecture and every decision behind it, `CONTEXT.md` is the vocabulary
 (Analysis, Revision, Request, ColumnStore, RowSlice — used consistently in code, tests and commits),
-and [`docs/adr/`](docs/adr/) holds twenty-three ADRs for the decisions that needed one.
+and [`docs/adr/`](docs/adr/) holds twenty-four ADRs for the decisions that needed one.
 
 Four pieces of complexity are deliberate and spec-mandated rather than accidental: the hand-rolled
 worker RPC (not Comlink), d3 submodules with hand-rendered axes (not a charting library), the

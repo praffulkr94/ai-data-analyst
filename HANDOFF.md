@@ -20,7 +20,7 @@ they win. Precedence is `DECISIONS.md` → `docs/adr/*` → `CONTEXT.md` → iss
   "store". RowSlice — never "window". ModelReply — never `SpecResponse`. Translator — never
   `SpecGenerator`. A concept you need that is missing from the glossary is a signal, not a
   licence to invent one.
-- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are twenty-three.
+- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are twenty-four.
 - Issue #1 — the whole spec, and the only place the work is decomposed.
 
 ## The constraint that has to travel with you
@@ -219,6 +219,10 @@ else is wiring around them.
   ISO day. `dimensionText` in `engine/result.ts` is the one place that knows, and `temporalLabel`
   lives in `engine/time.ts` rather than in `chart/marks.tsx` so the engine can reach it. The
   summary's extreme read "Highest: 1577836800000" until it did.
+- Instrumentation in a render path needs a ceiling. `canvas:draw` is one mark and one measure per
+  animation frame, nothing evicts user timing, and a continuous drag is sixty a second, so the
+  timeline keeps the last `DRAWS_KEPT` frames and drops the rest. Anything else that measures
+  inside a frame needs the same guard.
 - A `route.fulfill` body arrives whole, so a canned SSE stream is read in one task and React
   coalesces every narration delta into a single render: the stream strip can appear and vanish
   between two Playwright polls, and asserting it was there from outside the page is a race.
@@ -233,37 +237,38 @@ else is wiring around them.
 
 ## Where M9 stands
 
-Nine of the fifteen ledger items are ticked, one commit each, and `npm test` is green at 419.
-`npm run test:e2e` is now real — `scripts/e2e-run.mjs`, a plain `.mjs` with `assert`, no
-`@playwright/test`, needing the app up the way `bench-run.mjs` does. It routes `**/v1/messages`
-for both calls the application makes (the one-token key check and the streamed tool use) and
-builds the SSE frames from `src/ai/fixtures.ts`. One thing the stub cannot make faithful:
-`route.fulfill` hands over the whole body at once, so the deltas are read in one task, React
-coalesces the narration into a single render, and the cancel therefore lands mid-request rather
-than between two frames — the abort path is the same either way. What the transient strip showed
-is recorded by a `MutationObserver` inside the page rather than polled for from outside.
+Twelve of the fifteen ledger items are ticked, and `npm test` is green at 419, `npm run
+test:browser` at 5, `npm run test:e2e` on both flows. **The three that are left all need
+something this repository does not have**, and they are unticked rather than faked:
 
-`README.md` is written, and it is the public face: the honest performance framing (the last column
-first — 0 ms of main-thread blocking against 2,627 ms — and the worker path 23 ms *slower* end to
-end), the proxy trade-off quoted verbatim from §3, the grammar ceiling and why it is a consequence
-of not sending rows, and the three outstanding items named rather than faked. Two numbers in it are
-worth knowing before quoting them anywhere else: `blockedMs` in `docs/bench/` is the **sum over all
-nine runs** of a path, not one run, and columnar aggregation is *slower* than the object path on the
-98,899-group question — 122 ms against 34 ms — so §7's "measurably tighter loop" did not survive
-measurement and the README says so.
+- A live API key — the model comparison over the same 20 Questions, and with it the two entries
+  in the next section that are ahead of their tests.
+- A person — the 90-second recording that belongs at the top of the README. The README says it
+  is outstanding; delete that paragraph when it is not.
+- Credentials — the deploy. `#bench` is deliberately not dev-gated so it works on the deployed
+  URL (ADR-0024); check that it does.
 
-What is left, in the order it wants doing:
+What landed in this last stretch, and the parts of it worth knowing before touching anything:
 
-**The three that need something this repository does not have.** A live API key: the model
-comparison over the same 20 Questions, and with it the two entries below that are ahead of their
-tests. A person: the 90-second recording. Credentials: the deploy. Leave them unticked rather than
-faked, and say in the README that they are outstanding if they still are.
-
-**`/ponytail-audit` then `/code-review`, then the ADR.** The audit is a separate critique pass and
-comes before the review, not instead of it. The paragraph reproduced at the top of this document is
-the thing the audit must be told: four areas of deliberate complexity are spec-mandated and are not
-findings. Everything else is fair game — and `src/bench/` and `src/perf.ts` are new, unaudited, and
-were written to be measured rather than to be small.
+- **`npm run test:e2e` is real** — `scripts/e2e-run.mjs`, a plain `.mjs` with `assert`, no
+  `@playwright/test`, needing the app up the way `bench-run.mjs` does. It routes
+  `**/v1/messages` for both calls the application makes (the one-token key check and the
+  streamed tool use) and builds the SSE frames from `src/ai/fixtures.ts`.
+- **`README.md`** carries the honest framing: 0 ms of main-thread blocking against 2,627 ms, and
+  the worker path 23 ms *slower* end to end. Two numbers to know before quoting them elsewhere:
+  `blockedMs` in `docs/bench/` is the **sum over all nine runs** of a path, not one run, and
+  columnar aggregation is *slower* than the object path on the 98,899-group question — 122 ms
+  against 34 ms — so §7's "measurably tighter loop" did not survive measurement.
+- **`docs/over-engineering-audit.md`** is the audit pass. Seven of its eleven findings are
+  applied; two are the author's call (dropping `@tanstack/react-table` contradicts §6, and
+  `Intl.NumberFormat` would change what an axis tick says), and two were withdrawn on
+  inspection with the reason recorded. Read it before "simplifying" something it already
+  considered.
+- **The review pass** found two things and fixed both: `canvas:draw` was a mark and a measure
+  per animation frame with nothing evicting them, and the README claimed `storeBytes` counts
+  exactly when it charges strings at V8's worst case.
+- **ADR-0024** is the milestone ADR — why the evidence is a page a stranger can re-run, and why
+  the numbers that undercut §7 were published as they came out.
 
 ## Known to be ahead of its tests
 
