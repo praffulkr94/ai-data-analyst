@@ -20,7 +20,7 @@ they win. Precedence is `DECISIONS.md` → `docs/adr/*` → `CONTEXT.md` → iss
   "store". RowSlice — never "window". ModelReply — never `SpecResponse`. Translator — never
   `SpecGenerator`. A concept you need that is missing from the glossary is a signal, not a
   licence to invent one.
-- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are twenty-one.
+- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are twenty-two.
 - Issue #1 — the whole spec, and the only place the work is decomposed.
 
 ## The constraint that has to travel with you
@@ -62,10 +62,16 @@ else is wiring around them.
   dispatch, the Translator call, structural then semantic validation, the single Repair, worker
   execution, the staleness guards, and appending a Revision. Constructed with a Translator, which
   is what makes it testable without HTTP. Tests in `tests/workspace/`.
-- `src/ai/` — the Translator seam and the Anthropic implementation behind it. `tool.ts` generates
-  the tool schemas from the Zod grammar, `prompt.ts` builds what is sent, `models.ts` holds the
-  two models and the per-model normalizer, `partial.ts` is the tolerant reader for the chip strip.
-  The API key lives in a module variable in `anthropic.ts` and nowhere else. ADR-0020.
+- `src/ai/` — the Translator seam and its two implementations. `tool.ts` generates the tool
+  schemas from the Zod grammar, `prompt.ts` builds what is sent, `models.ts` holds the two models
+  and the per-model normalizer, `partial.ts` is the tolerant reader for the chip strip. The API
+  key lives in a module variable in `anthropic.ts` and nowhere else. ADR-0020.
+  `fixtures.ts` is the demo repertoire as data and `fixtureTranslator.ts` replays it through the
+  same `readMessage` the live stream uses. `faults.ts` is dev-only: it arms a damaged reply so
+  every starred row of the failure taxonomy is one click away. `switching()` in `translator.ts`
+  is what makes mode a per-Request choice of Translator and nothing else.
+- `src/data/session.ts` — the URL hash and what a reload rebuilds from it. The only persistence
+  there is. ADR-0022.
 - `src/worker/kernel.ts` — everything the worker does, as a plain request-to-responses function.
   `dataset.worker.ts` adapts it to a real `Worker` in nine lines and `localPort.ts` adapts it
   in-process for the seam tests. One implementation, two adapters — do not fork it.
@@ -142,10 +148,23 @@ else is wiring around them.
   it is testing legitimately offers nothing.
 - `ViewState` now carries `filters`, applied by `buildRowIndex` through the same `filterRows` the
   Operation executor uses. Do not add a second filter implementation for the table.
+- A thousands-separated number in a CSV has to be **quoted** — the separator is a comma. The first
+  `messy.csv` wrote attendances as bare `52,341` and lost 1,943 of 2,021 rows to the tokeniser
+  before the numeric rule it exists to demonstrate got a chance to run.
+- `messy.csv`'s dirt rates are chosen against the 95% numeric rule, not sprinkled. One null token
+  every seventeenth row pushes a column past the threshold and it infers categorical, at which
+  point the file demonstrates the rule's absence rather than the rule.
+- A retryable transport failure and a semantic one are two different bounded loops with two
+  different budgets: `MAX_RETRIES` waits, `MAX_ATTEMPTS` repairs, and a wait must not consume a
+  Repair. The SDK's own `maxRetries` is set to 0 — a retry the visitor cannot see is a wait they
+  cannot understand.
+- `zustand`'s plain `subscribe` fires on every `set`, narration frames included. Anything
+  subscribing outside React — the hash writer does — needs its own cheap reference-equality guard
+  on the values it actually cares about.
 
 ## Known to be ahead of its tests
 
-One entry, at the time of writing. Its ledger item is deliberately left unticked.
+Two entries at the time of writing. Both ledger items are deliberately left unticked.
 
 **Prompt caching is implemented and unverified.** The `cache_control` breakpoint is on the last
 system block and the readout shows `cache_read_input_tokens` as its own figure, but nobody has
@@ -158,6 +177,20 @@ silent invalidator has crept in. The minimum cacheable prefix is roughly 1,024 t
 one fails to cache without saying so, which is the whole reason the figure is on screen. **First
 task for whoever has a key: ask two Questions in one session and assert
 `usage.cache_read_input_tokens > 0`, then tick the item.**
+
+**The Fixtures are hand-authored, not captured.** `src/ai/fixtures.ts` holds thirteen replies
+written against the grammar rather than recorded from the API, for the same reason as above: no
+key. They are structurally and semantically valid — `tests/workspace/fixtures.test.ts` parses every
+one with Zod and runs every analysis through `validateSpec` against a hand-written `matches.csv`
+DatasetSchema — and the replay chunks and paces them the way a real stream arrives. What is missing
+is that the *wording* is mine rather than the model's, so Demo mode shows a plausible model rather
+than an observed one.
+
+**Whoever has a key: re-record them.** Ask each of the thirteen `question` strings in BYOK mode
+with the Smart model, and replace that Fixture's `narration`, `input` and `usage` with what came
+back. The narration is the text before the tool call, the input is the tool call verbatim, and the
+usage is the four numbers from the readout. `fixtures.test.ts` will fail loudly if a re-recorded
+reply drifts outside the grammar or names a column that does not exist. Then tick the item.
 
 If you leave a grammar field half-wired or an implementation ahead of its tests, add it here and
 leave its ledger item unticked.
