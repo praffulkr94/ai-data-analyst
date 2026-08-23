@@ -1,0 +1,33 @@
+{
+  "what": "the canvas draw loop, one arrow-key pan per entry, 98,899 points on team_matches",
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+    "hardwareConcurrency": 14,
+    "deviceMemoryGb": 32,
+    "viewport": "1400x1000",
+    "devicePixelRatio": 1,
+    "machine": "MacBook Pro, Apple M3 Max, 36 GB, macOS 26.5.1",
+    "headless": true
+  },
+  "runs": [
+    4.9,
+    4.5,
+    4.5,
+    4.4,
+    5,
+    4.2,
+    4.2,
+    4.3,
+    4.3
+  ],
+  "medianMs": 4.4,
+  "anomaly": "A frame that returns the view exactly to the origin costs about five times one that moves it further out, reproducibly, and the cause is not established. These are alternating presses: every other entry is a draw at pan {0,0}.",
+  "alternatingMs": [
+    4.2,
+    20.6,
+    3.9,
+    21.3,
+    4.4,
+    22
+  ]
+}

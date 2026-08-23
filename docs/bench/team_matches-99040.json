@@ -1,0 +1,278 @@
+{
+  "question": "goals for against goals against, by team and date — 98,899 points",
+  "dataset": "team_matches",
+  "rows": 99040,
+  "n": 9,
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+    "hardwareConcurrency": 14,
+    "deviceMemoryGb": 32,
+    "viewport": "1400x1000",
+    "devicePixelRatio": 1,
+    "machine": "MacBook Pro, Apple M3 Max, 36 GB, macOS 26.5.1",
+    "headless": true
+  },
+  "paths": [
+    {
+      "path": "naive rows, main thread",
+      "error": null,
+      "phases": [
+        {
+          "phase": "fetch and gunzip",
+          "nested": false,
+          "stat": {
+            "n": 9,
+            "median": 8.200000047683716,
+            "min": 7.8999998569488525,
+            "max": 8.900000095367432
+          }
+        },
+        {
+          "phase": "read as text",
+          "nested": false,
+          "stat": {
+            "n": 9,
+            "median": 5.200000047683716,
+            "min": 4.900000095367432,
+            "max": 5.599999904632568
+          }
+        },
+        {
+          "phase": "parse to row objects",
+          "nested": false,
+          "stat": {
+            "n": 9,
+            "median": 110.09999990463257,
+            "min": 102.70000004768372,
+            "max": 114.5
+          }
+        },
+        {
+          "phase": "aggregate over objects",
+          "nested": false,
+          "stat": {
+            "n": 9,
+            "median": 34.299999952316284,
+            "min": 33.60000014305115,
+            "max": 40.299999952316284
+          }
+        }
+      ],
+      "totalMs": 157.79999995231628,
+      "observed": {
+        "longTaskMs": [
+          146,
+          140,
+          148,
+          153,
+          153,
+          153,
+          151,
+          145
+        ],
+        "blockedMs": 1189,
+        "worstEventMs": 0
+      },
+      "columnarBytes": null,
+      "groups": 98899
+    },
+    {
+      "path": "columnar, main thread",
+      "error": null,
+      "phases": [
+        {
+          "phase": "fetch and gunzip",
+          "nested": false,
+          "stat": {
+            "n": 9,
+            "median": 8.299999952316284,
+            "min": 8,
+            "max": 8.799999952316284
+          }
+        },
+        {
+          "phase": "read as text",
+          "nested": false,
+          "stat": {
+            "n": 9,
+            "median": 5.299999952316284,
+            "min": 4.599999904632568,
+            "max": 5.599999904632568
+          }
+        },
+        {
+          "phase": "parse to rows of cells",
+          "nested": false,
+          "stat": {
+            "n": 9,
+            "median": 66,
+            "min": 62.60000014305115,
+            "max": 71.30000019073486
+          }
+        },
+        {
+          "phase": "infer types",
+          "nested": false,
+          "stat": {
+            "n": 9,
+            "median": 3.6999998092651367,
+            "min": 3.0999999046325684,
+            "max": 4
+          }
+        },
+        {
+          "phase": "encode columns",
+          "nested": false,
+          "stat": {
+            "n": 9,
+            "median": 129.79999995231628,
+            "min": 122.59999990463257,
+            "max": 135.5
+          }
+        },
+        {
+          "phase": "build the RowIndex",
+          "nested": false,
+          "stat": {
+            "n": 9,
+            "median": 2.200000047683716,
+            "min": 1.8999998569488525,
+            "max": 2.299999952316284
+          }
+        },
+        {
+          "phase": "aggregate over columns",
+          "nested": false,
+          "stat": {
+            "n": 9,
+            "median": 121.5,
+            "min": 111.59999990463257,
+            "max": 127.89999985694885
+          }
+        }
+      ],
+      "totalMs": 336.7999997138977,
+      "observed": {
+        "longTaskMs": [
+          331,
+          338,
+          315,
+          336,
+          329,
+          326,
+          329,
+          323
+        ],
+        "blockedMs": 2627,
+        "worstEventMs": 0
+      },
+      "columnarBytes": 5063712,
+      "groups": 98899
+    },
+    {
+      "path": "columnar, worker",
+      "error": null,
+      "phases": [
+        {
+          "phase": "parse: the whole round trip",
+          "nested": false,
+          "stat": {
+            "n": 9,
+            "median": 212,
+            "min": 205.59999990463257,
+            "max": 216.5
+          }
+        },
+        {
+          "phase": "  in the worker: fetch, gunzip and parse",
+          "nested": true,
+          "stat": {
+            "n": 9,
+            "median": 84.90000009536743,
+            "min": 78.40000009536743,
+            "max": 90
+          }
+        },
+        {
+          "phase": "  in the worker: infer types",
+          "nested": true,
+          "stat": {
+            "n": 9,
+            "median": 3.299999952316284,
+            "min": 2.9000000953674316,
+            "max": 3.5
+          }
+        },
+        {
+          "phase": "  in the worker: encode columns",
+          "nested": true,
+          "stat": {
+            "n": 9,
+            "median": 122.40000009536743,
+            "min": 116.19999980926514,
+            "max": 127.89999985694885
+          }
+        },
+        {
+          "phase": "  in the worker: build the RowIndex",
+          "nested": true,
+          "stat": {
+            "n": 9,
+            "median": 2,
+            "min": 1.8999998569488525,
+            "max": 2.1000001430511475
+          }
+        },
+        {
+          "phase": "  the round trip minus all of it",
+          "nested": true,
+          "stat": {
+            "n": 9,
+            "median": 0.2999999523162842,
+            "min": 0.19999980926513672,
+            "max": 0.8000001907348633
+          }
+        },
+        {
+          "phase": "analyze: the whole round trip",
+          "nested": false,
+          "stat": {
+            "n": 9,
+            "median": 147.60000014305115,
+            "min": 140.29999995231628,
+            "max": 154.20000004768372
+          }
+        },
+        {
+          "phase": "  in the worker: aggregate",
+          "nested": true,
+          "stat": {
+            "n": 9,
+            "median": 115.29999995231628,
+            "min": 109.70000004768372,
+            "max": 119.40000009536743
+          }
+        },
+        {
+          "phase": "  the clone of the result, and the two hops",
+          "nested": true,
+          "stat": {
+            "n": 9,
+            "median": 32.50000023841858,
+            "min": 30.59999990463257,
+            "max": 37.90000009536743
+          }
+        }
+      ],
+      "totalMs": 359.60000014305115,
+      "observed": {
+        "longTaskMs": [],
+        "blockedMs": 0,
+        "worstEventMs": 0
+      },
+      "columnarBytes": null,
+      "groups": 98899
+    }
+  ],
+  "driver": "scripts/bench-run.mjs"
+}
