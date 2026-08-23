@@ -478,6 +478,15 @@ h2 {
 
 .chart {
   width: 100%;
+  /* The canvas a large scatter draws into is positioned inside this box. */
+  position: relative;
+}
+
+/* Past CANVAS_ABOVE a scatter draws its points here rather than as elements. Over the plot area
+   and transparent to the pointer: the SVG below it owns the hit-testing for both renderers. */
+.chart-canvas {
+  position: absolute;
+  pointer-events: none;
 }
 
 .chart svg {

@@ -20,29 +20,32 @@ export function Tooltip({
   xField,
   yField,
   seriesBy,
-  groupField,
+  groupFields,
 }: {
   hover: Hover | null;
   xField: ResultField | undefined;
   yField: ResultField | undefined;
   seriesBy: string | null;
-  /** The dimension the point belongs to, when it is on neither axis. A scatter plots one measure
-      against another, so nothing on the screen says which group a point is — and the group is
-      the one thing the reader cannot work out from the axes. Its exact x and y are in the table.
-      Undefined for every other chart type, where the x-axis already names the group. */
-  groupField?: ResultField;
+  /** The dimensions the point belongs to, when they are on no axis. A scatter plots one measure
+      against another, so what each point *is* appears nowhere on the screen — and it is the one
+      thing the reader cannot work out from the axes, where its x and y are legible. Empty for
+      every other chart type, whose x-axis names the group itself. */
+  groupFields?: ResultField[];
 }) {
   if (!hover || !xField || !yField) return null;
   const { row } = hover;
 
-  const named = groupField ?? xField;
-  const raw = row[named.name] ?? null;
-  const at =
-    raw === null
+  const read = (field: ResultField) => {
+    const raw = row[field.name] ?? null;
+    return raw === null
       ? 'no value'
-      : named.temporal || named.type === 'date'
-        ? temporalLabel(named.unit, raw)
+      : field.temporal || field.type === 'date'
+        ? temporalLabel(field.unit, raw)
         : String(raw);
+  };
+  // Every grouping dimension, because the group is the whole tuple: one of two names half
+  // identifies the point.
+  const at = groupFields?.length ? groupFields.map(read).join(' · ') : read(xField);
   const value = row[yField.name];
   const series = seriesBy === null ? null : (row[seriesBy] ?? null);
 

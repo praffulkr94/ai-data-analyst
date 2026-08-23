@@ -5,12 +5,13 @@
     breaks at a gap rather than interpolating across it) the assertion is about the number of
     subpaths and never about where they are. */
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AnalysisChart } from '../../src/chart/AnalysisChart';
 import { buildColumnStore } from '../../src/engine/columnStore';
 import { inferSchema } from '../../src/engine/infer';
 import { executeOperation, type ExecuteOptions } from '../../src/engine/operation';
 import type { AnalysisResult } from '../../src/engine/result';
+import { CANVAS_ABOVE } from '../../src/chart/marks';
 import { TABLE_CAP } from '../../src/chart/ResultTable';
 import type { Operation, Visualization } from '../../src/spec/grammar';
 
@@ -89,6 +90,22 @@ describe('the line mark', () => {
     expect(rows).toHaveLength(4);
     expect(within(rows[0]!).getByRole('rowheader').textContent).toBe('2020-01-01');
     expect(rows.map((r) => within(r).getByRole('cell').textContent)).toEqual(['1', '1', '1', '1']);
+  });
+
+  /** A `date` column that was grouped by rather than bucketed reads out of the ColumnStore as an
+      ISO day, not as an epoch. Every tick of it was labelled "no value" until `temporalLabel`
+      accepted that third form. */
+  it('labels a date column that was grouped rather than bucketed', () => {
+    const grouped = run(YEARLY([2020, 2021]), op({ groupBy: ['date'] }));
+    render(
+      <AnalysisChart
+        result={grouped}
+        visualization={{ type: 'bar', x: 'date', y: 'm', seriesBy: null }}
+      />,
+    );
+    const svg = document.querySelector('svg')!;
+    expect(svg.textContent).toContain('15 Jun 2020');
+    expect(svg.textContent).not.toContain('no value');
   });
 
   it('labels the temporal axis at the bucket’s own resolution', () => {
@@ -458,6 +475,15 @@ describe('the scatter mark', () => {
     expect(tip()!.textContent).toContain('Peru');
   });
 
+  /** The group is the whole tuple: one of two names half-identifies the point. */
+  it('names every grouping dimension the point belongs to', () => {
+    const pairs = run(ROWS, { ...spec, groupBy: ['team', 'date'] }, { chartType: 'scatter' });
+    render(<AnalysisChart result={pairs} visualization={scatter} />);
+    // Brazil's three team-dates all sit at (3, 1), the largest x and the only y.
+    fireEvent.pointerMove(surface(), { clientX: INNER_W - 2, clientY: 2 });
+    expect(tip()!.textContent).toMatch(/Brazil · \d{2} \w{3} \d{4}/);
+  });
+
   it('names nothing when the pointer is on no point, rather than the nearest one anywhere', () => {
     render(<AnalysisChart result={points()} visualization={scatter} />);
     fireEvent.pointerMove(surface(), { clientX: Math.round(INNER_W / 2), clientY: 140 });
@@ -494,5 +520,77 @@ describe('the scatter mark', () => {
     expect(within(table).getAllByRole('row')).toHaveLength(TABLE_CAP + 1);
     expect(table.querySelector('caption')!.textContent).toContain('first 1,000 of 1,200');
     expect(document.querySelector('svg')!.getAttribute('aria-describedby')).toBe(table.id);
+  });
+});
+
+describe('the canvas a large scatter switches to', () => {
+  /** jsdom has no 2D context and nothing to draw one on, which is exactly why nothing here
+      asserts a pixel: what is asserted is that the elements are gone, that the canvas is there,
+      and that the table beside it still is. */
+  beforeAll(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  });
+  afterAll(() => vi.restoreAllMocks());
+
+  const spec = op({
+    groupBy: ['team'],
+    aggregations: [
+      { id: 'm', fn: 'count', column: null, label: 'matches' },
+      { id: 'g', fn: 'sum', column: 'goals', label: 'goals' },
+    ],
+  });
+  const scatter: Visualization = { type: 'scatter', x: 'g', y: 'm', seriesBy: null };
+  /** One row per team, one point per row, one past the threshold. */
+  const result = run(
+    Array.from({ length: CANVAS_ABOVE + 1 }, (_, i) => ['2020-06-15', `t${i}`, String(i)]),
+    spec,
+    { chartType: 'scatter' },
+  );
+
+  it('draws the points into a canvas instead of into elements', () => {
+    expect(result.rows).toHaveLength(CANVAS_ABOVE + 1);
+    render(<AnalysisChart result={result} visualization={scatter} />);
+    expect(document.querySelectorAll('canvas')).toHaveLength(1);
+    expect(document.querySelectorAll('svg circle')).toHaveLength(0);
+  });
+
+  /** The contract the canvas must not break: a chart with no elements still has an accessible
+      representation, and it is the same table pointed at by the same `aria-describedby`. */
+  it('keeps the data table and the description that points at it', () => {
+    render(<AnalysisChart result={result} visualization={scatter} />);
+    const table = screen.getByRole('table');
+    expect(document.querySelector('svg')!.getAttribute('aria-describedby')).toBe(table.id);
+    expect(within(table).getAllByRole('row')).toHaveLength(TABLE_CAP + 1);
+    expect(document.querySelector('svg title')!.textContent).toContain('Scatter plot');
+    expect(document.querySelector('svg title')!.textContent).toContain('points');
+  });
+
+  /** A drag is observable without measuring anything: the way back from one appears. */
+  it('offers a way back from a pan, for anyone who cannot drag one back', () => {
+    render(<AnalysisChart result={result} visualization={scatter} />);
+    const surface = document.querySelector('svg rect[fill="transparent"]')!;
+    expect(screen.queryByRole('button', { name: 'Reset view' })).toBeNull();
+
+    fireEvent.pointerDown(surface, { clientX: 100, clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(surface, { clientX: 160, clientY: 130, pointerId: 1 });
+    fireEvent.pointerUp(surface, { pointerId: 1 });
+    const reset = screen.getByRole('button', { name: 'Reset view' });
+
+    fireEvent.click(reset);
+    expect(screen.queryByRole('button', { name: 'Reset view' })).toBeNull();
+  });
+
+  it('does not offer a drag on a scatter small enough to be whole on the screen', () => {
+    const small = run(
+      Array.from({ length: 10 }, (_, i) => ['2020-06-15', `t${i}`, String(i)]),
+      spec,
+      { chartType: 'scatter' },
+    );
+    render(<AnalysisChart result={small} visualization={scatter} />);
+    const surface = document.querySelector('svg rect[fill="transparent"]')!;
+    fireEvent.pointerDown(surface, { clientX: 100, clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(surface, { clientX: 160, clientY: 130, pointerId: 1 });
+    expect(screen.queryByRole('button', { name: 'Reset view' })).toBeNull();
+    expect(document.querySelectorAll('canvas')).toHaveLength(0);
   });
 });

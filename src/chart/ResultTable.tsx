@@ -6,6 +6,7 @@
     light-mode palette obliges (ADR-0012); and it doubles as the chart test harness, which is why
     charts are tested through it and never through SVG geometry. */
 import { utcFormat } from 'd3-time-format';
+import { memo } from 'react';
 import type { AnalysisResult } from '../engine/result';
 import { formatValue } from './marks';
 
@@ -19,7 +20,12 @@ export const TABLE_CAP = 1_000;
     day to the one the bucket names for anyone west of Greenwich. */
 const isoDay = utcFormat('%Y-%m-%d');
 
-export function ResultTable({
+/** Memoized on its props, which is what keeps a hover cheap: the chart re-renders on every
+    pointer move, and a thousand rows of four cells re-rendered per frame is the difference
+    between a tooltip that follows the pointer and one that lags behind it. Safe to memoize
+    where the DataTable's window is not — an AnalysisResult is an immutable value, not a
+    reader over a mutating cache (ADR-0017). */
+export const ResultTable = memo(function ResultTable({
   result,
   id,
   hidden,
@@ -72,4 +78,4 @@ export function ResultTable({
       </tbody>
     </table>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import type { Loader } from './data/loader';
 import type { SliceCache } from './table/sliceCache';
 import type { DataPort } from './worker/port';
@@ -49,7 +49,12 @@ export function App({
     setRestoring(false);
   }
 
-  useEffect(() => {
+  /** Layout, not passive: the attribute every token hangs off has to be set before the paint
+      that follows the state change, and before any child effect reads a token back out. A
+      scatter's canvas cannot inherit a CSS variable, so it reads `--series-n` in its own effect
+      — and a passive effect here runs *after* that one, which left the canvas drawn in the
+      palette of the theme just left. */
+  useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 

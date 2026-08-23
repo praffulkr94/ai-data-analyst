@@ -5,8 +5,9 @@ import { format } from 'd3-format';
 import { quadtree } from 'd3-quadtree';
 import { area, line } from 'd3-shape';
 import { utcFormat } from 'd3-time-format';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { CHART_BUDGET } from '../engine/operation';
+import { useApp } from '../store';
 import type { ResultField, ResultRow } from '../engine/result';
 import type { ChartType, TimeUnit } from '../spec/grammar';
 import type { Scales } from './useScales';
@@ -77,13 +78,16 @@ const FORMATTERS = {
   none: utcFormat('%d %b %Y'),
 };
 
-/** Label one temporal tick. The value arrives as a Date from a time scale and as a stringified
-    epoch from a band scale, because a band domain is strings — so both are accepted here rather
-    than at two call sites. */
+/** Label one temporal tick. The value arrives as a Date from a time scale, as a stringified
+    epoch from a band scale — a band domain is strings — and as an ISO day from a `date` column
+    that was grouped by rather than bucketed, which is what `cellText` gives a date. All three
+    are accepted here rather than at three call sites; a bar chart grouped by a raw date column
+    labelled every tick "no value" until the third one was. */
 export function temporalLabel(unit: TimeUnit | undefined, v: number | string | Date): string {
   // `Number('')` is 0, so an empty band key would otherwise be labelled 1970.
   if (v === '') return 'no value';
-  const d = v instanceof Date ? v : new Date(Number(v));
+  const epoch = typeof v === 'string' && !/^-?\d+$/.test(v);
+  const d = v instanceof Date ? v : epoch ? new Date(v) : new Date(Number(v));
   if (Number.isNaN(d.valueOf())) return 'no value';
   return FORMATTERS[unit ?? 'none'](d);
 }
@@ -422,7 +426,9 @@ export function Points({
   labelY,
   drawn = true,
 }: MarkProps & { drawn?: boolean }) {
-  const ps = points(rows, x, y, scales).filter(defined);
+  // Memoized on the rows and the scales, because everything else that re-renders this chart —
+  // a hover, a tooltip, a pan — must not walk a hundred thousand rows again to do it.
+  const ps = useMemo(() => points(rows, x, y, scales).filter(defined), [rows, x, y, scales]);
   const last = ps.at(-1);
 
   return (
@@ -445,6 +451,70 @@ export function Points({
         </text>
       )}
     </g>
+  );
+}
+
+/** The same points, drawn once into a canvas rather than as thousands of elements.
+
+    One canvas per Series rather than one for the chart, so the composition stays what it is
+    everywhere else: a mark per Series, and the chart composing them. Three transparent canvases
+    the size of the plot area cost nothing, and a mark that had to be handed every Series would
+    not be a mark.
+
+    It takes no pointer events. `<PointsHover>` in the SVG above does the hit-testing for both
+    renderers, so hover has one implementation and not two, and the Series labels stay SVG text
+    because nothing can read a canvas. */
+export function PointsCanvas({
+  rows,
+  x,
+  y,
+  scales,
+  dimensions,
+  slot = 0,
+  pan = NO_PAN,
+}: MarkProps & { pan?: Pan }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  /** A canvas cannot inherit a CSS custom property, so it reads the token itself — and has to be
+      told when the tokens changed, which is the only reason a mark knows the theme exists. */
+  const theme = useApp((s) => s.theme);
+  const ps = useMemo(() => points(rows, x, y, scales).filter(defined), [rows, x, y, scales]);
+  const { innerWidth, innerHeight, margin } = dimensions;
+
+  useEffect(() => {
+    const el = ref.current;
+    const ctx = el?.getContext('2d');
+    if (!el || !ctx || innerWidth <= 0) return;
+    // Backing store in device pixels, coordinates in CSS pixels: on a 2× display a canvas sized
+    // in CSS pixels alone draws every point blurred.
+    const dpr = window.devicePixelRatio || 1;
+    el.width = Math.round(innerWidth * dpr);
+    el.height = Math.round(innerHeight * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle =
+      getComputedStyle(el).getPropertyValue(`--series-${(slot % SERIES_SLOTS) + 1}`).trim() ||
+      '#8a8a85';
+    // Squares, not arcs: at two and a half pixels the difference is invisible and `fillRect` is
+    // the difference between a smooth drag and a stuttering one at a hundred thousand points.
+    const size = POINT_RADIUS * 2;
+    for (const p of ps) {
+      ctx.fillRect(p.at + pan.x - POINT_RADIUS, p.value! + pan.y - POINT_RADIUS, size, size);
+    }
+  }, [ps, innerWidth, innerHeight, pan, slot, theme]);
+
+  return (
+    <canvas
+      ref={ref}
+      aria-hidden="true"
+      className="chart-canvas"
+      style={{
+        left: margin.left,
+        top: margin.top,
+        width: innerWidth,
+        height: innerHeight,
+      }}
+    />
   );
 }
 
@@ -475,9 +545,10 @@ export function PointsHover({
     [rows, x, y, scales],
   );
 
-  /** Dragging is tracked from the pointer's own start position rather than from movementX, which
-      is unreliable across a pointer capture. */
-  let from: { x: number; y: number; pan: Pan } | null = null;
+  /** Where the drag started and what the pan was then. A ref and not a local, because each pan
+      re-renders this component: a local would be null again by the second pointermove and the
+      drag would move one pixel and stop. */
+  const from = useRef<{ x: number; y: number; pan: Pan } | null>(null);
 
   return (
     <rect
@@ -488,18 +559,26 @@ export function PointsHover({
       style={onPan ? { cursor: 'grab', touchAction: 'none' } : undefined}
       onPointerDown={(e) => {
         if (!onPan) return;
-        from = { x: e.clientX, y: e.clientY, pan };
-        e.currentTarget.setPointerCapture(e.pointerId);
+        from.current = { x: e.clientX, y: e.clientY, pan };
+        // Capture keeps the drag alive past the edge of the plot. It throws on a pointer id that
+        // is no longer down, and jsdom does not implement it at all.
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* the drag still works, it just ends at the edge */
+        }
       }}
       onPointerUp={() => {
-        from = null;
+        from.current = null;
       }}
       onPointerMove={(e) => {
-        if (from) {
+        const start = from.current;
+        if (start) {
+          // A drag is not a hover: leaving the tooltip up would park it wherever the drag began.
           onHover?.(null, { x: 0, y: 0 });
           onPan?.({
-            x: from.pan.x + e.clientX - from.x,
-            y: from.pan.y + e.clientY - from.y,
+            x: start.pan.x + e.clientX - start.x,
+            y: start.pan.y + e.clientY - start.y,
           });
           return;
         }
@@ -513,7 +592,7 @@ export function PointsHover({
         onHover(found?.row ?? null, { x: e.clientX, y: e.clientY });
       }}
       onPointerLeave={() => {
-        from = null;
+        from.current = null;
         onHover?.(null, { x: 0, y: 0 });
       }}
     />

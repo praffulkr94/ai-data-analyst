@@ -13,6 +13,7 @@ export function ChartFrame({
   result,
   type,
   describedBy,
+  overlay,
   children,
 }: {
   dimensions: ChartDimensions;
@@ -21,12 +22,17 @@ export function ChartFrame({
   type: ChartType;
   /** The id of the table that *is* the accessible representation of this chart. */
   describedBy: string;
+  /** Drawn behind the SVG's pointer surface and above its axes, in the same box: the canvas a
+      scatter switches to past `CANVAS_ABOVE`. A canvas cannot be an SVG child, and this is the
+      whole of the accommodation it gets. */
+  overlay?: ReactNode;
   children: ReactNode;
 }) {
   const { width, height, margin } = dimensions;
   const titleId = useId();
   return (
     <div className="chart" ref={containerRef}>
+      {width > 0 && overlay}
       {width > 0 && (
         <svg
           width={width}

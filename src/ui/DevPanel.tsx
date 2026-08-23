@@ -110,7 +110,7 @@ export function DevPanel({
         <button type="button" className="primary" onClick={() => void run()}>
           Execute
         </button>
-        {DEGENERATE.map((preset) => (
+        {PRESETS.map((preset) => (
           <button
             key={preset.label}
             type="button"
@@ -291,9 +291,10 @@ const Fail = ({
   </li>
 );
 
-/** The degenerate results, as specifications rather than as screenshots. Executed through the
-    same textarea above, so what they prove is that the states come out of the pipeline. */
-const DEGENERATE = [
+/** Specifications rather than screenshots: the degenerate states, and the scatter that is the
+    whole of M8. Executed through the same textarea above, so what they prove is that these come
+    out of the pipeline rather than out of a mock. */
+const PRESETS = [
   {
     label: 'Empty result',
     spec: EXAMPLE.replace(
@@ -318,6 +319,35 @@ const DEGENERATE = [
     "limit": null
   },
   "visualization": { "type": "bar", "x": "date", "y": "m", "seriesBy": null }
+}`,
+  },
+  {
+    /** Load the `team_matches` sample first — the columns are that file's. 98,899 (date, team)
+        pairs, one per row of the file bar the teams that played twice in a day, and both axes
+        are measures, which is what makes it a scatter rather than a bar chart of pairs.
+
+        Two small integers overplot onto a grid, because nothing in this Dataset is continuous.
+        That is the honest shape of it: what is being demonstrated is 98,899 points drawn,
+        panned and hit-tested, and the count is in the caption and the table. */
+    label: '98,899-point scatter (team_matches)',
+    spec: `{
+  "kind": "analysis",
+  "intent": "new",
+  "title": "Goals for against goals against",
+  "narration": "One point per team-match, both axes measures — 98,899 of them.",
+  "operation": {
+    "filters": [],
+    "groupBy": ["date", "team"],
+    "timeBucket": null,
+    "aggregations": [
+      { "id": "gf", "fn": "sum", "column": "goals_for", "label": "goals for" },
+      { "id": "ga", "fn": "sum", "column": "goals_against", "label": "goals against" }
+    ],
+    "derived": [],
+    "sort": null,
+    "limit": null
+  },
+  "visualization": { "type": "scatter", "x": "gf", "y": "ga", "seriesBy": null }
 }`,
   },
 ];

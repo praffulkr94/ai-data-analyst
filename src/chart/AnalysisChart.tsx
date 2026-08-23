@@ -1,6 +1,6 @@
 /** Composes the three layers into a chart for one AnalysisResult. Everything type-specific is
     the choice of mark; nothing else branches on the chart type. */
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { CHART_BUDGET, FOLD_LABEL } from '../engine/operation';
 import {
   degeneracy,
@@ -14,12 +14,15 @@ import { ChartFrame } from './ChartFrame';
 import {
   Area,
   Bars,
+  CANVAS_ABOVE,
   Grid,
   HoverArea,
   lastPoint,
   Line,
   MARK_CAP,
+  NO_PAN,
   Points,
+  PointsCanvas,
   PointsHover,
   seriesColor,
   XAxis,
@@ -62,6 +65,11 @@ export function AnalysisChart({
   visualization: Visualization;
 }) {
   const [showTable, setShowTable] = useState(false);
+  /** A drag offset, and only a canvas scatter has one: an SVG chart is whole on the screen
+      already. Reset when a new result arrives, because it is a view of that result and not of
+      the chart element. */
+  const [pan, setPan] = useState(NO_PAN);
+  useEffect(() => setPan(NO_PAN), [result]);
   const [focusIndex, setFocusIndex] = useState(0);
   /** One hover value for the whole chart. Marks report into it; nothing else subscribes. */
   const [hover, setHover] = useState<Hover | null>(null);
@@ -69,11 +77,11 @@ export function AnalysisChart({
 
   const xField = result.fields.find((f) => f.name === visualization.x);
   const yField = result.fields.find((f) => f.name === visualization.y);
-  /** A scatter's axes are both measures, so the dimension its points are grouped by is on
-      neither of them and the tooltip is the only place it can be named. */
-  const groupField =
+  /** A scatter's axes are both measures, so the dimensions its points are grouped by are on
+      neither of them and the tooltip is the only place they can be named. */
+  const groupFields =
     visualization.type === 'scatter'
-      ? result.fields.find((f) => f.role === 'dimension' && f.name !== visualization.seriesBy)
+      ? result.fields.filter((f) => f.role === 'dimension' && f.name !== visualization.seriesBy)
       : undefined;
 
   /** The fold is in the result, the table and the caption, but not among the marks: an "Other"
@@ -133,6 +141,10 @@ export function AnalysisChart({
     return out;
   }, [labelled, series, scales, visualization.x, visualization.y]);
 
+  /** Where SVG gives way to canvas: the same points, the same scales, the same hit-testing, one
+      element instead of a hundred thousand. */
+  const onCanvas = visualization.type === 'scatter' && drawn.rows.length > CANVAS_ABOVE;
+
   /** The one pointer target over the whole plot area, whichever kind it is. */
   const surface = {
     rows: drawn.rows,
@@ -144,24 +156,26 @@ export function AnalysisChart({
       setHover(row === null ? null : { row, ...at }),
   };
 
+  const common = (s: Series, i: number) => ({
+    rows: s.rows,
+    x: visualization.x,
+    y: visualization.y,
+    scales,
+    dimensions,
+    slot: i,
+    label: named && series.length > 1 ? s.label : undefined,
+    onHover: (row: ResultRow | null, at: { x: number; y: number }) =>
+      setHover(row === null ? null : { row, ...at }),
+  });
+
   const mark = (s: Series, i: number) => {
-    const common = {
-      rows: s.rows,
-      x: visualization.x,
-      y: visualization.y,
-      scales,
-      dimensions,
-      slot: i,
-      label: named && series.length > 1 ? s.label : undefined,
-      onHover: (row: ResultRow | null, at: { x: number; y: number }) =>
-        setHover(row === null ? null : { row, ...at }),
-    };
+    const common_ = common(s, i);
     switch (visualization.type) {
       case 'bar':
         return (
           <Bars
             key={s.key}
-            {...common}
+            {...common_}
             subIndex={i}
             subCount={series.length}
             // ponytail: one focusable bar per Series, which is reachable but not ordered.
@@ -171,17 +185,19 @@ export function AnalysisChart({
           />
         );
       case 'line':
-        return <Line key={s.key} {...common} reveal={reveal} labelY={labelYs?.[i]} />;
+        return <Line key={s.key} {...common_} reveal={reveal} labelY={labelYs?.[i]} />;
       case 'area':
         // An area chart is the fill plus the line, composed — not a third mark that knows both.
         return (
           <g key={s.key}>
-            <Area {...common} />
-            <Line {...common} reveal={reveal} labelY={labelYs?.[i]} />
+            <Area {...common_} />
+            <Line {...common_} reveal={reveal} labelY={labelYs?.[i]} />
           </g>
         );
       case 'scatter':
-        return <Points key={s.key} {...common} labelY={labelYs?.[i]} />;
+        // Above the threshold the canvas in the overlay draws the points and this contributes
+        // the Series label alone.
+        return <Points key={s.key} {...common_} labelY={labelYs?.[i]} drawn={!onCanvas} />;
     }
   };
 
@@ -207,16 +223,21 @@ export function AnalysisChart({
           result={result}
           type={visualization.type}
           describedBy={tableId}
+          overlay={
+            onCanvas &&
+            series.map((s, i) => <PointsCanvas key={s.key} {...common(s, i)} pan={pan} />)
+          }
         >
-          <Grid scales={scales} dimensions={dimensions} />
-          <YAxis scales={scales} dimensions={dimensions} />
-          <XAxis scales={scales} dimensions={dimensions} field={xField} />
+          {/* The axes move with the data: a panned chart whose ticks stayed put is mislabelled. */}
+          <Grid scales={scales} dimensions={dimensions} pan={pan} />
+          <YAxis scales={scales} dimensions={dimensions} pan={pan} />
+          <XAxis scales={scales} dimensions={dimensions} field={xField} pan={pan} />
           {series.map(mark)}
           {/* Above the marks, so it receives the pointer for all of them at once. A scatter has
               marks the pointer can be over and hundreds of thousands of them, so it hit-tests a
               quadtree instead of inverting the x scale. */}
           {visualization.type === 'scatter' ? (
-            <PointsHover {...surface} />
+            <PointsHover {...surface} pan={pan} onPan={onCanvas ? setPan : undefined} />
           ) : (
             <HoverArea {...surface} />
           )}
@@ -233,6 +254,13 @@ export function AnalysisChart({
 
       <figcaption>
         <span className="chart-caption">{chartCaption(result.summary)}</span>
+        {/* A drag is the only way back from a drag, which is no way at all for anyone not using
+            a pointer. The button is the way back, and it appears only once there is one. */}
+        {(pan.x !== 0 || pan.y !== 0) && (
+          <button type="button" className="ghost" onClick={() => setPan(NO_PAN)}>
+            Reset view
+          </button>
+        )}
         <button type="button" className="ghost" onClick={() => setShowTable((v) => !v)}>
           {showTable ? 'Hide table' : 'View as table'}
         </button>
@@ -243,7 +271,7 @@ export function AnalysisChart({
         xField={xField}
         yField={yField}
         seriesBy={visualization.seriesBy}
-        groupField={groupField}
+        groupFields={groupFields}
       />
 
       <ResultTable result={result} id={tableId} hidden={!showTable} />
