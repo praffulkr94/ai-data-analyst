@@ -7,7 +7,7 @@
 import { bucketStart } from './time';
 import type { AnalysisResult, ChartSummary, Fold, ResultField, ResultRow } from './result';
 import { cellText, cellValue, type Column, type ColumnStore } from './types';
-import type { Aggregation, Filter, Operation } from '../spec/grammar';
+import type { Aggregation, ChartType, Filter, Operation } from '../spec/grammar';
 
 /** Categories shown on an axis before the rest collapse into one. `city` has 2,092 distinct
     values and "matches by city" is a natural first Question, so this fires on day one. */
@@ -17,8 +17,25 @@ export const FOLD_TOP_N = 15;
     this budget counts the "Other" Series against itself and `FOLD_TOP_N` does not. */
 export const SERIES_BUDGET = 6;
 export const FOLD_LABEL = 'Other';
-/** The protocol carries at most this many points, by construction. */
+/** The aggregate charts' cap: a bar, a line or an area aggregates to categories or buckets, and
+    past a thousand of them a reader cannot compare anything. */
 export const POINT_CAP = 1000;
+/** A scatter's Series cap. Past three, yellow and orange appear together and fail the all-pairs
+    colour-vision floors (ADR-0012). */
+export const SCATTER_SERIES_BUDGET = 3;
+/** A scatter's x is a measure, so its groups are positions rather than categories and one point
+    per row is the shape it asks for. `team_matches.csv` is 99,040 rows. */
+export const SCATTER_POINT_CAP = 100_000;
+
+/** How many points and how many Series survive, per chart type. Both are properties of the
+    Visualization rather than of the Operation, which is why the chart type travels on the
+    `analyze` message beside `metric` and `seriesBy` — see ADR-0023. */
+export const CHART_BUDGET: Record<ChartType, { points: number; series: number }> = {
+  bar: { points: POINT_CAP, series: SERIES_BUDGET },
+  line: { points: POINT_CAP, series: SERIES_BUDGET },
+  area: { points: POINT_CAP, series: SERIES_BUDGET },
+  scatter: { points: SCATTER_POINT_CAP, series: SCATTER_SERIES_BUDGET },
+};
 
 /* ---- filters ------------------------------------------------------------------------- */
 
@@ -215,6 +232,9 @@ export type ExecuteOptions = {
   /** The Visualization's `seriesBy`, which decides *which* dimension the fold collapses and to
       how many groups. The executor otherwise cannot tell a Series from an x-axis. */
   seriesBy?: string | null;
+  /** The Visualization's `type`, which decides how many points and how many Series survive.
+      Defaults to the aggregate budget — a thousand points and six Series. */
+  chartType?: ChartType;
 };
 
 /** Which dimension the fold collapses, and how many of its values survive.
@@ -223,13 +243,20 @@ export type ExecuteOptions = {
     keeping "the fifteen months with the most matches" out of a 152-year series is not an
     answer to the Question — the point cap is what bounds it instead.
 
-    A Series folds to the palette's six slots. Anything else folds to the top fifteen. */
+    A Series folds to the palette's slots — six, or three on a scatter. Anything else folds to
+    the top fifteen.
+
+    A scatter has nothing else. Its x is a measure, so no dimension of it is on an axis: there are
+    no categories to fold, and folding them anyway collapses the points the scatter is made of
+    (ADR-0023). The point cap bounds it instead, exactly as it bounds a time axis. */
 function foldPlan(
   dims: Dimension[],
   seriesBy: string | null | undefined,
+  chartType: ChartType,
 ): { index: number; budget: number } | null {
   const series = dims.findIndex((d) => d.field.name === seriesBy);
-  if (series >= 0) return { index: series, budget: SERIES_BUDGET };
+  if (series >= 0) return { index: series, budget: CHART_BUDGET[chartType].series };
+  if (chartType === 'scatter') return null;
   const first = dims.findIndex((d) => !d.field.temporal);
   return first >= 0 ? { index: first, budget: FOLD_TOP_N + 1 } : null;
 }
@@ -237,7 +264,7 @@ function foldPlan(
 export function executeOperation(
   store: ColumnStore,
   op: Operation,
-  { metric, seriesBy }: ExecuteOptions = {},
+  { metric, seriesBy, chartType = 'bar' }: ExecuteOptions = {},
 ): AnalysisResult {
   const kept = filterRows(store, op.filters);
 
@@ -299,7 +326,7 @@ export function executeOperation(
     return finish(laid(ranked), null);
   }
 
-  const plan = foldPlan(dims, seriesBy);
+  const plan = foldPlan(dims, seriesBy, chartType);
   if (plan === null) return finish(laid(groups.map(toRow)), null);
 
   // Rank the folded dimension's *values*, each scored over all of its rows pooled rather than
@@ -354,8 +381,12 @@ export function executeOperation(
 
   /** The point cap and the ChartSummary, which every path above needs. */
   function finish(rows: ResultRow[], fold: Fold | null): AnalysisResult {
-    const truncated = rows.length > POINT_CAP;
-    const capped = truncated ? rows.slice(0, POINT_CAP) : rows;
+    // ponytail: a scatter's 98,899 rows cross the worker boundary as plain objects, which is a
+    // few megabytes of structured clone once per Analysis. A columnar AnalysisResult over typed
+    // arrays is the upgrade path if that ever measures; it touches every reader of `rows`.
+    const cap = CHART_BUDGET[chartType].points;
+    const truncated = rows.length > cap;
+    const capped = truncated ? rows.slice(0, cap) : rows;
     return {
       fields,
       rows: capped,

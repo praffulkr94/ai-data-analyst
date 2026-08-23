@@ -128,6 +128,7 @@ export function createWorkspace({
         operation: spec.operation,
         metric: spec.visualization.y,
         seriesBy: spec.visualization.seriesBy,
+        chartType: spec.visualization.type,
       }).done;
       if (res.type === 'analyze:done') return { result: res.result };
       return { error: res.type === 'error' ? res.message : 'The analysis was cancelled.' };

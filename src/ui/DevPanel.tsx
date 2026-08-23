@@ -86,6 +86,7 @@ export function DevPanel({
       operation: spec.operation,
       metric: spec.visualization.y,
       seriesBy: spec.visualization.seriesBy,
+      chartType: spec.visualization.type,
     }).done;
     if (res.type === 'analyze:done') setOutcome({ state: 'done', spec, result: res.result });
     else if (res.type === 'error') setOutcome({ state: 'structural', message: res.message });

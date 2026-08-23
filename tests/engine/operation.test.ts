@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { buildColumnStore } from '../../src/engine/columnStore';
 import { inferSchema } from '../../src/engine/infer';
 import {
+  CHART_BUDGET,
   executeOperation,
   FOLD_LABEL,
   FOLD_TOP_N,
+  POINT_CAP,
+  SCATTER_SERIES_BUDGET,
   SERIES_BUDGET,
 } from '../../src/engine/operation';
 import type { ColumnType } from '../../src/engine/types';
@@ -579,5 +582,60 @@ describe('the Series budget', () => {
     expect(FOLD_TOP_N).toBe(15);
     expect(r.summary.fold).toBeNull();
     expect(r.rows).toHaveLength(10);
+  });
+});
+
+describe('the scatter budget', () => {
+  /** Forty groups over two measures — a scatter's shape: both axes are aggregations, and the
+      grouping column is on neither of them. */
+  const measures = [agg('x', 'sum', 'n'), agg('y', 'avg', 'n')];
+  const forty = store(
+    ['k', 'series', 'n'],
+    Array.from({ length: 200 }, (_, i) => [`k${i % 40}`, `s${i % 8}`, String(i)]),
+    { n: 'number' },
+  );
+  const spec = op({ groupBy: ['k'], aggregations: measures });
+  const asScatter = (o = spec, over = {}) =>
+    executeOperation(forty, o, { metric: 'y', chartType: 'scatter', ...over });
+
+  it('keeps every point, where an axis of categories would have folded at fifteen', () => {
+    expect(asScatter().rows).toHaveLength(40);
+    expect(asScatter().summary.fold).toBeNull();
+    // The same Operation on a bar chart's budget, for contrast.
+    expect(executeOperation(forty, spec, { metric: 'y' }).rows).toHaveLength(FOLD_TOP_N + 1);
+  });
+
+  it('folds the Series to three, the fold included', () => {
+    const r = asScatter(op({ groupBy: ['k', 'series'], aggregations: measures }), {
+      seriesBy: 'series',
+    });
+    expect(SCATTER_SERIES_BUDGET).toBe(3);
+    const series = new Set(r.rows.map((x) => x.series));
+    expect(series.size).toBe(SCATTER_SERIES_BUDGET);
+    expect(series.has(FOLD_LABEL)).toBe(true);
+    expect(r.summary.fold).toMatchObject({ dimensionLabel: 'series', kept: 2, folded: 6 });
+  });
+
+  it('carries a hundred times the points an aggregate chart carries', () => {
+    expect(CHART_BUDGET.bar.points).toBe(POINT_CAP);
+    expect(CHART_BUDGET.scatter.points).toBe(100_000);
+    expect(CHART_BUDGET.line.series).toBe(SERIES_BUDGET);
+    expect(CHART_BUDGET.scatter.series).toBe(SCATTER_SERIES_BUDGET);
+  });
+
+  it('keeps 1,400 points where a bar chart’s cap would have cut them at a thousand', () => {
+    const many = store(
+      ['k'],
+      Array.from({ length: 1_400 }, (_, i) => [`k${i}`]),
+    );
+    // 1,400 groups: past a bar chart's thousand, inside a scatter's hundred thousand.
+    const asBar = executeOperation(many, op({ groupBy: ['k'], limit: 1_000 }), { metric: 'm' });
+    expect(asBar.rows).toHaveLength(1_000);
+    const wide = executeOperation(many, op({ groupBy: ['k'] }), {
+      metric: 'm',
+      chartType: 'scatter',
+    });
+    expect(wide.rows).toHaveLength(1_400);
+    expect(wide.truncated).toBe(false);
   });
 });

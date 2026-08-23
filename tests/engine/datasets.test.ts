@@ -11,7 +11,10 @@ import { sampleById } from '../../src/data/samples';
 import { buildColumnStore } from '../../src/engine/columnStore';
 import { parseCsv } from '../../src/engine/csv';
 import { inferSchema } from '../../src/engine/infer';
+import { executeOperation } from '../../src/engine/operation';
+import { degeneracy } from '../../src/engine/result';
 import type { ColumnMeta } from '../../src/engine/types';
+import type { Operation } from '../../src/spec/grammar';
 
 function load(id: string) {
   const sample = sampleById(id)!;
@@ -20,7 +23,7 @@ function load(id: string) {
   const schema = inferSchema(parsed.header, parsed.rows);
   const store = buildColumnStore(parsed.header, parsed.rows, schema);
   const column = (name: string): ColumnMeta => store.schema.columns.find((c) => c.name === name)!;
-  return { sample, parsed, column };
+  return { sample, parsed, store, column };
 }
 
 describe('goals.csv, the inference showcase', () => {
@@ -80,5 +83,51 @@ describe('messy.csv, dirtied on purpose', () => {
     expect(dates.some((d) => d.includes('/'))).toBe(true);
     // Every value parsed, so the mixed format cost no rows.
     expect(column('date').nullCount).toBe(0);
+  });
+});
+
+describe('team_matches.csv, the scatter that needs its own budget', () => {
+  const { sample, parsed, store } = load('team_matches');
+
+  /** One point per team-match. Both axes are measures, which is what makes it a scatter, and
+      the grouping is fine enough that each group is one row of the file. */
+  const scatter: Operation = {
+    filters: [],
+    groupBy: ['date', 'team'],
+    timeBucket: null,
+    aggregations: [
+      { id: 'gf', fn: 'sum', column: 'goals_for', label: 'goals for' },
+      { id: 'ga', fn: 'sum', column: 'goals_against', label: 'goals against' },
+    ],
+    derived: [],
+    sort: null,
+    limit: null,
+  };
+
+  it('holds the row count the picker promises', () => {
+    expect(parsed.rows.length).toBe(99_040);
+    expect(sample.rowCount).toBe(parsed.rows.length);
+  });
+
+  /** 98,899 rather than 99,040: a handful of teams played twice on one day, and those two
+      matches are one (date, team) group. Read out of the file, not estimated. */
+  it('draws 98,899 points, neither folded nor truncated', () => {
+    const r = executeOperation(store, scatter, { metric: 'ga', chartType: 'scatter' });
+    expect(r.rows).toHaveLength(98_899);
+    expect(r.truncated).toBe(false);
+    expect(r.summary.fold).toBeNull();
+    expect(r.summary.groupCount).toBe(98_899);
+  });
+
+  /** The same Operation on the budget every other chart uses, which is what a scatter got
+      before ADR-0023: `date` folded to its top fifteen values, and what survived that still
+      overran the thousand-point cap. Truncated is refused at render, so the chart was a notice
+      saying the result was too long — for a Question whose answer is 98,899 points. */
+  it('is folded and then truncated on an aggregate chart’s budget', () => {
+    const r = executeOperation(store, scatter, { metric: 'ga' });
+    expect(r.summary.fold).toMatchObject({ dimensionLabel: 'date', kept: 15 });
+    expect(r.rows).toHaveLength(1_000);
+    expect(r.truncated).toBe(true);
+    expect(degeneracy(r, 'ga')).toBe('too-many');
   });
 });

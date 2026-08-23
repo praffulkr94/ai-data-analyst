@@ -257,6 +257,7 @@ export function createKernel(post: Post) {
           result: executeOperation(state.store, req.operation, {
             metric: req.metric,
             seriesBy: req.seriesBy,
+            chartType: req.chartType,
           }),
         });
         return;
