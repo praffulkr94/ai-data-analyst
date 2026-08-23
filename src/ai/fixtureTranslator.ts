@@ -13,8 +13,8 @@ import { takeFault, type Fault } from './faults';
 import { repertoireFor, type Fixture } from './fixtures';
 import { chipsFrom, readPartial } from './partial';
 import {
-  Cancelled,
   Retryable,
+  sleep,
   type Attempt,
   type TranslateRequest,
   type Translator,
@@ -39,24 +39,6 @@ function chunks(text: string, sizes: number[]): string[] {
     i += size;
   }
   return out;
-}
-
-/** Rejects rather than resolves when the visitor cancels, so a cancel lands between two deltas
-    instead of after the whole recording has played out. */
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  if (signal?.aborted) return Promise.reject(new Cancelled());
-  if (ms <= 0) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const abort = () => {
-      clearTimeout(timer);
-      reject(new Cancelled());
-    };
-    const timer = setTimeout(() => {
-      signal?.removeEventListener('abort', abort);
-      resolve();
-    }, ms);
-    signal?.addEventListener('abort', abort, { once: true });
-  });
 }
 
 const TOOL_NAMES = {

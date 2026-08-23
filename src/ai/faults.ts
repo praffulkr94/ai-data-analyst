@@ -20,10 +20,6 @@ export const armFault = (fault: Fault, times = 1): void => {
   armed = { fault, times };
 };
 
-export const disarmFaults = (): void => {
-  armed = null;
-};
-
 /** Consumes one use. Nothing outside the Fixture Translator should call this. */
 export function takeFault(): Fault | null {
   if (!armed) return null;

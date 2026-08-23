@@ -7,7 +7,7 @@
 
     Everything else in the application is wiring around this and the `DataEngine`. There is no
     third seam. */
-import { validateSpec, type SpecViolation } from '../spec/validate';
+import { validateSpec } from '../spec/validate';
 import { mark } from '../perf';
 import { specFromReply, type AnalysisSpec } from '../spec/grammar';
 import type { Sample } from '../data/samples';
@@ -16,6 +16,7 @@ import type { DataPort } from '../worker/port';
 import { useApp, type Notice, type Revision } from '../store';
 import {
   Cancelled,
+  sleep,
   Retryable,
   type Attempt,
   type TranslateRequest,
@@ -29,7 +30,7 @@ import type { Exchange } from '../ai/prompt';
     This is a bounded loop, not orchestration. It becomes orchestration at conditional multi-step
     repair with branching — a repair whose next step depends on which repair failed — and naming
     that threshold is the defence of the no-framework decision (ADR-0009). */
-export const MAX_ATTEMPTS = 2;
+const MAX_ATTEMPTS = 2;
 
 /** Waits for a rate limit or an overloaded server, and only for those. A wait is not the model
     getting the specification wrong, so it does not consume the Repair — it is the same attempt,
@@ -84,22 +85,6 @@ export function createWorkspace({
     };
   }
 
-  /** Rejects rather than resolves on cancel, so a visitor waiting out a rate limit is not made
-      to wait out the rest of it before their cancel is noticed. */
-  function delay(ms: number, signal: AbortSignal): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const abort = () => {
-        clearTimeout(timer);
-        reject(new Cancelled());
-      };
-      const timer = setTimeout(() => {
-        signal.removeEventListener('abort', abort);
-        resolve();
-      }, ms);
-      signal.addEventListener('abort', abort, { once: true });
-    });
-  }
-
   /** One Translator call, waited out and repeated if the failure was the kind waiting fixes. */
   async function translate(
     id: number,
@@ -113,7 +98,7 @@ export function createWorkspace({
         if (!(e instanceof Retryable) || retry >= MAX_RETRIES || stale(id)) throw e;
         const wait = e.afterMs ?? BACKOFF_MS * 2 ** retry;
         store.getState().waitToRetry(id, Date.now() + wait, e.message);
-        await delay(wait, signal);
+        await sleep(wait, signal);
         if (stale(id)) throw new Cancelled();
         store.getState().setRequestStatus(id, 'thinking');
       }
@@ -373,12 +358,5 @@ export function createWorkspace({
       inFlight?.abort();
       store.getState().cancelRequest();
     },
-
-    latestSpec(): AnalysisSpec | null {
-      const s = store.getState();
-      return s.analyses.find((a) => a.id === s.activeAnalysisId)?.revisions.at(-1)?.spec ?? null;
-    },
   };
 }
-
-export type { SpecViolation };

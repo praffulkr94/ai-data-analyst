@@ -10,6 +10,11 @@ array-of-objects), and the absence of TanStack Query are deliberate and spec-man
 `DECISIONS.md` §A9 and ADR-0013. Accidental complexity everywhere else was fair game, and
 `src/bench/` and `src/perf.ts` were audited for the first time.
 
+**Applied after the pass** (one commit, `npm test` green at 419, `npm run typecheck` clean, both
+Playwright flows still passing): findings 1, 3, 4, 6, 7, 8 and 10. Two are decided against below,
+and two more were withdrawn on inspection rather than reported — checking before cutting is what
+the audit is for.
+
 ## Findings, biggest cut first
 
 1. **`delete:`** `d3-scale-chromatic` and `@types/d3-scale-chromatic` are dependencies that no file
@@ -30,12 +35,13 @@ array-of-objects), and the absence of TanStack Query are deliberate and spec-man
    Translator, both ~12 lines, both rejecting with `Cancelled`, both wiring an `abort` listener
    around a `setTimeout`. One of them, shared. [`src/workspace/workspace.ts:87`,
    `src/ai/fixtureTranslator.ts:47`]
-5. **`native:`** Hand-rolled base64url — `btoa`, a `String.fromCharCode(...)` spread and three
-   regex replaces on the way out, the mirror image on the way in. This is a Chromium-only project
-   by decision, and Chromium has the primitive: `new TextEncoder().encode(text).toBase64({
-   alphabet: 'base64url', omitPadding: true })` and `Uint8Array.fromBase64(raw, { alphabet:
-   'base64url' })`. About 8 lines, and it drops the spread that would blow the stack on a large
-   enough hash. [`src/data/session.ts`]
+5. **`native:` — withdrawn, not applied.** Hand-rolled base64url — `btoa`, a
+   `String.fromCharCode(...)` spread and three regex replaces on the way out, the mirror image on
+   the way in. Chromium has the primitive (`Uint8Array.prototype.toBase64({ alphabet:
+   'base64url' })` / `Uint8Array.fromBase64`) and this is a Chromium-only project, but the seam
+   that tests this code is `tests/workspace/session.test.ts` under **jsdom in Node**, and Node
+   24.16 has neither method: `u.toBase64 is not a function`. Cutting 8 lines in exchange for a
+   red suite is not a cut. Revisit when the test runtime has it. [`src/data/session.ts`]
 6. **`delete:`** `disarmFaults` is exported and called by nothing. `takeFault` consumes the arming
    and the dev panel never disarms. [`src/ai/faults.ts:23`]
 7. **`yagni:`** `workspace.latestSpec()` — a method on the facade whose only caller in the
@@ -44,9 +50,13 @@ array-of-objects), and the absence of TanStack Query are deliberate and spec-man
 8. **`delete:`** `export type { SpecViolation }` at the foot of `workspace.ts` — a pass-through
    re-export nobody imports from there; every consumer takes it from `spec/validate`.
    [`src/workspace/workspace.ts:384`]
-9. **`shrink:`** `MARK_CAP` is a four-entry Record of which three entries alias
-   `CHART_BUDGET[type].points`; only `bar: 60` carries information. `type === 'bar' ? 60 :
-   CHART_BUDGET[type].points` says the same thing in one line. [`src/chart/marks.tsx:21`]
+9. **`shrink:` — withdrawn, not applied.** `MARK_CAP` is a four-entry Record of which three
+   entries alias `CHART_BUDGET[type].points`; only `bar: 60` carries information, so
+   `type === 'bar' ? 60 : CHART_BUDGET[type].points` says the same thing. But
+   `tests/engine/degeneracy.test.ts` reads `MARK_CAP.bar` and `MARK_CAP.line` at seven places —
+   including `expect(MARK_CAP.line).toBe(POINT_CAP)`, which is the assertion that the alias is
+   deliberate. Rewriting seven assertions to save three lines is a longer diff, not a shorter one.
+   [`src/chart/marks.tsx:21`]
 10. **`yagni:`** Twelve exports with no importer — `SCATTER_POINT_CAP`, `HISTORY_KEPT`,
     `MAX_ATTEMPTS`, `columnStats`, `describeColumn`, `inferColumn`, `sampleIndices`,
     `outputFields`, `formatAxisValue`, `prefersReducedMotion`, `REVEAL_MS`, `decode` — each used
@@ -58,9 +68,14 @@ array-of-objects), and the absence of TanStack Query are deliberate and spec-man
     and its `@types`, at the cost of changing what a tick says: a judgement call, not a free cut.
     [`src/chart/marks.tsx:42`]
 
-net: -55 lines, -3 runtime dependencies (-5 `package.json` entries counting `@types`) possible.
-Findings 2 and 11 change behaviour or contradict a settled decision and should be decided rather
-than applied.
+net: -46 lines and -1 runtime dependency (-2 `package.json` entries) applied; -2 more
+dependencies possible if 2 and 11 are taken. Findings 2 and 11 change behaviour or contradict a
+settled decision and are the author's call, not a defect. Findings 5 and 9 are withdrawn above.
+
+One thing the shared sleep fixed on the way past, which is why it is worth more than the twelve
+lines it saved: the `Workspace`'s copy added its `abort` listener without first checking
+`signal.aborted`, so a retry wait that began after the visitor had already cancelled would run to
+completion and resolve. The Fixture Translator's copy checked. The surviving one checks.
 
 ## Looked at and lean already
 

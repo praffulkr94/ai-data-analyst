@@ -30,7 +30,7 @@ const VERSION = 1;
 const encode = (session: Session): string =>
   base64url(JSON.stringify({ v: VERSION, ...session }));
 
-export function decode(hash: string): Session | null {
+function decode(hash: string): Session | null {
   const raw = hash.replace(/^#/, '');
   if (!raw) return null;
   let parsed: unknown;

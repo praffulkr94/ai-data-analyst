@@ -85,7 +85,7 @@ names a category value, use the value exactly as it is spelled in the DatasetSch
 
 /** One line per column. `date` statistics are epoch milliseconds in the ColumnStore, so they are
     rendered back as ISO dates here — a min of 1298764800000 tells the model nothing. */
-export function describeColumn(col: ColumnMeta): string {
+function describeColumn(col: ColumnMeta): string {
   const head = `- \`${col.name}\` — ${col.type}, confidence ${col.confidence.toFixed(2)}, ${
     col.nullCount
   } nulls`;
@@ -127,7 +127,7 @@ export function systemBlocks(schema: DatasetSchema): Anthropic.TextBlockParam[] 
     two exchanges — never the full history, which grows without bound and buys nothing. */
 export type Exchange = { question: string; spec: AnalysisSpec };
 
-export const HISTORY_KEPT = 2;
+const HISTORY_KEPT = 2;
 
 export type PromptRequest = {
   question: string;

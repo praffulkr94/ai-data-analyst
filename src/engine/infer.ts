@@ -29,7 +29,7 @@ export type InferOptions = {
 };
 
 /** Row indices to infer from: the first `headN`, plus `randomN` drawn from beyond them. */
-export function sampleIndices(
+function sampleIndices(
   rowCount: number,
   { headN = 500, randomN = 500, random = Math.random }: InferOptions = {},
 ): number[] {
@@ -120,7 +120,7 @@ function categoryStats(values: string[]): CategoryStats {
 /** Infer one column from its sampled values. `nullCount` is scaled to the sample, so it is an
     estimate on a sampled file and exact on a fully-read one; the ColumnStore records the true
     count when it encodes. */
-export function inferColumn(name: string, values: string[]): ColumnMeta {
+function inferColumn(name: string, values: string[]): ColumnMeta {
   const counts = tally(values);
   const type = decide(counts);
   const total = counts.values.length;

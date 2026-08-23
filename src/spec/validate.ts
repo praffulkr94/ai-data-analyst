@@ -213,7 +213,7 @@ type OutputField = { name: string; role: 'dimension' | 'measure'; type: ColumnTy
 
 /** The fields the Operation produces. The Visualization has to name these, not merely columns of
     the Dataset — the specific confusion this function exists to make checkable. */
-export function outputFields(op: Operation, schema: DatasetSchema): Map<string, OutputField> {
+function outputFields(op: Operation, schema: DatasetSchema): Map<string, OutputField> {
   const out = new Map<string, OutputField>();
   if (op.timeBucket) {
     out.set(op.timeBucket.column, {

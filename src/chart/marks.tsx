@@ -51,7 +51,7 @@ export function formatValue(v: number): string {
 
 /** Axis ticks are the one place abbreviation earns its keep — they repeat, and they are read as
     a scale rather than as a value. */
-export const formatAxisValue = (v: number) =>
+const formatAxisValue = (v: number) =>
   Math.abs(v) >= 10_000 ? si(v) : formatValue(v);
 
 /* ---- axes and grid, from scale.ticks() as React elements ----------------------------- */

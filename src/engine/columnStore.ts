@@ -65,7 +65,7 @@ function encodeString(cells: string[]): Column {
     only has to *decide the type* from a sample; the ranges and frequencies go into the prompt
     and onto the screen, so a sampled `city` reading 352 distinct instead of 2,092 would be a
     quietly wrong number in both places. */
-export function columnStats(col: Column): ColumnMeta['stats'] {
+function columnStats(col: Column): ColumnMeta['stats'] {
   if (col.kind === 'number' || col.kind === 'date') {
     let min = Infinity;
     let max = -Infinity;

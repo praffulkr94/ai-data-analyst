@@ -32,7 +32,7 @@ export const POINT_CAP = 1000;
 export const SCATTER_SERIES_BUDGET = 3;
 /** A scatter's x is a measure, so its groups are positions rather than categories and one point
     per row is the shape it asks for. `team_matches.csv` is 99,040 rows. */
-export const SCATTER_POINT_CAP = 100_000;
+const SCATTER_POINT_CAP = 100_000;
 
 /** How many points and how many Series survive, per chart type. Both are properties of the
     Visualization rather than of the Operation, which is why the chart type travels on the

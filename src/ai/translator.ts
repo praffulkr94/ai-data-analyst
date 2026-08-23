@@ -92,3 +92,24 @@ export class Cancelled extends Error {
     this.name = 'Cancelled';
   }
 }
+
+/** Wait, unless the visitor cancels — in which case reject rather than resolve, so the caller
+    drops the Request instead of carrying on with it after the wait. Shared by the two things
+    that wait: the `Workspace` between retries, and the Fixture Translator between deltas. A
+    signal that is *already* aborted rejects immediately, which a listener added after the fact
+    would never hear. */
+export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(new Cancelled());
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      clearTimeout(timer);
+      reject(new Cancelled());
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', abort, { once: true });
+  });
+}

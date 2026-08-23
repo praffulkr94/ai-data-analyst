@@ -17,6 +17,7 @@ import { inferSchema } from '../engine/infer';
 import { executeOperation } from '../engine/operation';
 import { buildRowIndex } from '../engine/rowIndex';
 import type { ChartType, Operation } from '../spec/grammar';
+import { timedAsync } from '../perf';
 import { fetchDataset } from '../worker/kernel';
 import type { DataPort } from '../worker/port';
 
@@ -36,15 +37,6 @@ export type Run = {
 };
 
 export type PathName = 'naive rows, main thread' | 'columnar, main thread' | 'columnar, worker';
-
-/** `performance.mark`/`measure` rather than two `now()` readings, so every phase is also in the
-    performance timeline and a DevTools trace of a run is readable without this page. */
-async function measure<T>(name: string, fn: () => T | Promise<T>): Promise<[T, number]> {
-  performance.mark(`${name}:start`);
-  const value = await fn();
-  const m = performance.measure(name, `${name}:start`);
-  return [value, m.duration];
-}
 
 /** The two questions, each naming the Dataset whose columns it reads. Not a free choice of
     sample and a fixed Operation: the columns belong to the file.
@@ -103,13 +95,13 @@ export const QUESTIONS: Question[] = [
     object per row, every value a string, coerced at read time. */
 async function naive(url: string, q: Question): Promise<Run> {
   const phases: Phase[] = [];
-  const [blob, fetched] = await measure('naive:fetch', () => fetchDataset(url));
+  const [blob, fetched] = await timedAsync('naive:fetch', () => fetchDataset(url));
   phases.push({ name: 'fetch and gunzip', ms: fetched });
 
-  const [text, read] = await measure('naive:read', () => blob.text());
+  const [text, read] = await timedAsync('naive:read', () => blob.text());
   phases.push({ name: 'read as text', ms: read });
 
-  const [rows, parsed] = await measure(
+  const [rows, parsed] = await timedAsync(
     'naive:parse',
     () => Papa.parse<Record<string, string>>(text, { header: true, skipEmptyLines: 'greedy' }).data,
   );
@@ -120,7 +112,7 @@ async function naive(url: string, q: Question): Promise<Run> {
       row of strings costs. Not the executor with a flag flipped — see the module comment. */
   const group = q.operation.groupBy;
   const sums = q.operation.aggregations.filter((a) => a.fn === 'sum');
-  const [groups, aggregated] = await measure('naive:aggregate', () => {
+  const [groups, aggregated] = await timedAsync('naive:aggregate', () => {
     const out = new Map<string, { n: number; sums: number[] }>();
     for (const row of rows) {
       const key = group.map((c) => row[c] ?? '').join('\u0000');
@@ -143,13 +135,13 @@ async function naive(url: string, q: Question): Promise<Run> {
     aggregation the worker runs, with nothing between it and the interface it is blocking. */
 async function columnar(url: string, q: Question): Promise<Run> {
   const phases: Phase[] = [];
-  const [blob, fetched] = await measure('columnar:fetch', () => fetchDataset(url));
+  const [blob, fetched] = await timedAsync('columnar:fetch', () => fetchDataset(url));
   phases.push({ name: 'fetch and gunzip', ms: fetched });
 
-  const [text, read] = await measure('columnar:read', () => blob.text());
+  const [text, read] = await timedAsync('columnar:read', () => blob.text());
   phases.push({ name: 'read as text', ms: read });
 
-  const [parsedRows, parsed] = await measure('columnar:parse', () => {
+  const [parsedRows, parsed] = await timedAsync('columnar:parse', () => {
     const data = Papa.parse<string[]>(text, { skipEmptyLines: 'greedy' }).data;
     const out = emptyResult(readHeader(data[0]!));
     for (let i = 1; i < data.length; i++) foldRow(out, data[i]!, i, ROW_LIMIT);
@@ -157,22 +149,22 @@ async function columnar(url: string, q: Question): Promise<Run> {
   });
   phases.push({ name: 'parse to rows of cells', ms: parsed });
 
-  const [schema, inferred] = await measure('columnar:infer', () =>
+  const [schema, inferred] = await timedAsync('columnar:infer', () =>
     inferSchema(parsedRows.header, parsedRows.rows),
   );
   phases.push({ name: 'infer types', ms: inferred });
 
-  const [store, built] = await measure('columnar:encode', () =>
+  const [store, built] = await timedAsync('columnar:encode', () =>
     buildColumnStore(parsedRows.header, parsedRows.rows, schema),
   );
   phases.push({ name: 'encode columns', ms: built });
 
-  const [, indexed] = await measure('columnar:index', () =>
+  const [, indexed] = await timedAsync('columnar:index', () =>
     buildRowIndex(store, { sort: null, filters: [], hidden: [] }),
   );
   phases.push({ name: 'build the RowIndex', ms: indexed });
 
-  const [result, aggregated] = await measure('columnar:aggregate', () =>
+  const [result, aggregated] = await timedAsync('columnar:aggregate', () =>
     executeOperation(store, q.operation, { metric: q.metric, chartType: q.chartType }),
   );
   phases.push({ name: 'aggregate over columns', ms: aggregated });
@@ -186,7 +178,7 @@ async function columnar(url: string, q: Question): Promise<Run> {
 async function worker(port: DataPort, url: string, id: string, q: Question): Promise<Run> {
   const phases: Phase[] = [];
 
-  const [handled, parsed] = await measure('worker:parse', () =>
+  const [handled, parsed] = await timedAsync('worker:parse', () =>
     port.send({ type: 'parse', source: { url }, ref: { kind: 'sample', id }, label: id }).done,
   );
   if (handled.type !== 'parse:done') throw new Error(`the worker said ${handled.type}`);
@@ -205,7 +197,7 @@ async function worker(port: DataPort, url: string, id: string, q: Question): Pro
   }
   phases.push({ name: '  the round trip minus all of it', ms: parsed - inside, nested: true });
 
-  const [answered, aggregated] = await measure('worker:analyze', () =>
+  const [answered, aggregated] = await timedAsync('worker:analyze', () =>
     port.send({
       type: 'analyze',
       operation: q.operation,

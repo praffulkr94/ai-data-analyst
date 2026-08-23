@@ -315,7 +315,7 @@ describe('the table under an Analysis', () => {
     useApp.getState().clearTableFilter();
 
     expect(byId(a)!.revisions).toHaveLength(1);
-    expect(s.workspace.latestSpec()).toBe(before);
+    expect(byId(a)!.revisions.at(-1)!.spec).toBe(before);
   });
 });
 

@@ -8,9 +8,9 @@
 import { useEffect, useState } from 'react';
 
 /** Matches the `--motion-slow` token, so the plot area and the chrome agree. */
-export const REVEAL_MS = 180;
+const REVEAL_MS = 180;
 
-export function prefersReducedMotion(): boolean {
+function prefersReducedMotion(): boolean {
   // jsdom has no `matchMedia`, and a chart in a test has nothing to animate anyway.
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true;
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
