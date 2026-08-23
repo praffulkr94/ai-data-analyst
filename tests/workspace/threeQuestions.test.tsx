@@ -92,7 +92,7 @@ describe('three Questions in four seconds', () => {
     if (parsed.type !== 'parse:done') throw new Error('fixture failed to parse');
     useApp.getState().setDataset(parsed.handle, null);
 
-    render(<AnalysisCard />);
+    render(<AnalysisCard workspace={workspace} />);
 
     await act(async () => {
       void workspace.ask('matches by team');

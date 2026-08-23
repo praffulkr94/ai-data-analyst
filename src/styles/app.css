@@ -162,7 +162,8 @@ button.link {
   font-size: var(--text-sm);
 }
 
-.segmented button.on {
+.segmented button.on,
+.segmented button[aria-pressed='true'] {
   background: var(--accent);
   color: var(--accent-on);
 }
@@ -802,6 +803,24 @@ h2 {
   font-weight: 500;
 }
 
+.rail-row {
+  display: flex;
+  align-items: center;
+}
+
+/* Only on hover or keyboard focus: a delete affordance on every row at rest is a rail that
+   reads as a list of things about to be deleted. */
+.rail-delete {
+  opacity: 0;
+  padding: 2px 6px;
+  color: var(--text-muted);
+}
+
+.rail-row:hover .rail-delete,
+.rail-delete:focus-visible {
+  opacity: 1;
+}
+
 .rail-updated {
   margin-left: 6px;
   color: var(--accent);
@@ -821,6 +840,41 @@ h2 {
   padding-left: 18px;
   font-size: var(--text-sm);
   color: var(--text-muted);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.stepper button {
+  padding: 0 6px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-right: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table-head .column-menu {
+  border-bottom: 0;
+  flex: 1;
 }
 
 .analysis h2 {

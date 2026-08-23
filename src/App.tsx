@@ -42,7 +42,7 @@ export function App({
         {hasDataset ? (
           <>
             <Notice workspace={workspace} />
-            <AnalysisCard />
+            <AnalysisCard workspace={workspace} />
             <SchemaPanel loader={loader} />
             <DevPanel port={port} />
             <DataTable cache={cache} />

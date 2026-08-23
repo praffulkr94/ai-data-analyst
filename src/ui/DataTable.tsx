@@ -5,6 +5,7 @@ import {
   type VisibilityState,
 } from '@tanstack/react-table';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { Filter } from '../spec/grammar';
 import { useApp } from '../store';
 import type { Row, SliceCache } from '../table/sliceCache';
 import { useRowSlice } from '../table/useRowSlice';
@@ -21,6 +22,7 @@ export function DataTable({ cache }: { cache: SliceCache }) {
   const schema = useApp((s) => s.columns);
   const sortBy = useApp((s) => s.sortBy);
   const toggleColumn = useApp((s) => s.toggleColumn);
+  const clearTableFilter = useApp((s) => s.clearTableFilter);
 
   const scroller = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -91,11 +93,26 @@ export function DataTable({ cache }: { cache: SliceCache }) {
 
   return (
     <section className="table-wrap">
-      <ColumnMenu
-        schema={schema.map((c) => c.name)}
-        hidden={viewState.hidden}
-        onToggle={toggleColumn}
-      />
+      <div className="table-head">
+        <ColumnMenu
+          schema={schema.map((c) => c.name)}
+          hidden={viewState.hidden}
+          onToggle={toggleColumn}
+        />
+        {/* The active Analysis's filters, as one removable chip: these are the rows its chart
+            was computed from. Removing it widens the table and leaves the Analysis alone —
+            table sort and filter never drive the chart, only ever the other way. */}
+        {viewState.filters.length > 0 && (
+          <button
+            type="button"
+            className="chip chip-button"
+            onClick={clearTableFilter}
+            aria-label={`Show all rows, removing the filter ${describe(viewState.filters)}`}
+          >
+            {describe(viewState.filters)} &times;
+          </button>
+        )}
+      </div>
       <div
         className="table-scroll"
         ref={scroller}
@@ -148,6 +165,36 @@ export function DataTable({ cache }: { cache: SliceCache }) {
     </section>
   );
 }
+
+const SYMBOL: Record<'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte', string> = {
+  eq: '=',
+  neq: '\u2260',
+  gt: '>',
+  gte: '\u2265',
+  lt: '<',
+  lte: '\u2264',
+};
+
+/** The filters as the chip's text. The Operation's own words, so a visitor can see that the
+    table is showing the same selection the chart was drawn from. */
+const describe = (filters: Filter[]): string =>
+  filters
+    .map((f) => {
+      switch (f.op) {
+        case 'in':
+          return `${f.column} in ${f.values.join(', ')}`;
+        case 'between':
+        case 'dateRange':
+          return `${f.column} ${f.from}\u2013${f.to}`;
+        case 'isNull':
+          return `${f.column} is empty`;
+        case 'isNotNull':
+          return `${f.column} is not empty`;
+        default:
+          return `${f.column} ${SYMBOL[f.op]} ${f.value}`;
+      }
+    })
+    .join(' \u00b7 ');
 
 /** Occupies the height of the rows that are not rendered. */
 function Spacer({ height, span }: { height: number; span: number }) {
