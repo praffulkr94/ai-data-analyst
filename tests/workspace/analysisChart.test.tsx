@@ -647,3 +647,99 @@ describe('the accessible chart', () => {
     expect(document.getElementById(describedBy!)).toBe(screen.getByRole('table', { hidden: true }));
   });
 });
+
+/** Keyboard-navigable marks, for bar only — doing one chart type well beats doing four badly
+    (DECISIONS §15). What is asserted is the shape of the interaction: one tab stop for the
+    whole chart, the arrow keys moving inside it, and every bar naming itself. */
+describe('walking a bar chart from the keyboard', () => {
+  const result = run(
+    [...YEARLY([2020, 2021, 2022], 'Brazil')],
+    op({ timeBucket: { column: 'date', unit: 'year' }, sort: { by: 'date', dir: 'asc' } }),
+  );
+  const bars = () => [...document.querySelectorAll<SVGRectElement>('[data-bar]')];
+  const stops = () => bars().filter((b) => b.getAttribute('tabindex') === '0');
+  const key = (el: Element, k: string) => fireEvent.keyDown(el, { key: k });
+
+  it('offers one tab stop for the whole chart, on the first bar', () => {
+    render(<AnalysisChart result={result} visualization={viz({ type: 'bar' })} />);
+    expect(bars()).toHaveLength(3);
+    expect(stops()).toEqual([bars()[0]]);
+  });
+
+  it('moves along the axis with the arrow keys, and the tab stop follows the focus', () => {
+    render(<AnalysisChart result={result} visualization={viz({ type: 'bar' })} />);
+    bars()[0]!.focus();
+    key(document.activeElement!, 'ArrowRight');
+    expect(document.activeElement).toBe(bars()[1]);
+    key(document.activeElement!, 'ArrowRight');
+    expect(document.activeElement).toBe(bars()[2]);
+    key(document.activeElement!, 'ArrowLeft');
+    expect(document.activeElement).toBe(bars()[1]);
+    // The reader left it there, so Tab comes back to it and not to the first bar.
+    expect(stops()).toEqual([bars()[1]]);
+  });
+
+  it('stops at both ends rather than wrapping, and Home and End reach them', () => {
+    render(<AnalysisChart result={result} visualization={viz({ type: 'bar' })} />);
+    bars()[0]!.focus();
+    key(document.activeElement!, 'ArrowLeft');
+    expect(document.activeElement).toBe(bars()[0]);
+    key(document.activeElement!, 'End');
+    expect(document.activeElement).toBe(bars()[2]);
+    key(document.activeElement!, 'ArrowRight');
+    expect(document.activeElement).toBe(bars()[2]);
+    key(document.activeElement!, 'Home');
+    expect(document.activeElement).toBe(bars()[0]);
+  });
+
+  it('names every bar by its group and its value, and a bucket as a date', () => {
+    render(<AnalysisChart result={result} visualization={viz({ type: 'bar' })} />);
+    expect(bars().map((b) => b.getAttribute('aria-label'))).toEqual([
+      '2020: 1',
+      '2021: 1',
+      '2022: 1',
+    ]);
+  });
+
+  it('names the Series too, where a bar carries one in colour alone', () => {
+    const grouped = run(
+      [...YEARLY([2020], 'Brazil'), ...YEARLY([2020], 'Peru')],
+      op({
+        timeBucket: { column: 'date', unit: 'year' },
+        groupBy: ['team'],
+        sort: { by: 'date', dir: 'asc' },
+      }),
+    );
+    render(<AnalysisChart result={grouped} visualization={viz({ type: 'bar', seriesBy: 'team' })} />);
+    expect(bars().map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Brazil, 2020: 1',
+      'Peru, 2020: 1',
+    ]);
+    // Still one tab stop across both Series, and the arrows cross from one into the other.
+    expect(stops()).toEqual([bars()[0]]);
+    bars()[0]!.focus();
+    key(document.activeElement!, 'ArrowRight');
+    expect(document.activeElement).toBe(bars()[1]);
+  });
+
+  it('keeps a tab stop when the first Series has no bar to draw', () => {
+    // `goals` is null for Chile throughout, so an average over it draws no bar for that Series.
+    const rows = [
+      ['2020-06-15', 'Chile', 'NA'],
+      ['2020-06-15', 'Brazil', '2'],
+    ];
+    const nulled = run(
+      rows,
+      op({
+        groupBy: ['team'],
+        aggregations: [{ id: 'm', fn: 'avg', column: 'goals', label: 'goals' }],
+        sort: null,
+      }),
+    );
+    render(
+      <AnalysisChart result={nulled} visualization={{ type: 'bar', x: 'team', y: 'm', seriesBy: null }} />,
+    );
+    expect(bars()).toHaveLength(1);
+    expect(stops()).toEqual([bars()[0]]);
+  });
+});

@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { CHART_BUDGET } from '../engine/operation';
 import { temporalLabel } from '../engine/time';
 import { useApp } from '../store';
-import type { ResultField, ResultRow } from '../engine/result';
+import { dimensionText, type ResultField, type ResultRow } from '../engine/result';
 import type { ChartType } from '../spec/grammar';
 import type { Scales } from './useScales';
 import type { ChartDimensions } from './useChartDimensions';
@@ -177,9 +177,16 @@ export type MarkProps = {
       identifiable without reading its colour (ADR-0012). Omitted for a single Series. */
   label?: string;
   onHover?: (row: ResultRow | null, at: { x: number; y: number }) => void;
-  /** Roving tabindex support: which mark is focusable, and what to call when it is entered. */
-  focusIndex?: number;
-  onFocusIndex?: (index: number) => void;
+  /** The result field on the x-axis, so a mark can name its group the way the axis does. */
+  field?: ResultField;
+  /** Roving tabindex: the bar that currently holds the chart's single tab stop, and what to
+      call when another one is entered. `null` before any has been — see `entry`. */
+  focusKey?: string | null;
+  onFocusKey?: (key: string) => void;
+  /** Whether this is the Series the tab stop starts in: the first one with a bar to draw. A
+      Series whose every value is null draws no rect, so "the first Series" is not good
+      enough — the chart works it out once and tells the mark. */
+  entry?: boolean;
   /** Where to put the direct label, when the chart has moved it off the line's own end to keep
       it clear of another Series' label. */
   labelY?: number;
@@ -187,6 +194,26 @@ export type MarkProps = {
       once when the visitor asked for reduced motion. */
   reveal?: number;
 };
+
+/** How far the arrow keys move, in bars. Left and right only: a bar chart's traversal is its
+    x-axis, and mapping up and down onto the same axis would be two names for one move. */
+const STEP: Record<string, number> = {
+  ArrowRight: 1,
+  ArrowLeft: -1,
+  Home: -Infinity,
+  End: Infinity,
+};
+
+/** Move the focus by `delta` bars, in document order — which for a grouped chart is Series by
+    Series rather than band by band. That is the more useful reading of a grouped bar chart
+    (one Series over its whole axis, then the next) and it is the order the marks are already
+    in, so nothing has to be sorted. Clamped at both ends: an arrow key that wraps loses the
+    reader's place. */
+function step(from: SVGRectElement, delta: number): void {
+  const bars = [...(from.ownerSVGElement?.querySelectorAll<SVGRectElement>('[data-bar]') ?? [])];
+  const to = bars.indexOf(from) + delta;
+  bars[Math.max(0, Math.min(bars.length - 1, to))]?.focus();
+}
 
 export function Bars({
   rows,
@@ -198,9 +225,11 @@ export function Bars({
   subIndex = 0,
   subCount = 1,
   label,
+  field,
   onHover,
-  focusIndex,
-  onFocusIndex,
+  focusKey,
+  onFocusKey,
+  entry = false,
 }: MarkProps) {
   if (scales.x.kind !== 'band') return null;
   const band = scales.x.scale;
@@ -208,6 +237,9 @@ export function Bars({
   // drawn over another.
   const width = band.bandwidth() / subCount;
   const zero = scales.y(0);
+  /** Before any bar has been entered the tab stop is the first one that exists, and a row with
+      no value draws nothing to land on. */
+  const first = rows.findIndex((r) => typeof r[y] === 'number');
 
   return (
     <g>
@@ -217,7 +249,11 @@ export function Bars({
         const left = (band(String(row[x] ?? '')) ?? 0) + subIndex * width;
         const top = scales.y(value);
         const height = Math.abs(zero - top);
-        const focusable = focusIndex === i;
+        const key = `${subIndex}:${i}`;
+        // One tab stop for the whole chart, wherever the reader last left it. The arrow keys
+        // move inside it; Tab leaves it (DECISIONS §15).
+        const focusable = focusKey === null || focusKey === undefined ? entry && i === first : focusKey === key;
+        const at = dimensionText(field, row[x]);
         return (
           <g key={`${String(row[x])}-${i}`}>
             <rect
@@ -226,14 +262,20 @@ export function Bars({
               width={width}
               height={Math.max(1, height)}
               fill={seriesColor(slot)}
+              data-bar={key}
               tabIndex={focusable ? 0 : -1}
               role="graphics-symbol"
               aria-label={
-                label
-                  ? `${label}, ${String(row[x] ?? 'no value')}: ${formatValue(value)}`
-                  : `${String(row[x] ?? 'no value')}: ${formatValue(value)}`
+                label ? `${label}, ${at}: ${formatValue(value)}` : `${at}: ${formatValue(value)}`
               }
-              onFocus={() => onFocusIndex?.(i)}
+              onFocus={() => onFocusKey?.(key)}
+              onKeyDown={(e) => {
+                const delta = STEP[e.key];
+                if (delta === undefined) return;
+                // The page would scroll under the reader otherwise, and Home would leave it.
+                e.preventDefault();
+                step(e.currentTarget, delta);
+              }}
               onMouseEnter={(e) => onHover?.(row, { x: e.clientX, y: e.clientY })}
               onMouseLeave={() => onHover?.(null, { x: 0, y: 0 })}
             />

@@ -69,8 +69,13 @@ export function AnalysisChart({
       already. Reset when a new result arrives, because it is a view of that result and not of
       the chart element. */
   const [pan, setPan] = useState(NO_PAN);
-  useEffect(() => setPan(NO_PAN), [result]);
-  const [focusIndex, setFocusIndex] = useState(0);
+  /** The bar the chart's single tab stop sits on, `null` until one has been entered. Reset with
+      the result: a key names a bar in the chart that is on screen now. */
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+  useEffect(() => {
+    setPan(NO_PAN);
+    setFocusKey(null);
+  }, [result]);
   /** One hover value for the whole chart. Marks report into it; nothing else subscribes. */
   const [hover, setHover] = useState<Hover | null>(null);
   const tableId = useId();
@@ -163,10 +168,19 @@ export function AnalysisChart({
     scales,
     dimensions,
     slot: i,
+    field: xField,
     label: named && series.length > 1 ? s.label : undefined,
     onHover: (row: ResultRow | null, at: { x: number; y: number }) =>
       setHover(row === null ? null : { row, ...at }),
   });
+
+  /** Where the tab stop starts: the first Series with a bar to draw. A Series whose every value
+      is null draws no rect, so taking Series 0 on faith can leave a chart with no tab stop at
+      all. */
+  const entrySeries = useMemo(
+    () => series.findIndex((s) => s.rows.some((r) => typeof r[visualization.y] === 'number')),
+    [series, visualization.y],
+  );
 
   const mark = (s: Series, i: number) => {
     const common_ = common(s, i);
@@ -178,10 +192,9 @@ export function AnalysisChart({
             {...common_}
             subIndex={i}
             subCount={series.length}
-            // ponytail: one focusable bar per Series, which is reachable but not ordered.
-            // Roving tabindex across marks is M9's item.
-            focusIndex={focusIndex}
-            onFocusIndex={setFocusIndex}
+            focusKey={focusKey}
+            onFocusKey={setFocusKey}
+            entry={i === entrySeries}
           />
         );
       case 'line':
