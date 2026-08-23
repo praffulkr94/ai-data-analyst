@@ -2,7 +2,7 @@
     write state from outside the React tree, and selector subscriptions let the chart re-render
     without re-rendering the table (DECISIONS §12). No middleware. */
 import { create } from 'zustand';
-import type { ModelChoice, TokenCounts } from './ai/models';
+import { costOf, type ModelChoice, type TokenCounts } from './ai/models';
 import type { Usage } from './ai/translator';
 import type { DatasetHandle, ParseReport } from './engine/handle';
 import type { AnalysisResult } from './engine/result';
@@ -63,6 +63,10 @@ export type UsageState = {
   /** Every Request this session, including ones whose results were discarded — they were still
       charged for. */
   total: TokenCounts;
+  /** Dollars, accumulated per Request at the price of the model that answered it. Kept here
+      rather than derived from `total` at render time, because a session can mix models and
+      modes, and a recorded reply cost nothing whatever its counts say. */
+  cost: number;
   requests: number;
 };
 
@@ -147,7 +151,7 @@ export const useApp = create<AppState>((set) => ({
   activeAnalysisId: null,
   pendingNotice: null,
   request: null,
-  usage: { last: null, total: NO_TOTAL, requests: 0 },
+  usage: { last: null, total: NO_TOTAL, cost: 0, requests: 0 },
 
   setMode: (mode) => set({ mode }),
   setModel: (model) => set({ model }),
@@ -233,6 +237,7 @@ export const useApp = create<AppState>((set) => ({
       usage: {
         last: current ? usage : s.usage.last,
         requests: s.usage.requests + 1,
+        cost: s.usage.cost + (usage.recorded ? 0 : costOf(usage.model, usage)),
         total: {
           inputTokens: s.usage.total.inputTokens + usage.inputTokens,
           cacheReadTokens: s.usage.total.cacheReadTokens + usage.cacheReadTokens,

@@ -8,7 +8,7 @@
     1,024 tokens and a shorter one silently fails to cache, so a caching claim that is not visible
     is a caching claim that is not checked. */
 import { buildRequest } from '../ai/anthropic';
-import { costOf, MODELS } from '../ai/models';
+import { MODELS } from '../ai/models';
 import { useApp } from '../store';
 
 export function UsageReadout() {
@@ -20,7 +20,6 @@ export function UsageReadout() {
 
   const last = usage.last;
   const recorded = last?.recorded ?? mode === 'demo';
-  const total = costOf(model, usage.total);
 
   return (
     <details className="usage">
@@ -40,8 +39,12 @@ export function UsageReadout() {
           <span className="muted">No questions asked yet</span>
         )}
         <span className="usage-total">
-          {usage.requests} {usage.requests === 1 ? 'question' : 'questions'} ·{' '}
-          {recorded ? <em>recorded, $0.00</em> : money(total)}
+          {usage.requests} {usage.requests === 1 ? 'question' : 'questions'} · {money(usage.cost)}
+          {recorded && (
+            <em className="tag" title="Replayed from a recording — nothing was charged">
+              recorded
+            </em>
+          )}
         </span>
       </summary>
 
@@ -52,7 +55,10 @@ export function UsageReadout() {
           <Row label="Input (cache write)" value={num(last?.cacheWriteTokens ?? 0)} />
           <Row label="Output" value={num(last?.outputTokens ?? 0)} />
           <Row label="Model" value={MODELS[last?.model ?? model].id} />
-          <Row label="Session total" value={`${num(sum(usage.total))} tokens · ${money(total)}`} />
+          <Row
+            label="Session total"
+            value={`${num(sum(usage.total))} tokens · ${money(usage.cost)}`}
+          />
         </tbody>
       </table>
       {recorded && (

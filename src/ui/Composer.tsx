@@ -4,6 +4,7 @@
     visitor they were understood before any data moves, and the chip strip beside it fills in as
     the specification's fields become readable. Both are display only. */
 import { useState, type FormEvent } from 'react';
+import { repertoireFor } from '../ai/fixtures';
 import { MODELS, MODEL_CHOICES, type ModelChoice } from '../ai/models';
 import { useApp } from '../store';
 import type { Workspace } from '../workspace/workspace';
@@ -31,6 +32,7 @@ export function Composer({ workspace }: { workspace: Workspace }) {
   return (
     <footer className="composer">
       <StreamStrip />
+      {ready && mode === 'demo' && <Repertoire workspace={workspace} />}
       <form className="composer-row" onSubmit={submit}>
         <input
           type="text"
@@ -41,7 +43,7 @@ export function Composer({ workspace }: { workspace: Workspace }) {
               ? 'Load a Dataset to ask a question'
               : canAsk
                 ? 'Ask a question about this Dataset…'
-                : 'Demo mode answers a fixed set of Questions'
+                : 'Demo mode answers the Questions above — add a key to ask anything'
           }
           disabled={!canAsk}
           aria-label="Question"
@@ -70,14 +72,59 @@ export function Composer({ workspace }: { workspace: Workspace }) {
           </button>
         )}
       </form>
-      {ready && mode === 'demo' && (
-        <p className="composer-hint muted">
-          Demo mode replays recorded model responses through the real validation and execution
-          path. Switch to <strong>Your API key</strong> to ask anything.
-        </p>
-      )}
       {ready && <UsageReadout />}
     </footer>
+  );
+}
+
+/** The demo repertoire, as chips. Free text is disabled in Demo mode, so these are not a
+    convenience — they are the whole set of Questions that can be asked, and saying which they are
+    is the difference between a fixed repertoire and an interface that appears broken.
+
+    A Fixture names columns, so only the ones recorded against the Dataset actually loaded are
+    offered. A refining Question needs something to refine, so it appears only once there is an
+    Analysis on screen. */
+function Repertoire({ workspace }: { workspace: Workspace }) {
+  const ref = useApp((s) => s.datasetHandle?.ref);
+  const hasAnalysis = useApp((s) => s.activeAnalysisId !== null);
+  const inFlight = useApp((s) => s.request !== null);
+
+  const fixtures = repertoireFor(ref?.kind === 'sample' ? ref.id : null).filter(
+    (f) => hasAnalysis || f.input.kind !== 'analysis' || f.input.intent !== 'refine',
+  );
+
+  if (fixtures.length === 0) {
+    return (
+      <p className="composer-hint muted">
+        Demo mode replays recorded answers, and none were recorded against this Dataset. Load{' '}
+        <strong>International football matches</strong>, or switch to{' '}
+        <strong>Your API key</strong> to ask anything.
+      </p>
+    );
+  }
+
+  return (
+    <div className="repertoire">
+      <p className="composer-hint muted" id="repertoire-hint">
+        Demo mode answers these {fixtures.length} Questions, replaying recorded responses through
+        the real validation and execution path. Switch to <strong>Your API key</strong> to ask
+        anything.
+      </p>
+      <ul className="chip-strip" aria-labelledby="repertoire-hint">
+        {fixtures.map((f) => (
+          <li key={f.question}>
+            <button
+              type="button"
+              className="chip chip-button"
+              disabled={inFlight}
+              onClick={() => void workspace.ask(f.question)}
+            >
+              {f.question}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

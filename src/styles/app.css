@@ -713,6 +713,33 @@ h2 {
   color: var(--text);
 }
 
+.chip-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.chip-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* The demo repertoire is the whole set of Questions that can be asked, not a suggestion
+   strip, so it sits above the disabled input rather than beside it. */
+.repertoire {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.repertoire .chip-strip {
+  gap: 6px;
+}
+
+.repertoire .chip {
+  padding: 3px 10px;
+}
+
 @keyframes chip-in {
   from {
     opacity: 0;
