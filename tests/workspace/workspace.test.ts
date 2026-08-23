@@ -2,127 +2,32 @@
     kernel. No HTTP anywhere — the Translator is the seam, and this is what it is for.
 
     The staleness test is the single highest-value test in the project. Everything else here is
-    the Repair, the notices and the usage accounting around it. */
+    the Repair, the notices and the usage accounting around it. The harness these share lives in
+    `harness.ts`, so a second file of Workspace tests does not fork it. */
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Attempt, TranslateRequest, Translator } from '../../src/ai/translator';
 import { createLoader } from '../../src/data/loader';
-import type { DatasetRef } from '../../src/engine/handle';
-import type { ModelReply } from '../../src/spec/grammar';
 import { useApp } from '../../src/store';
-import type { DataPort } from '../../src/worker/port';
 import { createLocalPort } from '../../src/worker/localPort';
 import { createWorkspace } from '../../src/workspace/workspace';
-
-const ref: DatasetRef = { kind: 'sample', id: 'matches' };
-const CSV = [
-  'date,home_team,home_score,neutral',
-  '1872-11-30,Scotland,0,FALSE',
-  '1873-03-08,England,4,FALSE',
-  '1874-03-07,Scotland,2,TRUE',
-  '1875-03-06,England,2,FALSE',
-].join('\n');
-
-/** A reply naming `column` as the thing to count matches by. `home_teem` is the typo that makes
-    the semantic validator speak. */
-const analysis = (title: string, column = 'home_team', intent: 'new' | 'refine' = 'new'): ModelReply => ({
-  kind: 'analysis',
-  intent,
-  title,
-  narration: `Counting matches by ${column}.`,
-  operation: {
-    filters: [],
-    groupBy: [column],
-    timeBucket: null,
-    aggregations: [{ id: 'm', fn: 'count', column: null, label: 'matches' }],
-    derived: [],
-    sort: null,
-    limit: null,
-  },
-  visualization: { type: 'bar', x: column, y: 'm', seriesBy: null },
-});
-
-const attempt = (reply: ModelReply | null, over: Partial<Attempt> = {}): Attempt => ({
-  reply,
-  failure: null,
-  usage: {
-    model: 'smart',
-    recorded: false,
-    inputTokens: 100,
-    cacheReadTokens: 0,
-    cacheWriteTokens: 0,
-    outputTokens: 50,
-  },
-  input: reply,
-  echo: { id: 'toolu_1', name: 'submit_analysis', input: reply },
-  ...over,
-});
-
-/** A Translator whose replies are handed out by the test, one at a time and in any order. */
-function scripted() {
-  const calls: { req: TranslateRequest; settle: (a: Attempt) => void }[] = [];
-  const translator: Translator = {
-    translate: (req) => new Promise<Attempt>((settle) => calls.push({ req, settle })),
-  };
-  return {
-    translator,
-    calls,
-    /** Resolve the nth call and let every continuation it starts run to completion. */
-    async resolve(n: number, a: Attempt) {
-      calls[n]!.settle(a);
-      await flush();
-    },
-  };
-}
-
-/** The Request lifecycle awaits the Translator, then the worker. Draining the microtask queue a
-    few times is enough for both, since the local port resolves without a timer. */
-const flush = async () => {
-  for (let i = 0; i < 8; i++) await Promise.resolve();
-};
-const frame = () => new Promise((r) => requestAnimationFrame(r));
-
-const INITIAL = useApp.getState();
-
-async function setup() {
-  useApp.setState(INITIAL, true);
-  const port = createLocalPort();
-  const loader = createLoader(port);
-  const script = scripted();
-  const workspace = createWorkspace({ translator: script.translator, port, loader });
-  const res = await port.send({ type: 'parse', source: { text: CSV }, ref, label: 'm.csv' }).done;
-  if (res.type !== 'parse:done') throw new Error('fixture failed to parse');
-  useApp.getState().setDataset(res.handle, null);
-  return { workspace, script, port };
-}
-
-/** A port that holds its answer until the test lets it go, so a Request can be superseded while
-    its worker job is still running — the case that separates a guard at every continuation from
-    a guard at the model call alone. */
-function gated(port: DataPort): { port: DataPort; release: () => Promise<void> } {
-  const held: (() => void)[] = [];
-  return {
-    port: {
-      ...port,
-      send(req, onProgress) {
-        const call = port.send(req, onProgress);
-        return {
-          jobId: call.jobId,
-          done: new Promise((resolve) => held.push(() => void call.done.then(resolve))),
-        };
-      },
-    },
-    async release() {
-      held.splice(0).forEach((r) => r());
-      await flush();
-    },
-  };
-}
-
-const analyses = () => useApp.getState().analyses;
-const titles = () => analyses().map((a) => a.title);
+import {
+  analyses,
+  analysis,
+  attempt,
+  CSV,
+  flush,
+  frame,
+  gated,
+  INITIAL,
+  ref,
+  reset,
+  scripted,
+  setup,
+  titles,
+} from './harness';
+import type { Attempt, Translator } from '../../src/ai/translator';
 
 describe('the Request lifecycle', () => {
-  beforeEach(() => useApp.setState(INITIAL, true));
+  beforeEach(reset);
 
   it('renders exactly one chart from three Questions that resolve out of order', async () => {
     const { workspace, script } = await setup();
@@ -232,7 +137,7 @@ describe('the Request lifecycle', () => {
 });
 
 describe('the single Repair', () => {
-  beforeEach(() => useApp.setState(INITIAL, true));
+  beforeEach(reset);
 
   it('hands the violations back once and lands the corrected specification', async () => {
     const { workspace, script } = await setup();
@@ -313,7 +218,7 @@ describe('the single Repair', () => {
 });
 
 describe('notices and navigation', () => {
-  beforeEach(() => useApp.setState(INITIAL, true));
+  beforeEach(reset);
 
   it('clears the notice on the next submission and on dismissal', async () => {
     const { workspace, script } = await setup();
@@ -403,7 +308,7 @@ describe('notices and navigation', () => {
 });
 
 describe('the narration', () => {
-  beforeEach(() => useApp.setState(INITIAL, true));
+  beforeEach(reset);
 
   it('reaches the store in whole frames rather than per delta', async () => {
     useApp.setState(INITIAL, true);

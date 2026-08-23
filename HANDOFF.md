@@ -86,6 +86,10 @@ else is wiring around them.
   `ResizeObserver` stub reporting a fixed 900px, because `useChartDimensions` takes its width from
   an observer and nowhere else and jsdom has none. Where a rule is only observable in the path — a
   line breaking at a gap — count subpaths, never coordinates.
+- **The `Workspace` seam tests share `tests/workspace/harness.ts`** — the scripted Translator, the
+  `attempt`/`analysis` builders, the gated port, and a `setup` that parses a four-row CSV through
+  the real kernel. Use it rather than forking a second copy; it is already what the M6 tests will
+  need.
 - **Tests that care about a ColumnType state it.** A small fixture falls under the 95% numeric
   threshold and infers categorical; `tests/engine/operation.test.ts` has the helper for this.
   Inference has its own tests and does not need testing again through the executor.
