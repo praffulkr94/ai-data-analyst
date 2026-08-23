@@ -17,11 +17,12 @@ import type { WorkerRequest, WorkerResponse } from './protocol';
 
 export type Post = (m: WorkerResponse) => void;
 
-/** Fetch a shipped Dataset, gunzipping it only if it actually arrives gzipped. Some hosts —
+/** Fetch a shipped Dataset, gunzipping it only if it actually arrives gzipped. Exported for
+    `/bench`, whose naive path has to do this on the main thread to be naive. Some hosts —
     Vite's dev server among them — serve a `.gz` file with `Content-Encoding: gzip`, so the
     browser has already decompressed it by the time we see the body; others serve the bytes
     untouched. Sniffing the two-byte magic number is correct on both. */
-async function fetchDataset(url: string): Promise<Blob> {
+export async function fetchDataset(url: string): Promise<Blob> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Could not fetch ${url} — the server said ${res.status}.`);
   const blob = await res.blob();

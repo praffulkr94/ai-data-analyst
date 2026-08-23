@@ -145,3 +145,31 @@ export function buildColumnStore(
   });
   return { rowCount: rows.length, columns, schema: { columns: corrected } };
 }
+
+/** The bytes a ColumnStore actually occupies, counted rather than estimated: typed arrays know
+    their own `byteLength`, and the only other storage is the strings a dictionary or a text
+    column holds. A JS string is charged 16 bytes of object header plus two per code unit, which
+    is V8's worst case — a one-byte string costs half that, and nothing here rounds down.
+    Row objects have no equivalent reading, which is why §13 sends the memory comparison to a
+    DevTools heap snapshot and this number stands beside it rather than instead of it. */
+export function storeBytes(store: ColumnStore): number {
+  const string = (s: string) => 16 + s.length * 2;
+  let total = 0;
+  for (const col of store.columns.values()) {
+    switch (col.kind) {
+      case 'number':
+      case 'date':
+      case 'boolean':
+        total += col.values.byteLength;
+        break;
+      case 'dict':
+        total += col.codes.byteLength;
+        for (const v of col.values) total += string(v);
+        break;
+      case 'text':
+        for (const v of col.values) total += v === null ? 0 : string(v);
+        break;
+    }
+  }
+  return total;
+}
