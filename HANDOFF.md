@@ -20,7 +20,7 @@ they win. Precedence is `DECISIONS.md` → `docs/adr/*` → `CONTEXT.md` → iss
   "store". RowSlice — never "window". ModelReply — never `SpecResponse`. Translator — never
   `SpecGenerator`. A concept you need that is missing from the glossary is a signal, not a
   licence to invent one.
-- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are twenty-two.
+- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are twenty-three.
 - Issue #1 — the whole spec, and the only place the work is decomposed.
 
 ## The constraint that has to travel with you
@@ -77,7 +77,12 @@ else is wiring around them.
   in-process for the seam tests. One implementation, two adapters — do not fork it.
 - `src/spec/` — the Zod grammar, the semantic validator, and `edits.ts`: the two manual edits and
   the option lists they offer, which are asked of the validator rather than restated.
-- `src/chart/` — the three layers: dimensions, scales, dumb marks.
+- `src/chart/` — the three layers: dimensions, scales, dumb marks. A scatter adds three marks
+  rather than a branch: `<Points>` (circles, and the Series label whether or not it drew them),
+  `<PointsCanvas>` (one canvas per Series past `CANVAS_ABOVE`, over the plot area, transparent to
+  the pointer), and `<PointsHover>` (the quadtree, which hit-tests for both renderers). The point
+  and Series budgets live in `CHART_BUDGET` in the engine and travel on the `analyze` message —
+  ADR-0023, read it before touching a cap.
 - `src/table/` — the SliceCache and its React window.
 - `src/ui/` — components.
 
@@ -158,41 +163,67 @@ else is wiring around them.
   different budgets: `MAX_RETRIES` waits, `MAX_ATTEMPTS` repairs, and a wait must not consume a
   Repair. The SDK's own `maxRetries` is set to 0 — a retry the visitor cannot see is a wait they
   cannot understand.
+- A mark that walks its rows in render costs that walk on **every** hover frame: the chart
+  re-renders per pointer move, and `<Points>` mapping and sorting 98,899 rows took a hover frame
+  to roughly a second. Memoize on the rows and the scales. `ResultTable` had the same problem from
+  the other end and is now `memo`'d — safe there, where an `AnalysisResult` is an immutable value,
+  and still not safe over the `DataTable`'s window (ADR-0017).
+- A canvas cannot inherit a CSS custom property, so it reads `--series-n` in its own effect — and
+  child effects run before parent effects, so the `data-theme` write in `App` has to be a
+  `useLayoutEffect` or the canvas keeps the palette of the theme just left.
+- `temporalLabel` receives three forms: a `Date` from a time scale, a stringified epoch from a
+  band domain, and an **ISO day** from a `date` column that was grouped by rather than bucketed,
+  because that is what `cellText` gives a date. It knew the first two, so a bar chart grouped by a
+  raw date column labelled every tick "no value".
+- A drag tracked in a local variable is reset by the re-render the drag itself causes: it moves
+  one pixel and stops. It has to be a ref.
+- `setPointerCapture` throws on a pointer id that is not down — which every synthetic event is —
+  and jsdom does not implement it. The call is wrapped; the drag works without it, it just ends
+  at the edge of the plot.
+- jsdom has no 2D context, so nothing about the canvas can be asserted in the seam tests: they
+  stub `getContext` to null and assert the elements are gone, the canvas is there, and the table
+  beside it still is. The drawing itself is covered only by the browser check in the M8 commit.
 - `zustand`'s plain `subscribe` fires on every `set`, narration frames included. Anything
   subscribing outside React — the hash writer does — needs its own cheap reference-equality guard
   on the values it actually cares about.
 
-## What M7 leaves standing under M8's ledger
+## What M8 leaves standing under M9's ledger
 
-M8 is scatter and canvas, and two of its ledger items are in direct tension with what the engine
-currently guarantees. Resolve that before writing a `<Points>` mark, not after.
+M9 is the accessibility pass, the evidence and the ship. Four of its items meet something M8 put
+there.
 
-**A 100,000-point scatter cannot come out of `executeOperation` as it stands.** `POINT_CAP` is
-1,000 and the protocol in issue #1 says `analyze:done` returns at most that; `truncated` past it
-is what `degeneracy` turns into the `too-many` state. Worse, `Operation.aggregations` has
-`.min(1)`, so every result is an aggregate — one point per row is not a shape the grammar can ask
-for. A 100k-point scatter therefore needs a decision, and there are only three honest shapes for
-it: raise `POINT_CAP` for scatter alone and let the fold and the renderability guard branch on
-chart type; add a rows-through message to the worker protocol beside `analyze`, which is a second
-execution path and should be argued for rather than slipped in; or restate the ledger item at the
-size the grammar can actually produce and say so in the README. **Whichever it is, it is an ADR.**
+**The canvas scatter has no keyboard path at all, and the pan is the new part.** Arrow-key
+traversal for scatter is explicitly cut (`DECISIONS.md` §15), so that is not the gap. The gap is
+that dragging is a pointer-only interaction that changes what is on screen, and its only keyboard
+affordance is the "Reset view" button that appears once it has been used — which nobody without a
+pointer can make appear. Either the full keyboard pass adds a keyboard way to pan, or the README
+says the pan is pointer-only. **Do not let the audit discover this; it is known.**
 
-**The scatter Series cap of 3 belongs where the fold already is.** `SERIES_BUDGET` is 6 and lives
-in `src/engine/operation.ts`, and the fold happens in the result rather than in the marks
-(ADR-0018). So the budget has to travel with the analyze request the way `metric` and `seriesBy`
-already do — do not cap Series in the chart layer, or the caption will name a fold the marks did
-not perform.
+**A scatter cannot carry a direct label per mark, and the palette obligation still has to be
+met.** ADR-0012 makes direct labels and the "View as table" toggle hard requirements because
+aqua, yellow and magenta fall below 3:1 on white. A hundred thousand labelled points is not a
+chart, so the reliefs a scatter actually offers are the Series name drawn at each Series' own
+rightmost point and the table toggle, both present. A single-Series scatter encodes nothing in
+colour at all. The contrast audit should confirm that reading rather than flag a missing relief.
 
-**Canvas has no accessible table, and that is the contract.** Charts are tested through
-`ResultTable` and never through geometry (`tests/workspace/analysisChart.test.tsx`). A canvas
-renderer must keep rendering the same `ResultTable` beside it and keep the same
-`aria-describedby`, or the chart layer loses its only test surface at exactly the point it gets
-hardest to test. `MARK_CAP.scatter` is already 5,000 in `src/chart/marks.tsx`, which is where the
-SVG-versus-canvas switch belongs.
+**`/bench`'s third path is the scatter, and the numbers in the M8 commit are a spot check, not the
+benchmark.** They are two medians from one browser on one machine with synthetic pointer events —
+8.3 ms hover, 11.5 ms pan at 98,899 points. `/bench` wants N≥7 with min and max, and the honest
+thing to instrument is the pair M8 never measured: the canvas draw loop, and the structured clone
+of ~99,000 result rows across the worker boundary, which ADR-0023 accepted on reasoning alone. The
+spec to drive it is in the dev panel — the `98,899-point scatter (team_matches)` preset, verbatim.
+
+**Say 98,899, never 100k.** `team_matches.csv` is 99,040 rows and 98,899 distinct (date, team)
+pairs, because a few teams played twice in a day. `DECISIONS.md` §16 calls the milestone a
+100k-point scatter; the file's own ceiling is 98,899 and that is the number to write, for the same
+reason §A6 says 99,040 rather than "100k+". The README's performance framing should also say what
+the shape actually is: two small-integer measures overplot onto a grid, because nothing in this
+Dataset is continuous. What is demonstrated is 98,899 points drawn, panned and hit-tested.
 
 ## Known to be ahead of its tests
 
-Two entries at the time of writing. Both ledger items are deliberately left unticked.
+Three entries at the time of writing. The two that are ledger items — caching and the Fixtures —
+are deliberately left unticked; the third is a gap the same key closes.
 
 **Prompt caching is implemented and unverified.** The `cache_control` breakpoint is on the last
 system block and the readout shows `cache_read_input_tokens` as its own figure, but nobody has
@@ -219,6 +250,15 @@ with the Smart model, and replace that Fixture's `narration`, `input` and `usage
 back. The narration is the text before the tool call, the input is the tool call verbatim, and the
 usage is the four numbers from the readout. `fixtures.test.ts` will fail loudly if a re-recorded
 reply drifts outside the grammar or names a column that does not exist. Then tick the item.
+
+**No Fixture asks a scatter Question, so Demo mode cannot show one.** The whole of M8 is
+reachable without a key only from the dev panel's `98,899-point scatter (team_matches)` preset. A
+fourteenth hand-authored Fixture was deliberately *not* added: the thirteen that exist are already
+owed a re-recording, and adding to that debt to fill a gap a key closes properly is the wrong
+trade. Whoever re-records them should add one against the `matches` Dataset — "Do teams that
+score at home also concede at home?", `groupBy ["home_team"]`, `avg home_score` against
+`avg away_score`, `type: "scatter"` — which is ~320 points and so exercises the SVG path, and note
+that the canvas path needs a Dataset with a fine enough grouping to pass 5,000.
 
 If you leave a grammar field half-wired or an implementation ahead of its tests, add it here and
 leave its ledger item unticked.
