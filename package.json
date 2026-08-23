@@ -27,7 +27,8 @@
     "test:watch": "vitest",
     "test:browser": "vitest run --project browser",
     "test:e2e": "playwright test",
-    "test:all": "vitest run"
+    "test:all": "vitest run",
+    "audit:contrast": "node scripts/contrast-audit.mjs"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",

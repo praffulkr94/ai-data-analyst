@@ -760,3 +760,79 @@ describe('walking a bar chart from the keyboard', () => {
     expect(stops()).toEqual([bars()[0]]);
   });
 });
+
+/** The two reliefs the light-mode palette obliges (ADR-0012): direct labels on marks, and the
+    visible "View as table" toggle. Aqua, yellow and magenta fall below 3:1 on white — the
+    contrast audit in `docs/contrast-audit.md` says so every time it is run — and these are what
+    answers for that. They are accessibility requirements wearing the costume of visual polish,
+    so they are asserted here rather than left to be noticed. */
+describe('the palette reliefs', () => {
+  const labels = () => [...document.querySelectorAll('.mark-label')].map((n) => n.textContent);
+  const seriesLabels = () =>
+    [...document.querySelectorAll('.series-label')].map((n) => n.textContent);
+
+  const overTime = run(
+    [...YEARLY([2020, 2021, 2022], 'Brazil')],
+    op({ timeBucket: { column: 'date', unit: 'year' }, sort: { by: 'date', dir: 'asc' } }),
+  );
+  const twoSeries = run(
+    [
+      ...YEARLY([2020, 2021], 'Brazil'),
+      ...YEARLY([2020, 2021], 'Peru'),
+      ...YEARLY([2021], 'Peru'),
+    ],
+    op({
+      timeBucket: { column: 'date', unit: 'year' },
+      groupBy: ['team'],
+      sort: { by: 'date', dir: 'asc' },
+    }),
+  );
+
+  it('writes every bar’s value on the bar, so the value is never read off the colour', () => {
+    render(<AnalysisChart result={overTime} visualization={viz({ type: 'bar' })} />);
+    expect(labels()).toEqual(['1', '1', '1']);
+  });
+
+  it('names every Series at the end of its own line', () => {
+    render(<AnalysisChart result={twoSeries} visualization={viz({ seriesBy: 'team' })} />);
+    expect(seriesLabels()).toEqual(['Brazil', 'Peru']);
+  });
+
+  /** A scatter cannot carry a label per mark — a hundred thousand labelled points is not a
+      chart — so its relief is the Series name at that Series' own rightmost point, plus the
+      table. A single-Series scatter encodes nothing in colour at all. */
+  it('names every Series on a scatter too, where a label per point is impossible', () => {
+    const result = run(
+      [
+        ['2020-06-15', 'Brazil', '3'],
+        ['2021-06-15', 'Brazil', '1'],
+        ['2020-06-15', 'Peru', '0'],
+      ],
+      op({
+        groupBy: ['team', 'date'],
+        aggregations: [
+          { id: 'm', fn: 'count', column: null, label: 'matches' },
+          { id: 'g', fn: 'sum', column: 'goals', label: 'goals' },
+        ],
+      }),
+      { chartType: 'scatter', seriesBy: 'team' },
+    );
+    render(
+      <AnalysisChart result={result} visualization={{ type: 'scatter', x: 'g', y: 'm', seriesBy: 'team' }} />,
+    );
+    expect(seriesLabels().sort()).toEqual(['Brazil', 'Peru']);
+  });
+
+  it('offers the table as a visible toggle and not only to a screen reader', () => {
+    render(<AnalysisChart result={overTime} visualization={viz({ type: 'bar' })} />);
+    const table = screen.getByRole('table', { hidden: true });
+    // Hidden from sight, never from the accessibility tree: that is the whole point of it.
+    expect(table.className).toContain('visually-hidden');
+
+    fireEvent.click(screen.getByRole('button', { name: 'View as table' }));
+    expect(table.className).not.toContain('visually-hidden');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide table' }));
+    expect(table.className).toContain('visually-hidden');
+  });
+});

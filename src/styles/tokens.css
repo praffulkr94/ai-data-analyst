@@ -8,6 +8,9 @@
   --accent-hover: #4f5bd5; /* light mode hovers DARKER — see below */
   --accent-focus-tint: #5e69d1;
   --accent-on: #ffffff;
+  /* Its own token because the dark hover is *lighter* than the accent: white on #828fff is
+     2.87:1 and fails AA. §A5 validated that fill against the surface and not the label on it. */
+  --accent-on-hover: #ffffff;
 
   /* Surfaces */
   --surface: #ffffff;
@@ -19,9 +22,12 @@
   --border: #e6e7eb;
   --border-strong: #d0d2d9;
 
+  /* Two greys and not three. A third, fainter one has nowhere to live: `--text-muted` is
+     5.05:1 on white and the AA floor for 12px text is 4.5:1, so anything legibly fainter than
+     muted is illegible. The audit found the old `--text-faint` at 2.69:1, carrying the data
+     table's "no value" cells. */
   --text: #17181c;
   --text-muted: #6b6f76;
-  --text-faint: #9a9ea6;
 
   /* Categorical data palette — 6 slots, fixed order, never cycled. */
   --series-1: #2a78d6;
@@ -37,7 +43,10 @@
   --div-mid: #f0efec;
 
   /* Status. Reserved — never a data Series, and never carries meaning alone. */
-  --status-good: #0ca30c;
+  /* Every one of these is a border stripe beside text that names the state — never colour
+     alone — except `good`, which colours the cache figure in the readout. That one is text, so
+     light mode takes it darker than §A5's #0ca30c: 3.35:1 does not clear AA at 12px. */
+  --status-good: #0a7f0a;
   --status-warning: #fab219;
   --status-serious: #ec835a;
   --status-critical: #d03b3b;
@@ -67,6 +76,7 @@
                               with white text and fails AA — which is why this token splits. */
   --accent-focus-tint: #5e69d1;
   --accent-on: #ffffff;
+  --accent-on-hover: #08090a; /* 6.95:1 on the lighter dark-mode hover */
 
   --surface: #08090a;
   --surface-raised: #101113;
@@ -78,7 +88,6 @@
 
   --text: #f2f3f5;
   --text-muted: #9ba0a8;
-  --text-faint: #6a6e76;
 
   --series-1: #3987e5;
   --series-2: #d95926;

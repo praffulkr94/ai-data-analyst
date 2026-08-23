@@ -87,7 +87,7 @@ body {
 }
 
 .rail-empty {
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: var(--text-sm);
   margin: 0;
 }
@@ -151,6 +151,7 @@ button.primary {
 button.primary:hover {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
+  color: var(--accent-on-hover);
 }
 
 button.ghost {
@@ -405,7 +406,7 @@ h2 {
 }
 
 .null-cell {
-  color: var(--text-faint);
+  color: var(--text-muted);
 }
 
 /* A row that has not arrived yet reads as working, not as broken. */
@@ -710,7 +711,7 @@ h2 {
 
 .stream-status {
   font-size: var(--text-sm);
-  color: var(--text-faint);
+  color: var(--text-muted);
   animation: shimmer 1.4s var(--ease) infinite;
 }
 
