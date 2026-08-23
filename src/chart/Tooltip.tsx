@@ -20,21 +20,28 @@ export function Tooltip({
   xField,
   yField,
   seriesBy,
+  groupField,
 }: {
   hover: Hover | null;
   xField: ResultField | undefined;
   yField: ResultField | undefined;
   seriesBy: string | null;
+  /** The dimension the point belongs to, when it is on neither axis. A scatter plots one measure
+      against another, so nothing on the screen says which group a point is — and the group is
+      the one thing the reader cannot work out from the axes. Its exact x and y are in the table.
+      Undefined for every other chart type, where the x-axis already names the group. */
+  groupField?: ResultField;
 }) {
   if (!hover || !xField || !yField) return null;
   const { row } = hover;
 
-  const raw = row[xField.name] ?? null;
+  const named = groupField ?? xField;
+  const raw = row[named.name] ?? null;
   const at =
     raw === null
       ? 'no value'
-      : xField.temporal || xField.type === 'date'
-        ? temporalLabel(xField.unit, raw)
+      : named.temporal || named.type === 'date'
+        ? temporalLabel(named.unit, raw)
         : String(raw);
   const value = row[yField.name];
   const series = seriesBy === null ? null : (row[seriesBy] ?? null);

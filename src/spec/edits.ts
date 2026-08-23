@@ -50,9 +50,9 @@ export function withAggregation(spec: AnalysisSpec, fn: AggregationFn): Analysis
 const legal = (spec: AnalysisSpec, schema: DatasetSchema) => validateSpec(spec, schema).length === 0;
 
 export const chartTypeOptions = (spec: AnalysisSpec, schema: DatasetSchema): ChartType[] =>
-  // Scatter is drawn by `<Points>`, which arrives in M8 — offering it now would toggle to a
-  // chart with no marks.
-  CHART_TYPES.filter((t) => t !== 'scatter' && legal(withChartType(spec, t), schema));
+  // Scatter appears here only for a spec whose x is already a measure, which is what the
+  // validator requires of one — so it is offered on a scatter and on nothing else.
+  CHART_TYPES.filter((t) => legal(withChartType(spec, t), schema));
 
 export const aggregationOptions = (spec: AnalysisSpec, schema: DatasetSchema): AggregationFn[] =>
   metricAggregation(spec) === null

@@ -9,6 +9,12 @@ import { utcFormat } from 'd3-time-format';
 import type { AnalysisResult } from '../engine/result';
 import { formatValue } from './marks';
 
+/** Rows rendered, however many the result holds. The table is the chart's accessible
+    representation and it stays that — same element, same `aria-describedby` — but a
+    99,000-point scatter is 400,000 DOM nodes, which is nobody's accessibility win. Past this
+    the caption says what is being shown of what (ADR-0023). */
+export const TABLE_CAP = 1_000;
+
 /** UTC, like every other reading of a bucket start: `timeFormat` here would print a different
     day to the one the bucket names for anyone west of Greenwich. */
 const isoDay = utcFormat('%Y-%m-%d');
@@ -25,7 +31,12 @@ export function ResultTable({
 }) {
   return (
     <table id={id} className={hidden ? 'result-table visually-hidden' : 'result-table'}>
-      <caption>The numbers behind this chart</caption>
+      <caption>
+        {result.rows.length > TABLE_CAP
+          ? `The numbers behind this chart — the first ${TABLE_CAP.toLocaleString('en-US')} of ` +
+            `${result.rows.length.toLocaleString('en-US')} rows`
+          : 'The numbers behind this chart'}
+      </caption>
       <thead>
         <tr>
           {result.fields.map((f) => (
@@ -36,7 +47,7 @@ export function ResultTable({
         </tr>
       </thead>
       <tbody>
-        {result.rows.map((row, i) => (
+        {result.rows.slice(0, TABLE_CAP).map((row, i) => (
           <tr key={i}>
             {result.fields.map((f, j) => {
               const value = row[f.name] ?? null;

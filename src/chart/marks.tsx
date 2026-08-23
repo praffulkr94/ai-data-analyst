@@ -2,9 +2,11 @@
     `<Chart type="bar">` mega-component with forty props — a chart is composed of these under
     `<ChartFrame>`, which is what keeps them dumb. */
 import { format } from 'd3-format';
+import { quadtree } from 'd3-quadtree';
 import { area, line } from 'd3-shape';
 import { utcFormat } from 'd3-time-format';
-import { POINT_CAP } from '../engine/operation';
+import { useMemo } from 'react';
+import { CHART_BUDGET } from '../engine/operation';
 import type { ResultField, ResultRow } from '../engine/result';
 import type { ChartType, TimeUnit } from '../spec/grammar';
 import type { Scales } from './useScales';
@@ -12,15 +14,24 @@ import type { ChartDimensions } from './useChartDimensions';
 
 /** What each chart type can draw and still be read. A bar has to be wide enough to compare and
     to carry its own label, which is why its cap is two orders of magnitude below a line's: at
-    900px, 60 bands are 15px each and 800 would be under a pixel. A line needs one pixel per
-    point, so the point cap is its only limit. Scatter's cap is where SVG gives way to canvas in
-    M8. */
+    900px, 60 bands are 15px each and 800 would be under a pixel. Everything else needs one pixel
+    per point, so its own point budget is its only limit. */
 export const MARK_CAP: Record<ChartType, number> = {
   bar: 60,
-  line: POINT_CAP,
-  area: POINT_CAP,
-  scatter: 5_000,
+  line: CHART_BUDGET.line.points,
+  area: CHART_BUDGET.area.points,
+  scatter: CHART_BUDGET.scatter.points,
 };
+
+/** Where SVG gives way to canvas, and nothing else. Below this a scatter is React elements like
+    every other mark; above it one canvas draws every point. Five thousand `<circle>` is where
+    the diff between the two stops being academic (DECISIONS §10). */
+export const CANVAS_ABOVE = 5_000;
+
+/** A drag offset in pixels. Only a canvas scatter pans — an SVG chart is already whole on the
+    screen, and panning a bar chart off its own axis is not a feature. */
+export type Pan = { x: number; y: number };
+export const NO_PAN: Pan = { x: 0, y: 0 };
 
 /** Six slots, fixed order, never cycled. Read from the design tokens so light and dark agree. */
 export const SERIES_SLOTS = 6;
@@ -83,12 +94,17 @@ export function XAxis({
   scales,
   dimensions,
   field,
+  pan = NO_PAN,
 }: {
   scales: Scales;
   dimensions: ChartDimensions;
   /** The result field on the x-axis. It carries whether the axis is temporal and, if it came
       from a `timeBucket`, at what resolution — so the axis never has to guess either. */
   field: ResultField | undefined;
+  /** The pan the marks were drawn with. The axis moves with the data — a panned chart whose
+      ticks stayed put would be labelled wrongly — and a tick that lands outside the plot is
+      dropped rather than drawn over the margin. */
+  pan?: Pan;
 }) {
   const { x } = scales;
   const { innerHeight, innerWidth } = dimensions;
@@ -116,37 +132,63 @@ export function XAxis({
   return (
     <g transform={`translate(0,${innerHeight})`} className="axis" aria-hidden="true">
       <line x2={innerWidth} />
-      {ticks.map((t) => (
-        <g key={String(t.value)} transform={`translate(${t.at},0)`}>
-          <line y2={4} />
-          <text y={16} textAnchor="middle">
-            {truncate(label(t.value), fits)}
-          </text>
-        </g>
-      ))}
+      {ticks
+        .map((t) => ({ ...t, at: t.at + pan.x }))
+        .filter((t) => t.at >= 0 && t.at <= innerWidth)
+        .map((t) => (
+          <g key={String(t.value)} transform={`translate(${t.at},0)`}>
+            <line y2={4} />
+            <text y={16} textAnchor="middle">
+              {truncate(label(t.value), fits)}
+            </text>
+          </g>
+        ))}
     </g>
   );
 }
 
-export function YAxis({ scales, dimensions }: { scales: Scales; dimensions: ChartDimensions }) {
-  const ticks = scales.y.ticks(Math.max(2, Math.floor(dimensions.innerHeight / 44)));
+/** The visible y ticks, panned. Shared by the axis and the grid so a panned grid line and its
+    label are never one without the other. */
+function yTicks(scales: Scales, dimensions: ChartDimensions, pan: Pan) {
+  return scales.y
+    .ticks(Math.max(2, Math.floor(dimensions.innerHeight / 44)))
+    .map((t) => ({ value: t, at: scales.y(t) + pan.y }))
+    .filter((t) => t.at >= 0 && t.at <= dimensions.innerHeight);
+}
+
+export function YAxis({
+  scales,
+  dimensions,
+  pan = NO_PAN,
+}: {
+  scales: Scales;
+  dimensions: ChartDimensions;
+  pan?: Pan;
+}) {
   return (
     <g className="axis" aria-hidden="true">
-      {ticks.map((t) => (
-        <text key={t} x={-8} y={scales.y(t)} dy="0.32em" textAnchor="end">
-          {formatAxisValue(t)}
+      {yTicks(scales, dimensions, pan).map((t) => (
+        <text key={t.value} x={-8} y={t.at} dy="0.32em" textAnchor="end">
+          {formatAxisValue(t.value)}
         </text>
       ))}
     </g>
   );
 }
 
-export function Grid({ scales, dimensions }: { scales: Scales; dimensions: ChartDimensions }) {
-  const ticks = scales.y.ticks(Math.max(2, Math.floor(dimensions.innerHeight / 44)));
+export function Grid({
+  scales,
+  dimensions,
+  pan = NO_PAN,
+}: {
+  scales: Scales;
+  dimensions: ChartDimensions;
+  pan?: Pan;
+}) {
   return (
     <g className="grid" aria-hidden="true">
-      {ticks.map((t) => (
-        <line key={t} x2={dimensions.innerWidth} y1={scales.y(t)} y2={scales.y(t)} />
+      {yTicks(scales, dimensions, pan).map((t) => (
+        <line key={t.value} x2={dimensions.innerWidth} y1={t.at} y2={t.at} />
       ))}
     </g>
   );
@@ -356,6 +398,126 @@ export function Area({ rows, x, y, scales, slot = 0 }: MarkProps) {
   const path = PATH(ps, Math.min(Math.max(scales.y(0), 0), bottom!), true);
   if (path === null) return null;
   return <path d={path} fill={seriesColor(slot)} fillOpacity={0.16} stroke="none" />;
+}
+
+/* ---- scatter -------------------------------------------------------------------------- */
+
+/** How far from a point the pointer counts as on it. */
+const HIT_RADIUS = 14;
+const POINT_RADIUS = 2.5;
+
+/** One circle per row, and the Series named at its rightmost point the way a line is.
+
+    The circles take no pointer events: a scatter's hit-testing is `<PointsHover>`, one quadtree
+    for the whole chart rather than a listener per mark. `drawn` is false above `CANVAS_ABOVE`,
+    where `<PointsCanvas>` draws the same points and this contributes the label alone — the label
+    is SVG text either way, because a canvas cannot be read by anything. */
+export function Points({
+  rows,
+  x,
+  y,
+  scales,
+  slot = 0,
+  label,
+  labelY,
+  drawn = true,
+}: MarkProps & { drawn?: boolean }) {
+  const ps = points(rows, x, y, scales).filter(defined);
+  const last = ps.at(-1);
+
+  return (
+    <g aria-hidden="true">
+      {drawn &&
+        ps.map((p, i) => (
+          <circle
+            key={i}
+            cx={p.at}
+            cy={p.value!}
+            r={POINT_RADIUS}
+            fill={seriesColor(slot)}
+            fillOpacity={0.7}
+            pointerEvents="none"
+          />
+        ))}
+      {label && last && (
+        <text className="series-label" x={last.at + 6} y={labelY ?? last.value!} dy="0.32em">
+          {truncate(label, 13)}
+        </text>
+      )}
+    </g>
+  );
+}
+
+/** Scatter hit-testing: one `d3-quadtree` over the drawn points in pixel space, queried at the
+    pointer, feeding the same portal tooltip every other chart feeds. A scatter has a mark under
+    the pointer, unlike a line, but ninety-nine thousand of them cannot each carry a listener —
+    and above `CANVAS_ABOVE` there is no element to carry one at all.
+
+    The tree is built in unpanned pixel space and the query is offset by the pan, because a pan
+    is a pixel translation: rebuilding a hundred thousand nodes per frame is the one thing that
+    would make the drag stutter. */
+export function PointsHover({
+  rows,
+  x,
+  y,
+  scales,
+  dimensions,
+  onHover,
+  pan = NO_PAN,
+  onPan,
+}: MarkProps & { pan?: Pan; onPan?: (pan: Pan) => void }) {
+  const tree = useMemo(
+    () =>
+      quadtree<Point>()
+        .x((p) => p.at)
+        .y((p) => p.value!)
+        .addAll(points(rows, x, y, scales).filter(defined)),
+    [rows, x, y, scales],
+  );
+
+  /** Dragging is tracked from the pointer's own start position rather than from movementX, which
+      is unreliable across a pointer capture. */
+  let from: { x: number; y: number; pan: Pan } | null = null;
+
+  return (
+    <rect
+      width={dimensions.innerWidth}
+      height={dimensions.innerHeight}
+      fill="transparent"
+      aria-hidden="true"
+      style={onPan ? { cursor: 'grab', touchAction: 'none' } : undefined}
+      onPointerDown={(e) => {
+        if (!onPan) return;
+        from = { x: e.clientX, y: e.clientY, pan };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }}
+      onPointerUp={() => {
+        from = null;
+      }}
+      onPointerMove={(e) => {
+        if (from) {
+          onHover?.(null, { x: 0, y: 0 });
+          onPan?.({
+            x: from.pan.x + e.clientX - from.x,
+            y: from.pan.y + e.clientY - from.y,
+          });
+          return;
+        }
+        if (!onHover) return;
+        const box = e.currentTarget.getBoundingClientRect();
+        const found = tree.find(
+          e.clientX - box.left - pan.x,
+          e.clientY - box.top - pan.y,
+          HIT_RADIUS,
+        );
+        onHover(found?.row ?? null, { x: e.clientX, y: e.clientY });
+      }}
+      onPointerLeave={() => {
+        from = null;
+        onHover?.(null, { x: 0, y: 0 });
+      }}
+    />
+  );
 }
 
 /* ---- the hover surface ---------------------------------------------------------------- */

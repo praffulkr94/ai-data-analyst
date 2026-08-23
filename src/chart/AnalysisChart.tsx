@@ -1,7 +1,7 @@
 /** Composes the three layers into a chart for one AnalysisResult. Everything type-specific is
     the choice of mark; nothing else branches on the chart type. */
 import { useId, useMemo, useState } from 'react';
-import { FOLD_LABEL, POINT_CAP } from '../engine/operation';
+import { CHART_BUDGET, FOLD_LABEL } from '../engine/operation';
 import {
   degeneracy,
   marksNeeded,
@@ -19,6 +19,8 @@ import {
   lastPoint,
   Line,
   MARK_CAP,
+  Points,
+  PointsHover,
   seriesColor,
   XAxis,
   YAxis,
@@ -67,6 +69,12 @@ export function AnalysisChart({
 
   const xField = result.fields.find((f) => f.name === visualization.x);
   const yField = result.fields.find((f) => f.name === visualization.y);
+  /** A scatter's axes are both measures, so the dimension its points are grouped by is on
+      neither of them and the tooltip is the only place it can be named. */
+  const groupField =
+    visualization.type === 'scatter'
+      ? result.fields.find((f) => f.role === 'dimension' && f.name !== visualization.seriesBy)
+      : undefined;
 
   /** The fold is in the result, the table and the caption, but not among the marks: an "Other"
       bar holding most of the Dataset flattens the fifteen groups the Question was about, and a
@@ -125,6 +133,17 @@ export function AnalysisChart({
     return out;
   }, [labelled, series, scales, visualization.x, visualization.y]);
 
+  /** The one pointer target over the whole plot area, whichever kind it is. */
+  const surface = {
+    rows: drawn.rows,
+    x: visualization.x,
+    y: visualization.y,
+    scales,
+    dimensions,
+    onHover: (row: ResultRow | null, at: { x: number; y: number }) =>
+      setHover(row === null ? null : { row, ...at }),
+  };
+
   const mark = (s: Series, i: number) => {
     const common = {
       rows: s.rows,
@@ -161,9 +180,8 @@ export function AnalysisChart({
             <Line {...common} reveal={reveal} labelY={labelYs?.[i]} />
           </g>
         );
-      default:
-        // Scatter arrives with `<Points>` in M8.
-        return null;
+      case 'scatter':
+        return <Points key={s.key} {...common} labelY={labelYs?.[i]} />;
     }
   };
 
@@ -194,21 +212,21 @@ export function AnalysisChart({
           <YAxis scales={scales} dimensions={dimensions} />
           <XAxis scales={scales} dimensions={dimensions} field={xField} />
           {series.map(mark)}
-          {/* Above the marks, so it receives the pointer for all of them at once. */}
-          <HoverArea
-            rows={drawn.rows}
-            x={visualization.x}
-            y={visualization.y}
-            scales={scales}
-            dimensions={dimensions}
-            onHover={(row, at) => setHover(row === null ? null : { row, ...at })}
-          />
+          {/* Above the marks, so it receives the pointer for all of them at once. A scatter has
+              marks the pointer can be over and hundreds of thousands of them, so it hit-tests a
+              quadtree instead of inverting the x scale. */}
+          {visualization.type === 'scatter' ? (
+            <PointsHover {...surface} />
+          ) : (
+            <HoverArea {...surface} />
+          )}
         </ChartFrame>
       ) : (
         <DegenerateState
           state={state}
           marks={marksNeeded(result, visualization.x)}
           cap={MARK_CAP[visualization.type]}
+          pointCap={CHART_BUDGET[visualization.type].points}
           truncated={result.truncated}
         />
       )}
@@ -225,6 +243,7 @@ export function AnalysisChart({
         xField={xField}
         yField={yField}
         seriesBy={visualization.seriesBy}
+        groupField={groupField}
       />
 
       <ResultTable result={result} id={tableId} hidden={!showTable} />
@@ -239,11 +258,14 @@ function DegenerateState({
   state,
   marks,
   cap,
+  pointCap,
   truncated,
 }: {
   state: Exclude<Degenerate, null | 'single'>;
   marks: number;
   cap: number;
+  /** The chart type's point budget, which is what `truncated` means it exceeded. */
+  pointCap: number;
   truncated: boolean;
 }) {
   const n = (v: number) => v.toLocaleString('en-US');
@@ -255,7 +277,7 @@ function DegenerateState({
           ? 'Every group came back with no value. Drawn as zeros that would read as real zeros, ' +
             'so it is not drawn.'
           : truncated
-            ? `This result is longer than the ${n(POINT_CAP)} points the application draws, so ` +
+            ? `This result is longer than the ${n(pointCap)} points the application draws, so ` +
               'what came back is not the whole answer. Ask for a top-N, or bucket the dates by ' +
               'a coarser unit.'
             : `${n(marks)} categories is past the ${n(cap)} this chart can show without the ` +

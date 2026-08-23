@@ -9,8 +9,9 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AnalysisChart } from '../../src/chart/AnalysisChart';
 import { buildColumnStore } from '../../src/engine/columnStore';
 import { inferSchema } from '../../src/engine/infer';
-import { executeOperation } from '../../src/engine/operation';
+import { executeOperation, type ExecuteOptions } from '../../src/engine/operation';
 import type { AnalysisResult } from '../../src/engine/result';
+import { TABLE_CAP } from '../../src/chart/ResultTable';
 import type { Operation, Visualization } from '../../src/spec/grammar';
 
 /** jsdom has no ResizeObserver, and `useChartDimensions` takes its width from one and nowhere
@@ -54,12 +55,16 @@ const viz = (over: Partial<Viz> = {}): Visualization => ({
 /** `date,team,goals` over the given rows, with `goals` stated numeric — a small fixture falls
     under the 95% numeric threshold and would infer categorical. */
 const HEADER = ['date', 'team', 'goals'];
-const run = (rows: string[][], operation: Operation): AnalysisResult => {
+const run = (
+  rows: string[][],
+  operation: Operation,
+  over: ExecuteOptions = {},
+): AnalysisResult => {
   const schema = inferSchema(HEADER, rows);
   const store = buildColumnStore(HEADER, rows, {
     columns: schema.columns.map((c) => (c.name === 'goals' ? { ...c, type: 'number' } : c)),
   });
-  return executeOperation(store, operation, { metric: 'm' });
+  return executeOperation(store, operation, { metric: 'm', ...over });
 };
 
 const YEARLY = (years: number[], team = 'Brazil') =>
@@ -394,5 +399,100 @@ describe('the reveal transition', () => {
     // default; the chart is legible either way.
     render(<AnalysisChart result={result} visualization={viz()} />);
     expect(line().getAttribute('stroke-dasharray')).toBeNull();
+  });
+});
+
+describe('the scatter mark', () => {
+  /** Both axes are measures, which is what makes it a scatter: `g` is goals summed and `m` is
+      matches counted, and `team` — the thing each point *is* — is on neither axis.
+
+      Hand-worked so the two points sit in opposite corners of the plot. Brazil: three matches of
+      three goals, so (9, 3), the largest of both, at the top right. Peru: one match of none, so
+      (0, 1), at the left edge two thirds of the way down. */
+  const ROWS = [
+    ['2020-06-15', 'Brazil', '3'],
+    ['2021-06-15', 'Brazil', '3'],
+    ['2022-06-15', 'Brazil', '3'],
+    ['2020-06-15', 'Peru', '0'],
+  ];
+  const spec = op({
+    groupBy: ['team'],
+    aggregations: [
+      { id: 'm', fn: 'count', column: null, label: 'matches' },
+      { id: 'g', fn: 'sum', column: 'goals', label: 'goals' },
+    ],
+  });
+  const points = (over: Partial<Operation> = {}, rows = ROWS) =>
+    run(rows, { ...spec, ...over }, { chartType: 'scatter' });
+  const scatter: Visualization = { type: 'scatter', x: 'g', y: 'm', seriesBy: null };
+
+  const INNER_W = 900 - 52 - 16;
+  const INNER_H = 320 - 12 - 28;
+  const surface = () => document.querySelector('svg rect[fill="transparent"]')!;
+  const tip = () => document.querySelector('.chart-tooltip');
+
+  it('draws one circle per point, and the pair behind each is in the data table', () => {
+    render(<AnalysisChart result={points()} visualization={scatter} />);
+    expect(document.querySelectorAll('svg circle')).toHaveLength(2);
+
+    const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+    expect(rows).toHaveLength(2);
+    const cells = rows.map((r) => [
+      within(r).getByRole('rowheader').textContent,
+      ...within(r).getAllByRole('cell').map((c) => c.textContent),
+    ]);
+    expect(cells).toEqual([
+      ['Brazil', '3', '9'],
+      ['Peru', '1', '0'],
+    ]);
+  });
+
+  /** There is no line to invert a scale against: the point is found in the quadtree, by pixel
+      distance, in both directions at once. And what it is named by is the dimension, which on a
+      scatter is on neither axis. */
+  it('names the group of the point under the pointer', () => {
+    render(<AnalysisChart result={points()} visualization={scatter} />);
+    fireEvent.pointerMove(surface(), { clientX: INNER_W - 2, clientY: 2 });
+    expect(tip()!.textContent).toContain('Brazil');
+    fireEvent.pointerMove(surface(), { clientX: 2, clientY: Math.round(INNER_H * (2 / 3)) });
+    expect(tip()!.textContent).toContain('Peru');
+  });
+
+  it('names nothing when the pointer is on no point, rather than the nearest one anywhere', () => {
+    render(<AnalysisChart result={points()} visualization={scatter} />);
+    fireEvent.pointerMove(surface(), { clientX: Math.round(INNER_W / 2), clientY: 140 });
+    expect(tip()).toBeNull();
+  });
+
+  it('draws three Series at most, each in a slot of its own, the fold among them', () => {
+    const rows = Array.from({ length: 40 }, (_, i) => [
+      `${2000 + (i % 10)}-06-15`,
+      `t${i % 8}`,
+      String(i),
+    ]);
+    const result = run(
+      rows,
+      { ...spec, groupBy: ['team', 'date'] },
+      { chartType: 'scatter', seriesBy: 'team' },
+    );
+    render(<AnalysisChart result={result} visualization={{ ...scatter, seriesBy: 'team' }} />);
+    const fills = new Set(
+      [...document.querySelectorAll('svg circle')].map((c) => c.getAttribute('fill')),
+    );
+    expect(fills.size).toBe(3);
+    expect(document.querySelector('svg')!.textContent).toContain('Other');
+  });
+
+  /** The table stays the chart's accessible representation — one element, one id, pointed at by
+      the same `aria-describedby` — but it renders a bounded number of rows and says so. */
+  it('caps the table and says how much of the result it is showing', () => {
+    const many = Array.from({ length: 1_200 }, (_, i) => ['2020-06-15', `t${i}`, String(i)]);
+    const result = points({}, many);
+    expect(result.rows).toHaveLength(1_200);
+    render(<AnalysisChart result={result} visualization={scatter} />);
+    const table = screen.getByRole('table');
+    expect(within(table).getAllByRole('row')).toHaveLength(TABLE_CAP + 1);
+    expect(table.querySelector('caption')!.textContent).toContain('first 1,000 of 1,200');
+    expect(document.querySelector('svg')!.getAttribute('aria-describedby')).toBe(table.id);
   });
 });

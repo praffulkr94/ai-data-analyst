@@ -32,7 +32,9 @@ export function chartLabel(s: ChartSummary, type: ChartType): string {
           `with the rest grouped as ${FOLD_LABEL}`
         : s.dimensionLabel === null
           ? 'a single value'
-          : `${n(s.groupCount)} categories`;
+          : // A scatter's groups are positions rather than categories, because its x is a
+            // measure. Calling 98,899 points "categories" would be a lie about the axis.
+            `${n(s.groupCount)} ${type === 'scatter' ? 'points' : 'categories'}`;
 
   const extreme = s.extreme ? ` Highest: ${s.extreme.label}, ${n(s.extreme.value)}.` : '';
   return `${CHART_NAMES[type]}. ${what}, ${scale}.${extreme}`;
