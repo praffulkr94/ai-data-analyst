@@ -309,6 +309,28 @@ export function createWorkspace({
     land(target, null, spec, { spec, result: res.result, model: analysis.revisions[analysis.at]!.model });
   }
 
+  /** Re-execute the Analysis a shared link carried, against the DatasetSchema that has just been
+      inferred rather than the one it was written against. Those two can disagree — a re-selected
+      file whose columns have moved on — and when they do the SpecViolations are rendered, which
+      is the state a bad reply already produces, rather than a throw. */
+  async function restore(spec: AnalysisSpec): Promise<void> {
+    const id = ++requestId;
+    const violations = validateSpec(spec, { columns: store.getState().columns });
+    if (violations.length > 0) {
+      return notice(id, {
+        kind: 'failed',
+        message:
+          'This link describes an analysis the Dataset just loaded cannot answer. It may not be ' +
+          'the file the link was built on.',
+        violations,
+      });
+    }
+    const res = await analyze(spec);
+    if (stale(id)) return;
+    if ('error' in res) return notice(id, { kind: 'failed', message: res.error, violations: [] });
+    land(null, null, spec, { spec, result: res.result, model: store.getState().model });
+  }
+
   return {
     /** A Dataset the Analyses were not asked against makes every one of them meaningless, so the
         store drops them — and any Request still in flight is abandoned here rather than allowed
@@ -324,6 +346,8 @@ export function createWorkspace({
     ask,
 
     revise,
+
+    restore,
 
     /** Deleting an Analysis takes its Questions with it: they are dispatch context for refining
         that Analysis, and there is no longer one to refine. */

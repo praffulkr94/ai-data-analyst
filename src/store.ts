@@ -4,7 +4,7 @@
 import { create } from 'zustand';
 import { costOf, type ModelChoice, type TokenCounts } from './ai/models';
 import type { Usage } from './ai/translator';
-import type { DatasetHandle, ParseReport } from './engine/handle';
+import type { DatasetHandle, DatasetRef, ParseReport } from './engine/handle';
 import type { AnalysisResult } from './engine/result';
 import type { ViewState } from './engine/rowIndex';
 import type { ColumnMeta, ColumnType } from './engine/types';
@@ -107,6 +107,12 @@ export type AppState = {
   pendingNotice: Notice | null;
   request: RequestState | null;
   usage: UsageState;
+  /** What a reload arrived with and has not yet rebuilt. Present only while a Dataset named by
+      the hash is still being fetched, or while an uploaded one is waiting to be re-selected —
+      the rows of an upload are unrecoverable, so the visitor has to hand them over again. */
+  restore: { ref: DatasetRef; spec: AnalysisSpec | null } | null;
+  /** Set once the visitor has read the note saying Analyses are not saved. */
+  saveNoteRead: boolean;
 
   setMode: (mode: Mode) => void;
   setModel: (model: ModelChoice) => void;
@@ -131,6 +137,8 @@ export type AppState = {
   dismissNotice: () => void;
   /** Append a Revision to the Analysis captured at dispatch, creating it if this is its first. */
   landRevision: (target: string | null, id: string, title: string, revision: Revision) => void;
+  awaitRestore: (restore: AppState['restore']) => void;
+  readSaveNote: () => void;
   toggleTheme: () => void;
   beginLoad: (label: string, warning?: string) => void;
   reportProgress: (rows: number) => void;
@@ -160,6 +168,8 @@ export const useApp = create<AppState>((set) => ({
   pendingNotice: null,
   request: null,
   usage: { last: null, total: NO_TOTAL, cost: 0, requests: 0 },
+  restore: null,
+  saveNoteRead: false,
 
   setMode: (mode) => set({ mode }),
   setModel: (model) => set({ model }),
@@ -307,6 +317,8 @@ export const useApp = create<AppState>((set) => ({
         ),
       };
     }),
+  awaitRestore: (restore) => set({ restore }),
+  readSaveNote: () => set({ saveNoteRead: true }),
   toggleTheme: () => set((s) => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),
   beginLoad: (label, warning = undefined) =>
     set({ load: { status: 'loading', label, rows: 0, warning: warning ?? null } }),

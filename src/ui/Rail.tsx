@@ -12,6 +12,8 @@ export function Rail({ workspace }: { workspace: Workspace }) {
   const columns = useApp((s) => s.columns);
   const analyses = useApp((s) => s.analyses);
   const activeId = useApp((s) => s.activeAnalysisId);
+  const saveNoteRead = useApp((s) => s.saveNoteRead);
+  const readSaveNote = useApp((s) => s.readSaveNote);
 
   return (
     <nav className="rail" aria-label="Analyses">
@@ -48,6 +50,19 @@ export function Rail({ workspace }: { workspace: Workspace }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Once, quietly, next to the list, the first time there is more than one thing to lose.
+          There is no persistence — that is the accepted price of having no backend — and the
+          failure being guarded against is not losing the work but losing it silently, so a
+          visitor reloads and concludes the application is broken. */}
+      {analyses.length > 1 && !saveNoteRead && (
+        <p className="rail-note" role="status">
+          Analyses aren't saved — copy the link to keep the one you're looking at.{' '}
+          <button type="button" className="link" onClick={readSaveNote}>
+            Got it
+          </button>
+        </p>
       )}
     </nav>
   );

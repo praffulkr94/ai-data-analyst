@@ -5,6 +5,7 @@ import { createAnthropicTranslator } from './ai/anthropic';
 import { createFixtureTranslator } from './ai/fixtureTranslator';
 import { switching } from './ai/translator';
 import { createLoader } from './data/loader';
+import { readSession, resumeSession, trackSession } from './data/session';
 import { createSliceCache } from './table/sliceCache';
 import { createTransport } from './worker/transport';
 import { useApp } from './store';
@@ -36,8 +37,21 @@ const workspace = createWorkspace({
   loader,
 });
 
+/** The hash is read once, before anything renders, and then kept in step for the rest of the
+    session. `byok` in it is deliberately not acted on here: the key went with the tab, and the
+    dialog the interface opens is what decides whether the mode comes back. */
+const session = readSession();
+if (session) resumeSession(session, { workspace, loader });
+trackSession();
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App loader={loader} cache={cache} port={port} workspace={workspace} />
+    <App
+      loader={loader}
+      cache={cache}
+      port={port}
+      workspace={workspace}
+      wantsKey={session?.mode === 'byok'}
+    />
   </StrictMode>,
 );

@@ -61,7 +61,9 @@ export function createLoader(port: DataPort) {
         sample.label,
       ),
 
-    loadFile(file: File): Promise<void> {
+    /** `note` is whatever the caller knows and the loader cannot — that the file just picked is
+        not the one a shared link named, for instance. It warns and does not block. */
+    loadFile(file: File, note?: string): Promise<void> {
       if (file.size > MAX_BYTES) {
         app
           .getState()
@@ -83,10 +85,15 @@ export function createLoader(port: DataPort) {
           label: file.name,
         },
         file.name,
-        file.size > WARN_BYTES
-          ? `${file.name} is ${mb(file.size)}MB, so this will take a few seconds. Parsing runs ` +
-            `in the worker, so the interface keeps responding throughout.`
-          : undefined,
+        [
+          note,
+          file.size > WARN_BYTES
+            ? `${file.name} is ${mb(file.size)}MB, so this will take a few seconds. Parsing ` +
+              `runs in the worker, so the interface keeps responding throughout.`
+            : undefined,
+        ]
+          .filter(Boolean)
+          .join(' ') || undefined,
       );
     },
 

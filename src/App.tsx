@@ -20,15 +20,34 @@ export function App({
   cache,
   port,
   workspace,
+  wantsKey = false,
 }: {
   loader: Loader;
   cache: SliceCache;
   port: DataPort;
   workspace: Workspace;
+  /** The reloaded link said BYOK. The key went with the tab, so the dialog opens rather than
+      the mode quietly reverting to Demo behind the visitor's back. */
+  wantsKey?: boolean;
 }) {
   const theme = useApp((s) => s.theme);
   const hasDataset = useApp((s) => s.datasetHandle !== null);
-  const [keyDialog, setKeyDialog] = useState(false);
+  const [keyDialog, setKeyDialog] = useState(wantsKey);
+  /** Only the dialog the reload opened announces its dismissal. One the visitor opened from the
+      header and closed has changed nothing, and saying so would be noise. */
+  const [restoring, setRestoring] = useState(wantsKey);
+  const [announcement, setAnnouncement] = useState<string | null>(null);
+
+  function closeKeyDialog(): void {
+    setKeyDialog(false);
+    if (restoring && useApp.getState().mode !== 'byok') {
+      setAnnouncement(
+        'Your key was not restored — it is only ever held in memory — so this session is in ' +
+          'Demo mode. Enter it again from the header at any time.',
+      );
+    }
+    setRestoring(false);
+  }
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -39,6 +58,14 @@ export function App({
       <Header onWantKey={() => setKeyDialog(true)} />
       <Rail workspace={workspace} />
       <main className="canvas">
+        {announcement && (
+          <p className="notice notice-warning announcement" role="status">
+            {announcement}
+            <button type="button" className="link" onClick={() => setAnnouncement(null)}>
+              Dismiss
+            </button>
+          </p>
+        )}
         {hasDataset ? (
           <>
             <Notice workspace={workspace} />
@@ -52,7 +79,7 @@ export function App({
         )}
       </main>
       <Composer workspace={workspace} />
-      <KeyDialog open={keyDialog} onClose={() => setKeyDialog(false)} />
+      <KeyDialog open={keyDialog} onClose={closeKeyDialog} />
     </div>
   );
 }

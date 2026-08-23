@@ -69,6 +69,23 @@ body {
   overflow-y: auto;
 }
 
+/* A mode the visitor did not choose has to be said out loud, above whatever they came for. */
+.announcement {
+  margin: 0 0 12px;
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.rail-note {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
 .rail-empty {
   color: var(--text-faint);
   font-size: var(--text-sm);

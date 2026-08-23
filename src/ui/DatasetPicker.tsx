@@ -7,8 +7,22 @@ import { useApp } from '../store';
     app can be seen working before they invest a file or a key. */
 export function DatasetPicker({ loader }: { loader: Loader }) {
   const load = useApp((s) => s.load);
+  const restore = useApp((s) => s.restore);
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
+
+  /** The rows of an upload are unrecoverable across a reload, so a link built on one names the
+      file and asks for it back. A file with a different name warns and loads anyway — it is far
+      more often a renamed copy than a different Dataset, and the semantic validator is what
+      decides whether the analysis still holds. */
+  const wanted = restore?.ref.kind === 'upload' ? restore.ref : null;
+  const take = (file: File) =>
+    void loader.loadFile(
+      file,
+      wanted && file.name !== wanted.filename
+        ? `This link was built on ${wanted.filename}, and you picked ${file.name}.`
+        : undefined,
+    );
 
   if (load.status === 'loading') {
     return (
@@ -41,7 +55,7 @@ export function DatasetPicker({ loader }: { loader: Loader }) {
         e.preventDefault();
         setOver(false);
         const file = e.dataTransfer.files[0];
-        if (file) void loader.loadFile(file);
+        if (file) take(file);
       }}
     >
       <h1>Ask a question about a table</h1>
@@ -49,6 +63,16 @@ export function DatasetPicker({ loader }: { loader: Loader }) {
         The model translates your question into a specification. The application checks it,
         executes it, and draws the chart. Your rows never leave the browser.
       </p>
+      {wanted && (
+        <p className="notice notice-warning" role="status">
+          This link was built on <code>{wanted.filename}</code>
+          {wanted.rowCount > 0 && <> ({wanted.rowCount.toLocaleString()} rows)</>}. Rows are never
+          written to storage, so re-select it to restore the analysis.{' '}
+          <button type="button" className="link" onClick={() => input.current?.click()}>
+            Choose the file
+          </button>
+        </p>
+      )}
       {load.status === 'failed' && (
         <p className="notice notice-error" role="alert">
           {load.message}
@@ -80,7 +104,7 @@ export function DatasetPicker({ loader }: { loader: Loader }) {
         className="visually-hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) void loader.loadFile(file);
+          if (file) take(file);
         }}
       />
     </section>
