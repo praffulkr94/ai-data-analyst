@@ -162,6 +162,34 @@ else is wiring around them.
   subscribing outside React — the hash writer does — needs its own cheap reference-equality guard
   on the values it actually cares about.
 
+## What M7 leaves standing under M8's ledger
+
+M8 is scatter and canvas, and two of its ledger items are in direct tension with what the engine
+currently guarantees. Resolve that before writing a `<Points>` mark, not after.
+
+**A 100,000-point scatter cannot come out of `executeOperation` as it stands.** `POINT_CAP` is
+1,000 and the protocol in issue #1 says `analyze:done` returns at most that; `truncated` past it
+is what `degeneracy` turns into the `too-many` state. Worse, `Operation.aggregations` has
+`.min(1)`, so every result is an aggregate — one point per row is not a shape the grammar can ask
+for. A 100k-point scatter therefore needs a decision, and there are only three honest shapes for
+it: raise `POINT_CAP` for scatter alone and let the fold and the renderability guard branch on
+chart type; add a rows-through message to the worker protocol beside `analyze`, which is a second
+execution path and should be argued for rather than slipped in; or restate the ledger item at the
+size the grammar can actually produce and say so in the README. **Whichever it is, it is an ADR.**
+
+**The scatter Series cap of 3 belongs where the fold already is.** `SERIES_BUDGET` is 6 and lives
+in `src/engine/operation.ts`, and the fold happens in the result rather than in the marks
+(ADR-0018). So the budget has to travel with the analyze request the way `metric` and `seriesBy`
+already do — do not cap Series in the chart layer, or the caption will name a fold the marks did
+not perform.
+
+**Canvas has no accessible table, and that is the contract.** Charts are tested through
+`ResultTable` and never through geometry (`tests/workspace/analysisChart.test.tsx`). A canvas
+renderer must keep rendering the same `ResultTable` beside it and keep the same
+`aria-describedby`, or the chart layer loses its only test surface at exactly the point it gets
+hardest to test. `MARK_CAP.scatter` is already 5,000 in `src/chart/marks.tsx`, which is where the
+SVG-versus-canvas switch belongs.
+
 ## Known to be ahead of its tests
 
 Two entries at the time of writing. Both ledger items are deliberately left unticked.
