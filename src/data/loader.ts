@@ -9,6 +9,11 @@ import { sampleRef, sampleUrl, type Sample } from './samples';
 /** Above the cap the tab cannot hold the Dataset, so we refuse rather than hang. */
 export const MAX_BYTES = 50 * 1024 * 1024;
 
+/** Below the cap but big enough that the parse is measured in seconds. Warned about while it
+    runs rather than as a question first: the load is going to succeed, and an interstitial that
+    asks permission to do what was just asked for is friction, not care. */
+export const WARN_BYTES = 20 * 1024 * 1024;
+
 export type Loader = ReturnType<typeof createLoader>;
 
 export function createLoader(port: DataPort) {
@@ -20,8 +25,12 @@ export function createLoader(port: DataPort) {
     app.getState().failLoad(`${message} Re-select the Dataset to carry on.`);
   });
 
-  async function run(source: Parameters<DataPort['send']>[0], label: string): Promise<void> {
-    app.getState().beginLoad(label);
+  async function run(
+    source: Parameters<DataPort['send']>[0],
+    label: string,
+    warning?: string,
+  ): Promise<void> {
+    app.getState().beginLoad(label, warning);
     const call = port.send(source, (m) => {
       if (m.type === 'parse:progress' && m.jobId === current) app.getState().reportProgress(m.rows);
     });
@@ -74,6 +83,10 @@ export function createLoader(port: DataPort) {
           label: file.name,
         },
         file.name,
+        file.size > WARN_BYTES
+          ? `${file.name} is ${mb(file.size)}MB, so this will take a few seconds. Parsing runs ` +
+            `in the worker, so the interface keeps responding throughout.`
+          : undefined,
       );
     },
 

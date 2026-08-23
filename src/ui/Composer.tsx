@@ -3,7 +3,7 @@
     The streaming strip above the input is the payoff — a narration sentence typed live tells the
     visitor they were understood before any data moves, and the chip strip beside it fills in as
     the specification's fields become readable. Both are display only. */
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { repertoireFor } from '../ai/fixtures';
 import { MODELS, MODEL_CHOICES, type ModelChoice } from '../ai/models';
 import { useApp } from '../store';
@@ -128,10 +128,28 @@ function Repertoire({ workspace }: { workspace: Workspace }) {
   );
 }
 
+/** Ticks once a second, and only while there is something to count down. The deadline is in the
+    store and the tick is not: a store that re-published every second would re-render everything
+    subscribed to it for a number one element shows. */
+function useCountdown(until: number | null): number {
+  const [left, setLeft] = useState(() => remaining(until));
+  useEffect(() => {
+    setLeft(remaining(until));
+    if (until === null) return;
+    const timer = setInterval(() => setLeft(remaining(until)), 1000);
+    return () => clearInterval(timer);
+  }, [until]);
+  return left;
+}
+
+const remaining = (until: number | null) =>
+  until === null ? 0 : Math.max(0, Math.ceil((until - Date.now()) / 1000));
+
 /** Subscribes to the Request slice and nothing else, so sixty narration flushes a second never
     re-render the rail or the chart. */
 function StreamStrip() {
   const request = useApp((s) => s.request);
+  const secondsLeft = useCountdown(request?.retryAt ?? null);
   if (!request) return null;
   return (
     <div className="stream" aria-live="polite">
@@ -140,7 +158,9 @@ function StreamStrip() {
           ? 'Thinking…'
           : request.status === 'repairing'
             ? 'Correcting…'
-            : 'Computing…'}
+            : request.status === 'waiting'
+              ? `${request.waiting} Retrying in ${secondsLeft}s`
+              : 'Computing…'}
       </span>
       <p className="narration">{request.narration}</p>
       {request.chips.length > 0 && (

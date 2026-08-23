@@ -70,6 +70,21 @@ export const switching = (pick: () => Translator): Translator => ({
   translate: (req, events, signal) => pick().translate(req, events, signal),
 });
 
+/** Raised when the request failed for a reason that waiting might fix — a rate limit, an
+    overloaded server, a dropped connection. It is not the model getting the specification wrong,
+    so it does not consume the single Repair: the `Workspace` waits and asks again.
+
+    `afterMs` is what the server asked for when it said so, and `null` when it did not. */
+export class Retryable extends Error {
+  constructor(
+    message: string,
+    readonly afterMs: number | null = null,
+  ) {
+    super(message);
+    this.name = 'Retryable';
+  }
+}
+
 /** Raised when the visitor cancelled. Not a failure of the Request — the caller drops it. */
 export class Cancelled extends Error {
   constructor() {

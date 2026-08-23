@@ -13,7 +13,14 @@ import type { Sample } from '../data/samples';
 import type { Loader } from '../data/loader';
 import type { DataPort } from '../worker/port';
 import { useApp, type Notice, type Revision } from '../store';
-import { Cancelled, type Attempt, type TranslateRequest, type Translator } from '../ai/translator';
+import {
+  Cancelled,
+  Retryable,
+  type Attempt,
+  type TranslateRequest,
+  type Translator,
+} from '../ai/translator';
+import type { AnalysisResult } from '../engine/result';
 import type { Exchange } from '../ai/prompt';
 
 /** One retry, and only one. A structural failure and a semantic one consume the same attempt.
@@ -22,6 +29,12 @@ import type { Exchange } from '../ai/prompt';
     repair with branching — a repair whose next step depends on which repair failed — and naming
     that threshold is the defence of the no-framework decision (ADR-0009). */
 export const MAX_ATTEMPTS = 2;
+
+/** Waits for a rate limit or an overloaded server, and only for those. A wait is not the model
+    getting the specification wrong, so it does not consume the Repair — it is the same attempt,
+    asked again. Two of them, then the failure is the visitor's to see. */
+export const MAX_RETRIES = 2;
+const BACKOFF_MS = 2_000;
 
 export type Workspace = ReturnType<typeof createWorkspace>;
 
@@ -70,6 +83,63 @@ export function createWorkspace({
     };
   }
 
+  /** Rejects rather than resolves on cancel, so a visitor waiting out a rate limit is not made
+      to wait out the rest of it before their cancel is noticed. */
+  function delay(ms: number, signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const abort = () => {
+        clearTimeout(timer);
+        reject(new Cancelled());
+      };
+      const timer = setTimeout(() => {
+        signal.removeEventListener('abort', abort);
+        resolve();
+      }, ms);
+      signal.addEventListener('abort', abort, { once: true });
+    });
+  }
+
+  /** One Translator call, waited out and repeated if the failure was the kind waiting fixes. */
+  async function translate(
+    id: number,
+    req: TranslateRequest,
+    signal: AbortSignal,
+  ): Promise<Attempt> {
+    for (let retry = 0; ; retry++) {
+      try {
+        return await translator.translate(req, events(id), signal);
+      } catch (e) {
+        if (!(e instanceof Retryable) || retry >= MAX_RETRIES || stale(id)) throw e;
+        const wait = e.afterMs ?? BACKOFF_MS * 2 ** retry;
+        store.getState().waitToRetry(id, Date.now() + wait, e.message);
+        await delay(wait, signal);
+        if (stale(id)) throw new Cancelled();
+        store.getState().setRequestStatus(id, 'thinking');
+      }
+    }
+  }
+
+  /** The worker call both editors make. A crashed worker rejects rather than answering, and the
+      whole point of respawning it is that one Analysis fails instead of the tab. */
+  async function analyze(spec: AnalysisSpec): Promise<{ result: AnalysisResult } | { error: string }> {
+    try {
+      const res = await port.send({
+        type: 'analyze',
+        operation: spec.operation,
+        metric: spec.visualization.y,
+        seriesBy: spec.visualization.seriesBy,
+      }).done;
+      if (res.type === 'analyze:done') return { result: res.result };
+      return { error: res.type === 'error' ? res.message : 'The analysis was cancelled.' };
+    } catch (e) {
+      return {
+        error:
+          `${e instanceof Error ? e.message : String(e)} ` +
+          'The worker has been restarted — re-load the Dataset to carry on.',
+      };
+    }
+  }
+
   function notice(id: number, value: Notice): void {
     store.getState().setNotice(value);
     store.getState().endRequest(id);
@@ -105,11 +175,7 @@ export function createWorkspace({
     for (let attemptNo = 0; attemptNo < MAX_ATTEMPTS; attemptNo++) {
       let attempt: Attempt;
       try {
-        attempt = await translator.translate(
-          { question, schema, model, refine, repair },
-          events(id),
-          signal,
-        );
+        attempt = await translate(id, { question, schema, model, refine, repair }, signal);
       } catch (e) {
         // Continuation 1 — after the Translator resolves.
         if (stale(id)) return;
@@ -159,21 +225,12 @@ export function createWorkspace({
       // anyway so that the boundary is guarded rather than guarded by accident.
       if (stale(id)) return;
       store.getState().setRequestStatus(id, 'executing');
-      const res = await port.send({
-        type: 'analyze',
-        operation: spec.operation,
-        metric: spec.visualization.y,
-        seriesBy: spec.visualization.seriesBy,
-      }).done;
+      const res = await analyze(spec);
       // Continuation 3 — after the worker responds. The worker cancel is best-effort; this is
       // what makes the correctness independent of it.
       if (stale(id)) return;
-      if (res.type !== 'analyze:done') {
-        return notice(id, {
-          kind: 'failed',
-          message: res.type === 'error' ? res.message : 'The analysis was cancelled.',
-          violations: [],
-        });
+      if ('error' in res) {
+        return notice(id, { kind: 'failed', message: res.error, violations: [] });
       }
 
       // The model proposes and the dispatcher decides: `refine` with nothing captured at
@@ -242,19 +299,10 @@ export function createWorkspace({
     // ponytail: a chart-type toggle re-executes an Operation that has not changed, to keep one
     // path with no special case (ADR-0021). Reuse the previous Revision's result when the
     // Operation is deep-equal if the tens of milliseconds ever measure.
-    const res = await port.send({
-      type: 'analyze',
-      operation: spec.operation,
-      metric: spec.visualization.y,
-      seriesBy: spec.visualization.seriesBy,
-    }).done;
+    const res = await analyze(spec);
     if (stale(id)) return;
-    if (res.type !== 'analyze:done') {
-      return notice(id, {
-        kind: 'failed',
-        message: res.type === 'error' ? res.message : 'The analysis was cancelled.',
-        violations: [],
-      });
+    if ('error' in res) {
+      return notice(id, { kind: 'failed', message: res.error, violations: [] });
     }
     // The model of the Revision this was derived from: a manual edit changes the spec, not who
     // wrote the analysis it descends from.

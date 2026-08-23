@@ -17,6 +17,11 @@ export function DatasetPicker({ loader }: { loader: Loader }) {
         <p className="muted" aria-live="polite">
           {load.rows.toLocaleString()} rows parsed — the interface stays responsive throughout.
         </p>
+        {load.warning && (
+          <p className="notice notice-warning" role="status">
+            {load.warning}
+          </p>
+        )}
         <button type="button" className="ghost" onClick={() => loader.cancel()}>
           Cancel
         </button>

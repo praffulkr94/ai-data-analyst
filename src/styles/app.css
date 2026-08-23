@@ -617,8 +617,22 @@ h2 {
 
 .dev-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dev-failures {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.dev-failures h3 {
+  margin: 0;
+  font-size: var(--text-sm);
 }
 
 .dev-panel pre {

@@ -52,9 +52,15 @@ export type Notice =
 export type RequestState = {
   id: number;
   question: string;
-  status: 'thinking' | 'repairing' | 'executing';
+  status: 'thinking' | 'repairing' | 'executing' | 'waiting';
   narration: string;
   chips: string[];
+  /** When the wait after a rate limit or an overloaded server ends, as epoch milliseconds. The
+      countdown ticks in the component that shows it — a store that ticked once a second would
+      re-render everything subscribed to it for a number only one element displays. */
+  retryAt: number | null;
+  /** Why the wait, so the visitor is told which failure they are waiting out. */
+  waiting: string | null;
 };
 
 export type UsageState = {
@@ -79,7 +85,7 @@ const NO_TOTAL: TokenCounts = {
 
 export type LoadState =
   | { status: 'idle' }
-  | { status: 'loading'; label: string; rows: number }
+  | { status: 'loading'; label: string; rows: number; warning: string | null }
   | { status: 'ready' }
   | { status: 'failed'; message: string };
 
@@ -115,6 +121,8 @@ export type AppState = {
   appendNarration: (id: number, text: string) => void;
   setChips: (id: number, chips: string[]) => void;
   setRequestStatus: (id: number, status: RequestState['status']) => void;
+  /** Hold the Request while a retryable failure is waited out. */
+  waitToRetry: (id: number, until: number, reason: string) => void;
   endRequest: (id: number) => void;
   /** Unconditional, for the visitor's own cancel — there is no newer Request to protect. */
   cancelRequest: () => void;
@@ -124,7 +132,7 @@ export type AppState = {
   /** Append a Revision to the Analysis captured at dispatch, creating it if this is its first. */
   landRevision: (target: string | null, id: string, title: string, revision: Revision) => void;
   toggleTheme: () => void;
-  beginLoad: (label: string) => void;
+  beginLoad: (label: string, warning?: string) => void;
   reportProgress: (rows: number) => void;
   failLoad: (message: string) => void;
   setDataset: (handle: DatasetHandle, report: ParseReport | null) => void;
@@ -210,7 +218,15 @@ export const useApp = create<AppState>((set) => ({
 
   startRequest: (id, question) =>
     set({
-      request: { id, question, status: 'thinking', narration: '', chips: [] },
+      request: {
+        id,
+        question,
+        status: 'thinking',
+        narration: '',
+        chips: [],
+        retryAt: null,
+        waiting: null,
+      },
       // A new submission clears the last refusal: it is the visitor's answer to it.
       pendingNotice: null,
     }),
@@ -224,7 +240,18 @@ export const useApp = create<AppState>((set) => ({
     set((s) => (s.request?.id === id ? { request: { ...s.request, chips } } : {})),
 
   setRequestStatus: (id, status) =>
-    set((s) => (s.request?.id === id ? { request: { ...s.request, status } } : {})),
+    set((s) =>
+      s.request?.id === id
+        ? { request: { ...s.request, status, retryAt: null, waiting: null } }
+        : {},
+    ),
+
+  waitToRetry: (id, until, reason) =>
+    set((s) =>
+      s.request?.id === id
+        ? { request: { ...s.request, status: 'waiting', retryAt: until, waiting: reason } }
+        : {},
+    ),
 
   endRequest: (id) => set((s) => (s.request?.id === id ? { request: null } : {})),
 
@@ -281,7 +308,8 @@ export const useApp = create<AppState>((set) => ({
       };
     }),
   toggleTheme: () => set((s) => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),
-  beginLoad: (label) => set({ load: { status: 'loading', label, rows: 0 } }),
+  beginLoad: (label, warning = undefined) =>
+    set({ load: { status: 'loading', label, rows: 0, warning: warning ?? null } }),
   reportProgress: (rows) =>
     set((s) => (s.load.status === 'loading' ? { load: { ...s.load, rows } } : {})),
   failLoad: (message) => set({ load: { status: 'failed', message } }),

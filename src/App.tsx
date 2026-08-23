@@ -44,7 +44,7 @@ export function App({
             <Notice workspace={workspace} />
             <AnalysisCard workspace={workspace} />
             <SchemaPanel loader={loader} />
-            <DevPanel port={port} />
+            <DevPanel port={port} workspace={workspace} onWantKey={() => setKeyDialog(true)} />
             <DataTable cache={cache} />
           </>
         ) : (

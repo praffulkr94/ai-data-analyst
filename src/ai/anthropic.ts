@@ -18,6 +18,7 @@ import { TOOLS } from './tool';
 import {
   Cancelled,
   NO_USAGE,
+  Retryable,
   type Attempt,
   type TranslateRequest,
   type Translator,
@@ -39,7 +40,29 @@ function clientFor(key: string): Anthropic {
     apiKey: key,
     dangerouslyAllowBrowser: true,
     defaultHeaders: { 'anthropic-dangerous-direct-browser-access': 'true' },
+    // The SDK retries a 429 twice on its own, silently. A retry the visitor cannot see is a
+    // wait they cannot understand, so the retry is ours and the countdown is on screen.
+    maxRetries: 0,
   });
+}
+
+/** A rate limit, an overloaded server or a dropped connection is worth waiting out; a 400 or a
+    401 is not. `retry-after` is in seconds when the server sends it. */
+function asRetryable(e: unknown): Retryable | null {
+  if (e instanceof Anthropic.RateLimitError) {
+    const after = Number(e.headers?.get('retry-after'));
+    return new Retryable(
+      'The API rate-limited this request.',
+      Number.isFinite(after) && after > 0 ? after * 1000 : null,
+    );
+  }
+  if (e instanceof Anthropic.APIConnectionError) {
+    return new Retryable('Could not reach the API.');
+  }
+  if (e instanceof Anthropic.APIError && typeof e.status === 'number' && e.status >= 500) {
+    return new Retryable(`The API is overloaded — it answered ${e.status}.`);
+  }
+  return null;
 }
 
 /** Exactly what is sent, as a plain object. The "what the model sees" inspector renders this, so
@@ -82,7 +105,7 @@ export function createAnthropicTranslator(): Translator {
         return readMessage(await stream.finalMessage(), req);
       } catch (e) {
         if (e instanceof Anthropic.APIUserAbortError || signal?.aborted) throw new Cancelled();
-        throw e;
+        throw asRetryable(e) ?? e;
       }
     },
   };

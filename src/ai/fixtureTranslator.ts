@@ -9,9 +9,16 @@
     Demo mode disables free text precisely so that this stays a guard rather than a UX. */
 import type Anthropic from '@anthropic-ai/sdk';
 import { readMessage } from './anthropic';
+import { takeFault, type Fault } from './faults';
 import { repertoireFor, type Fixture } from './fixtures';
 import { chipsFrom, readPartial } from './partial';
-import { Cancelled, type Attempt, type TranslateRequest, type Translator } from './translator';
+import {
+  Cancelled,
+  Retryable,
+  type Attempt,
+  type TranslateRequest,
+  type Translator,
+} from './translator';
 
 /** Chunk sizes and gaps taken from what a real stream looks like: a first token a little under
     half a second in, then text a few characters at a time and tool JSON a little faster. */
@@ -58,25 +65,42 @@ const TOOL_NAMES = {
   unsupported: 'report_unsupported',
 } as const;
 
+/** What the armed fault does to the reply, if anything. Each one is a shape the API really can
+    return, so the application meets the same reply it would meet in the wild. */
+function damage(input: Fixture['input'], fault: Fault | null): unknown {
+  if (fault === 'malformed') return { kind: 'analysis', intent: 'new', title: 'Half a reply' };
+  if (fault === 'unknown-column' && input.kind === 'analysis') {
+    return {
+      ...input,
+      operation: { ...input.operation, groupBy: ['home_teem'] },
+      visualization: { ...input.visualization, x: 'home_teem' },
+    };
+  }
+  return input;
+}
+
 /** The message the recorded deltas add up to. Handed to the same `readMessage` the live stream
     uses, so a Fixture cannot take a shortcut past the structural check. */
-function messageFor(fixture: Fixture, model: string): Anthropic.Message {
+function messageFor(fixture: Fixture, model: string, fault: Fault | null): Anthropic.Message {
   return {
     id: `msg_fixture_${fixture.dataset}`,
     type: 'message',
     role: 'assistant',
     model,
-    stop_reason: 'tool_use',
+    stop_reason: fault === 'max-tokens' ? 'max_tokens' : 'tool_use',
     stop_sequence: null,
-    content: [
-      { type: 'text', text: fixture.narration, citations: null },
-      {
-        type: 'tool_use',
-        id: 'toolu_fixture',
-        name: TOOL_NAMES[fixture.input.kind],
-        input: fixture.input,
-      },
-    ],
+    content:
+      fault === 'no-tool'
+        ? [{ type: 'text', text: fixture.narration, citations: null }]
+        : [
+            { type: 'text', text: fixture.narration, citations: null },
+            {
+              type: 'tool_use',
+              id: 'toolu_fixture',
+              name: TOOL_NAMES[fixture.input.kind],
+              input: damage(fixture.input, fault),
+            },
+          ],
     usage: {
       input_tokens: fixture.usage.inputTokens,
       output_tokens: fixture.usage.outputTokens,
@@ -115,7 +139,13 @@ export function createFixtureTranslator({
         );
       }
 
+      const fault = takeFault();
       await sleep(FIRST_TOKEN_MS * pace, signal);
+      if (fault === 'rate-limit') {
+        throw new Retryable('The API rate-limited this request.', 5_000);
+      }
+      if (fault === 'overloaded') throw new Retryable('The API is overloaded — it answered 529.');
+
       for (const delta of chunks(fixture.narration, TEXT_CHUNK)) {
         events?.onNarration?.(delta);
         await sleep(TEXT_GAP_MS * pace, signal);
@@ -134,7 +164,7 @@ export function createFixtureTranslator({
         await sleep(TOOL_GAP_MS * pace, signal);
       }
 
-      const attempt = readMessage(messageFor(fixture, req.model), req);
+      const attempt = readMessage(messageFor(fixture, req.model, fault), req);
       // Nothing was charged, and the readout says so rather than vanishing or implying a bill.
       return { ...attempt, usage: { ...attempt.usage, recorded: true } };
     },
