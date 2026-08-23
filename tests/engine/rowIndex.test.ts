@@ -6,7 +6,7 @@ import { buildRowIndex, readSlice, type ViewState } from '../../src/engine/rowIn
 const store = (header: string[], rows: string[][]) =>
   buildColumnStore(header, rows, inferSchema(header, rows));
 
-const view = (over: Partial<ViewState> = {}): ViewState => ({ sort: null, hidden: [], ...over });
+const view = (over: Partial<ViewState> = {}): ViewState => ({ sort: null, filters: [], hidden: [], ...over });
 
 /** Reads one column back in RowIndex order, which is what the table renders. */
 const ordered = (header: string[], rows: string[][], v: ViewState, col = 0) => {
@@ -16,6 +16,46 @@ const ordered = (header: string[], rows: string[][], v: ViewState, col = 0) => {
     (r) => r[col],
   );
 };
+
+describe('a filtered RowIndex', () => {
+  const rows = [
+    ['Scotland', '0'],
+    ['England', '4'],
+    ['Scotland', '2'],
+    ['England', '2'],
+  ];
+
+  it('keeps only the rows the filters select, in file order', () => {
+    const out = ordered(
+      ['team', 'n'],
+      rows,
+      view({ filters: [{ op: 'eq', column: 'team', value: 'Scotland' }] }),
+      1,
+    );
+    expect(out).toEqual(['0', '2']);
+  });
+
+  it('applies every filter, and sorts what survives them', () => {
+    const out = ordered(
+      ['team', 'n'],
+      rows,
+      view({
+        filters: [
+          { op: 'neq', column: 'team', value: 'Scotland' },
+          { op: 'gte', column: 'n', value: 2 },
+        ],
+        sort: { column: 'n', dir: 'desc' },
+      }),
+      1,
+    );
+    // Both England rows pass, ordered by the sort rather than by the file.
+    expect(out).toEqual(['4', '2']);
+  });
+
+  it('is the whole Dataset when there are no filters', () => {
+    expect(ordered(['team', 'n'], rows, view(), 1)).toEqual(['0', '4', '2', '2']);
+  });
+});
 
 describe('RowIndex ordering', () => {
   it('is the natural row order when nothing is sorted', () => {

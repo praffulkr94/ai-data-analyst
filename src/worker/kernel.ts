@@ -59,7 +59,7 @@ export function createKernel(post: Post) {
     ref: null,
     label: '',
     index: new Int32Array(0),
-    view: { sort: null, hidden: [] },
+    view: { sort: null, filters: [], hidden: [] },
     viewVersion: 0,
   };
 
@@ -150,7 +150,7 @@ export function createKernel(post: Post) {
       const schema = inferSchema(result.header, result.rows);
       const store = buildColumnStore(result.header, result.rows, schema);
       Object.assign(state, { store, ref, label });
-      state.view = { sort: null, hidden: [] };
+      state.view = { sort: null, filters: [], hidden: [] };
       state.index = buildRowIndex(store, state.view);
       state.viewVersion++;
       post({

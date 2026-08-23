@@ -8,7 +8,7 @@ import type { DatasetHandle, ParseReport } from './engine/handle';
 import type { AnalysisResult } from './engine/result';
 import type { ViewState } from './engine/rowIndex';
 import type { ColumnMeta, ColumnType } from './engine/types';
-import type { AnalysisSpec } from './spec/grammar';
+import type { AnalysisSpec, Filter } from './spec/grammar';
 import type { SpecViolation } from './spec/validate';
 
 /** Demo mode is the default for a first-time visitor. There is no "Live" mode — its opposite
@@ -29,6 +29,9 @@ export type Analysis = {
   id: string;
   title: string;
   revisions: Revision[];
+  /** Which Revision is on screen. The stepper and undo move it; a Revision that lands moves it
+      to itself, because a result nobody can see is the failure the updated marker exists for. */
+  at: number;
   /** Set when a Revision landed while the visitor was looking at a different Analysis. Without
       it the finished work is silently invisible. */
   updated: boolean;
@@ -98,6 +101,12 @@ export type AppState = {
   setMode: (mode: Mode) => void;
   setModel: (model: ModelChoice) => void;
   selectAnalysis: (id: string | null) => void;
+  /** Remove the active Analysis's filter chip from the table. The Analysis is untouched — the
+      table is inspection only, and it never sends anything back the other way. */
+  clearTableFilter: () => void;
+  /** Step one Revision back or forward, clamped. Undo is this with a delta of -1. */
+  stepRevision: (id: string, delta: number) => void;
+  deleteAnalysis: (id: string) => void;
   startRequest: (id: number, question: string) => void;
   appendNarration: (id: number, text: string) => void;
   setChips: (id: number, chips: string[]) => void;
@@ -120,6 +129,10 @@ export type AppState = {
   toggleColumn: (column: string) => void;
 };
 
+/** The filters of the Revision an Analysis is currently showing. */
+const shownFilters = (a: Analysis | undefined): Filter[] =>
+  a?.revisions[a.at]?.spec.operation.filters ?? [];
+
 export const useApp = create<AppState>((set) => ({
   mode: 'demo',
   theme: 'light',
@@ -127,7 +140,7 @@ export const useApp = create<AppState>((set) => ({
   columns: [],
   parseReport: null,
   load: { status: 'idle' },
-  viewState: { sort: null, hidden: [] },
+  viewState: { sort: null, filters: [], hidden: [] },
 
   model: 'smart',
   analyses: [],
@@ -140,12 +153,56 @@ export const useApp = create<AppState>((set) => ({
   setModel: (model) => set({ model }),
 
   /** A pure view change. It cancels nothing — discarding work the visitor asked for to service a
-      navigation is hostile — and it clears the Analysis's updated marker, which has been read. */
+      navigation is hostile — and it clears the Analysis's updated marker, which has been read.
+
+      The table follows the Analysis onto its rows, which is the one direction this coupling
+      runs: an Analysis filters the table, and the table never filters an Analysis. */
   selectAnalysis: (id) =>
-    set((s) => ({
-      activeAnalysisId: id,
-      analyses: s.analyses.map((a) => (a.id === id ? { ...a, updated: false } : a)),
-    })),
+    set((s) => {
+      const analyses = s.analyses.map((a) => (a.id === id ? { ...a, updated: false } : a));
+      return {
+        activeAnalysisId: id,
+        analyses,
+        viewState: { ...s.viewState, filters: shownFilters(analyses.find((a) => a.id === id)) },
+      };
+    }),
+
+  clearTableFilter: () => set((s) => ({ viewState: { ...s.viewState, filters: [] } })),
+
+  stepRevision: (id, delta) =>
+    set((s) => {
+      const analyses = s.analyses.map((a) =>
+        a.id === id
+          ? { ...a, at: Math.min(a.revisions.length - 1, Math.max(0, a.at + delta)) }
+          : a,
+      );
+      const stepped = analyses.find((a) => a.id === id);
+      return {
+        analyses,
+        // Two Revisions of one Analysis can hold different filters, so the rows behind the chart
+        // change with it — but only while that Analysis is the one on screen.
+        viewState:
+          s.activeAnalysisId === id
+            ? { ...s.viewState, filters: shownFilters(stepped) }
+            : s.viewState,
+      };
+    }),
+
+  /** The Analysis before it takes the selection, so deleting the one you are looking at leaves
+      you somewhere rather than on an empty canvas. */
+  deleteAnalysis: (id) =>
+    set((s) => {
+      const at = s.analyses.findIndex((a) => a.id === id);
+      if (at < 0) return {};
+      const analyses = s.analyses.filter((a) => a.id !== id);
+      if (s.activeAnalysisId !== id) return { analyses };
+      const next = analyses[Math.max(0, at - 1)] ?? null;
+      return {
+        analyses,
+        activeAnalysisId: next?.id ?? null,
+        viewState: { ...s.viewState, filters: shownFilters(next ?? undefined) },
+      };
+    }),
 
   startRequest: (id, question) =>
     set({
@@ -193,17 +250,24 @@ export const useApp = create<AppState>((set) => ({
       const existing = s.analyses.find((a) => a.id === target);
       if (!existing) {
         return {
-          analyses: [...s.analyses, { id, title, revisions: [revision], updated: false }],
+          analyses: [...s.analyses, { id, title, revisions: [revision], updated: false, at: 0 }],
           activeAnalysisId: id,
+          viewState: { ...s.viewState, filters: revision.spec.operation.filters },
         };
       }
       return {
+        viewState:
+          s.activeAnalysisId === existing.id
+            ? { ...s.viewState, filters: revision.spec.operation.filters }
+            : s.viewState,
         analyses: s.analyses.map((a) =>
           a.id === existing.id
             ? {
                 ...a,
                 title,
                 revisions: [...a.revisions, revision],
+                // The Revision that just landed is the one to show, wherever the stepper was.
+                at: a.revisions.length,
                 // Quiet marker: the result landed on an Analysis the visitor is not looking at.
                 updated: s.activeAnalysisId !== a.id,
               }
@@ -224,7 +288,7 @@ export const useApp = create<AppState>((set) => ({
       load: { status: 'ready' },
       // A different Dataset has different columns, so a sort or a hidden column carried over
       // from the last one would name something that no longer exists.
-      viewState: s.datasetHandle?.label === handle.label ? s.viewState : { sort: null, hidden: [] },
+      viewState: s.datasetHandle?.label === handle.label ? s.viewState : { sort: null, filters: [], hidden: [] },
       // Analyses name columns of the Dataset they were asked against, so a different one leaves
       // them meaningless rather than merely stale.
       analyses: s.datasetHandle?.label === handle.label ? s.analyses : [],
@@ -255,6 +319,7 @@ export const useApp = create<AppState>((set) => ({
         : [...s.viewState.hidden, column];
       return {
         viewState: {
+          ...s.viewState,
           // A hidden column cannot also be the sort column.
           sort: s.viewState.sort?.column === column ? null : s.viewState.sort,
           hidden,

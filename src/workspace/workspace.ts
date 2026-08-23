@@ -202,14 +202,60 @@ export function createWorkspace({
 
   function land(
     target: string | null,
-    question: string,
+    question: string | null,
     spec: AnalysisSpec,
     revision: Revision,
   ): void {
     const known = store.getState().analyses.some((a) => a.id === target);
     const id = known ? target! : `a${nextAnalysisId++}`;
     store.getState().landRevision(target, id, spec.title, revision);
-    exchanges.set(id, [...(exchanges.get(id) ?? []), { question, spec }]);
+    // A manual edit has no Question, so it contributes nothing to the history a later refine
+    // carries — the spec it produced is already the one that history is about.
+    if (question !== null) exchanges.set(id, [...(exchanges.get(id) ?? []), { question, spec }]);
+  }
+
+  /** A manual edit: the chart-type toggle or the aggregation dropdown, already applied to the
+      spec by `spec/edits`. It skips the Translator and nothing else — the same semantic
+      validation, the same worker execution, the same captured target, and a Revision identical
+      to the one a spoken edit produces, in one history.
+
+      It is a submission, so it takes a requestId: a manual edit made while a Question is in
+      flight supersedes that Question rather than racing it. */
+  async function revise(spec: AnalysisSpec): Promise<void> {
+    const id = ++requestId;
+    const state = store.getState();
+    const target = state.activeAnalysisId;
+    const analysis = state.analyses.find((a) => a.id === target);
+    if (!analysis) return;
+    inFlight?.abort();
+    store.getState().dismissNotice();
+
+    const violations = validateSpec(spec, { columns: state.columns });
+    if (violations.length > 0) {
+      return notice(id, {
+        kind: 'failed',
+        message: 'That change does not describe an analysis this Dataset can answer.',
+        violations,
+      });
+    }
+
+    const res = await port.send({
+      type: 'analyze',
+      operation: spec.operation,
+      metric: spec.visualization.y,
+      seriesBy: spec.visualization.seriesBy,
+    }).done;
+    if (stale(id)) return;
+    if (res.type !== 'analyze:done') {
+      return notice(id, {
+        kind: 'failed',
+        message: res.type === 'error' ? res.message : 'The analysis was cancelled.',
+        violations: [],
+      });
+    }
+    // The model of the Revision this was derived from: a manual edit changes the spec, not who
+    // wrote the analysis it descends from.
+    land(target, null, spec, { spec, result: res.result, model: analysis.revisions[analysis.at]!.model });
   }
 
   return {
@@ -225,6 +271,15 @@ export function createWorkspace({
     },
 
     ask,
+
+    revise,
+
+    /** Deleting an Analysis takes its Questions with it: they are dispatch context for refining
+        that Analysis, and there is no longer one to refine. */
+    deleteCard(id: string): void {
+      exchanges.delete(id);
+      store.getState().deleteAnalysis(id);
+    },
 
     /** A pure view change. It cancels nothing. */
     selectCard(id: string | null): void {

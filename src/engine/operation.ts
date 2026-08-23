@@ -59,6 +59,18 @@ function passes(col: Column | undefined, row: number, f: Filter): boolean {
   }
 }
 
+/** The rows an Operation's filters keep, in file order. Shared with the RowIndex, so the rows
+    behind a chart and the rows the table shows under that Analysis's chip are selected by one
+    implementation rather than two that can disagree. */
+export function filterRows(store: ColumnStore, filters: Filter[]): number[] {
+  const cols = filters.map((f) => store.columns.get(f.column));
+  const kept: number[] = [];
+  for (let row = 0; row < store.rowCount; row++) {
+    if (filters.every((f, i) => passes(cols[i], row, f))) kept.push(row);
+  }
+  return kept;
+}
+
 /** A boolean column reads as `TRUE`/`FALSE`, so a filter written against `true` must too. */
 const booleanText = (v: string | number | boolean) =>
   typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : v;
@@ -227,11 +239,7 @@ export function executeOperation(
   op: Operation,
   { metric, seriesBy }: ExecuteOptions = {},
 ): AnalysisResult {
-  const filterCols = op.filters.map((f) => store.columns.get(f.column));
-  const kept: number[] = [];
-  for (let row = 0; row < store.rowCount; row++) {
-    if (op.filters.every((f, i) => passes(filterCols[i], row, f))) kept.push(row);
-  }
+  const kept = filterRows(store, op.filters);
 
   const dims = dimensions(store, op);
   const groups = groupRows(kept, dims);

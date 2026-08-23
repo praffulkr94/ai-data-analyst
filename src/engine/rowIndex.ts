@@ -1,6 +1,8 @@
 /** The RowIndex — the ordered set of rows a ViewState selects from a Dataset — and reading a
     RowSlice out of it. Both run in the worker: locale-aware string sorting over 49,520 rows is
     precisely the expensive work the worker exists to keep off the main thread (ADR-0004). */
+import { filterRows } from './operation';
+import type { Filter } from '../spec/grammar';
 import type { Column, ColumnStore } from './types';
 import { cellText } from './types';
 
@@ -8,6 +10,9 @@ import { cellText } from './types';
     table sort never drives the chart (DECISIONS §11). */
 export type ViewState = {
   sort: { column: string; dir: 'asc' | 'desc' } | null;
+  /** The active Analysis's filters, so the table can show the rows behind its chart. They arrive
+      from the Analysis and are removed as a chip; the table never sends them the other way. */
+  filters: Filter[];
   /** Columns the visitor has hidden. */
   hidden: string[];
 };
@@ -58,8 +63,12 @@ function sortKeys(col: Column): Float64Array {
 }
 
 export function buildRowIndex(store: ColumnStore, view: ViewState): Int32Array {
-  const index = new Int32Array(store.rowCount);
-  for (let i = 0; i < index.length; i++) index[i] = i;
+  // The same selection the Operation makes, so the table under an Analysis's chip holds exactly
+  // the rows its chart was computed from.
+  const index =
+    view.filters.length > 0
+      ? Int32Array.from(filterRows(store, view.filters))
+      : Int32Array.from({ length: store.rowCount }, (_, i) => i);
 
   const col = view.sort ? store.columns.get(view.sort.column) : undefined;
   if (!view.sort || !col) return index;

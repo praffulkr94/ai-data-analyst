@@ -114,7 +114,7 @@ describe('view and slice', () => {
     const port = await loaded();
     const res = await port.send({
       type: 'view',
-      viewState: { sort: { column: 'n', dir: 'desc' }, hidden: [] },
+      viewState: { sort: { column: 'n', dir: 'desc' }, filters: [], hidden: [] },
     }).done;
     expect(res.type).toBe('view:done');
     if (res.type !== 'view:done') return;
@@ -124,7 +124,7 @@ describe('view and slice', () => {
 
   it('answers a slice with the requested run of rows in the current view order', async () => {
     const port = await loaded();
-    await port.send({ type: 'view', viewState: { sort: { column: 'n', dir: 'desc' }, hidden: [] } })
+    await port.send({ type: 'view', viewState: { sort: { column: 'n', dir: 'desc' }, filters: [], hidden: [] } })
       .done;
     const res = await port.send({ type: 'slice', offset: 0, limit: 3 }).done;
     if (res.type !== 'slice:done') throw new Error('expected slice:done');
@@ -136,11 +136,11 @@ describe('view and slice', () => {
     const port = await loaded();
     const first = await port.send({
       type: 'view',
-      viewState: { sort: { column: 'n', dir: 'asc' }, hidden: [] },
+      viewState: { sort: { column: 'n', dir: 'asc' }, filters: [], hidden: [] },
     }).done;
     const second = await port.send({
       type: 'view',
-      viewState: { sort: { column: 'n', dir: 'desc' }, hidden: [] },
+      viewState: { sort: { column: 'n', dir: 'desc' }, filters: [], hidden: [] },
     }).done;
     if (first.type !== 'view:done' || second.type !== 'view:done') throw new Error('bad');
     expect(second.viewVersion).toBe(first.viewVersion + 1);
@@ -148,7 +148,7 @@ describe('view and slice', () => {
 
   it('omits hidden columns from the slice', async () => {
     const port = await loaded();
-    await port.send({ type: 'view', viewState: { sort: null, hidden: ['team'] } }).done;
+    await port.send({ type: 'view', viewState: { sort: null, filters: [], hidden: ['team'] } }).done;
     const res = await port.send({ type: 'slice', offset: 0, limit: 1 }).done;
     if (res.type !== 'slice:done') throw new Error('expected slice:done');
     expect(res.columns).toEqual(['date', 'n']);
@@ -166,7 +166,7 @@ describe('view and slice', () => {
   it('refuses a view before any Dataset is loaded', async () => {
     const res = await createLocalPort().send({
       type: 'view',
-      viewState: { sort: null, hidden: [] },
+      viewState: { sort: null, filters: [], hidden: [] },
     }).done;
     expect(res).toMatchObject({ type: 'error', code: 'no-dataset' });
   });

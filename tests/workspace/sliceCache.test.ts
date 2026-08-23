@@ -15,7 +15,7 @@ const loaded = async () => {
     label: 'x',
   }).done;
   const cache = createSliceCache(port);
-  await cache.setView({ sort: null, hidden: [] });
+  await cache.setView({ sort: null, filters: [], hidden: [] });
   return { port, cache };
 };
 
@@ -90,7 +90,7 @@ describe('stale RowSlices', () => {
   it('drops a RowSlice built against an older view version', async () => {
     const port = scriptedPort();
     const cache = createSliceCache(port);
-    await cache.setView({ sort: null, hidden: [] });
+    await cache.setView({ sort: null, filters: [], hidden: [] });
     cache.setRange(0, 50);
     // The view has since been rebuilt — a sort landed — so this answer describes an ordering
     // that is no longer on screen.
@@ -109,7 +109,7 @@ describe('stale RowSlices', () => {
   it('drops a RowSlice for rows the viewport has already scrolled past', async () => {
     const port = scriptedPort();
     const cache = createSliceCache(port);
-    await cache.setView({ sort: null, hidden: [] });
+    await cache.setView({ sort: null, filters: [], hidden: [] });
     cache.setRange(0, 50);
     // The visitor flung down the table before the answer came back.
     cache.setRange(800, 850);
@@ -128,7 +128,7 @@ describe('stale RowSlices', () => {
   it('keeps a RowSlice that is still on screen when it arrives', async () => {
     const port = scriptedPort();
     const cache = createSliceCache(port);
-    await cache.setView({ sort: null, hidden: [] });
+    await cache.setView({ sort: null, filters: [], hidden: [] });
     cache.setRange(0, 50);
     port.reply({
       type: 'slice:done',
@@ -145,7 +145,7 @@ describe('stale RowSlices', () => {
   it('asks once for a RowSlice already in flight', async () => {
     const port = scriptedPort();
     const cache = createSliceCache(port);
-    await cache.setView({ sort: null, hidden: [] });
+    await cache.setView({ sort: null, filters: [], hidden: [] });
     cache.setRange(0, 50);
     cache.setRange(10, 60);
     expect(port.asked.filter((o) => o === 0)).toHaveLength(1);
