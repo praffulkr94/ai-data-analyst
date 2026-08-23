@@ -239,6 +239,9 @@ export function createWorkspace({
       });
     }
 
+    // ponytail: a chart-type toggle re-executes an Operation that has not changed, to keep one
+    // path with no special case (ADR-0021). Reuse the previous Revision's result when the
+    // Operation is deep-equal if the tens of milliseconds ever measure.
     const res = await port.send({
       type: 'analyze',
       operation: spec.operation,

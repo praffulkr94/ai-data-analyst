@@ -20,7 +20,7 @@ they win. Precedence is `DECISIONS.md` → `docs/adr/*` → `CONTEXT.md` → iss
   "store". RowSlice — never "window". ModelReply — never `SpecResponse`. Translator — never
   `SpecGenerator`. A concept you need that is missing from the glossary is a signal, not a
   licence to invent one.
-- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are twenty.
+- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are twenty-one.
 - Issue #1 — the whole spec, and the only place the work is decomposed.
 
 ## The constraint that has to travel with you
@@ -69,7 +69,8 @@ else is wiring around them.
 - `src/worker/kernel.ts` — everything the worker does, as a plain request-to-responses function.
   `dataset.worker.ts` adapts it to a real `Worker` in nine lines and `localPort.ts` adapts it
   in-process for the seam tests. One implementation, two adapters — do not fork it.
-- `src/spec/` — the Zod grammar and the semantic validator.
+- `src/spec/` — the Zod grammar, the semantic validator, and `edits.ts`: the two manual edits and
+  the option lists they offer, which are asked of the validator rather than restated.
 - `src/chart/` — the three layers: dimensions, scales, dumb marks.
 - `src/table/` — the SliceCache and its React window.
 - `src/ui/` — components.
@@ -88,8 +89,12 @@ else is wiring around them.
   line breaking at a gap — count subpaths, never coordinates.
 - **The `Workspace` seam tests share `tests/workspace/harness.ts`** — the scripted Translator, the
   `attempt`/`analysis` builders, the gated port, and a `setup` that parses a four-row CSV through
-  the real kernel. Use it rather than forking a second copy; it is already what the M6 tests will
-  need.
+  the real kernel. Three files use it now (`workspace`, `analysis`, `analysisCard`); use it rather
+  than forking a fourth copy.
+- **Every edit to an Analysis goes through the `Workspace`**, spoken or manual. `workspace.revise`
+  is the manual path and it is deliberately `ask` without the Translator — same validation, same
+  worker execution, same captured target, same Revision (ADR-0021). A control that writes a
+  Revision into the store directly is a second dispatcher.
 - **Tests that care about a ColumnType state it.** A small fixture falls under the 95% numeric
   threshold and infers categorical; `tests/engine/operation.test.ts` has the helper for this.
   Inference has its own tests and does not need testing again through the executor.
@@ -131,10 +136,16 @@ else is wiring around them.
 - The staleness guard that matters is the one after the worker responds, and testing it needs a
   port that holds its answer. Three model calls resolving out of order pass with that guard
   deleted; only a Request superseded *while its worker job runs* catches it.
+- A line or an area chart over a categorical x-axis is a SpecViolation — a line joins its points,
+  which implies an order a category does not have. The four-row fixture's natural spec is a count
+  by `home_team`, so any test about chart types needs a `timeBucket` spec instead, or the toggle
+  it is testing legitimately offers nothing.
+- `ViewState` now carries `filters`, applied by `buildRowIndex` through the same `filterRows` the
+  Operation executor uses. Do not add a second filter implementation for the table.
 
 ## Known to be ahead of its tests
 
-Two entries, at the time of writing. Both have their ledger items deliberately left unticked.
+One entry, at the time of writing. Its ledger item is deliberately left unticked.
 
 **Prompt caching is implemented and unverified.** The `cache_control` breakpoint is on the last
 system block and the readout shows `cache_read_input_tokens` as its own figure, but nobody has
@@ -147,31 +158,6 @@ silent invalidator has crept in. The minimum cacheable prefix is roughly 1,024 t
 one fails to cache without saying so, which is the whole reason the figure is on screen. **First
 task for whoever has a key: ask two Questions in one session and assert
 `usage.cache_read_input_tokens > 0`, then tick the item.**
-
-**Three of M6's unticked items already have their code.** M5 could not land a Revision without
-deciding where it goes, so the parts of the Analysis model that the Request lifecycle needed were
-built with it. Read these before writing M6, or you will build a second dispatcher beside the
-first:
-
-- *Analysis and Revision model; Revisions immutable* — `src/store.ts`. A Revision is the
-  AnalysisSpec, the AnalysisResult and the model choice, and nothing else. The Question that
-  produced it is **not** on the Revision: it is dispatch context, so it lives in the `exchanges`
-  map inside `createWorkspace` alongside `intent`. Exercised throughout the Workspace tests.
-- *Dispatcher decides new-versus-refine; `intent` consumed and never persisted* — one line in
-  `workspace.ts`: `reply.intent === 'refine' ? target : null`, where `target` is the Analysis
-  captured at dispatch, so `refine` with nothing captured becomes a new Analysis. Tested by
-  "appends a Revision when the model refines, and starts an Analysis when it does not".
-- *`targetAnalysisId` captured at dispatch* — implemented, **untested**. `ask` reads
-  `activeAnalysisId` once at the top and never again; every write goes to that captured value.
-  M6's captured-target test is what proves it, and it does not exist yet.
-- *Quiet "updated" marker* — implemented in `landRevision` and rendered by the `Rail`,
-  **untested**. It falls out of the captured target: a Revision can land on an Analysis the
-  visitor navigated away from, and `selectAnalysis` clears the marker on arrival.
-
-What M6 still owns in full: the Revision stepper and Cmd+Z, the manual chart-type and aggregation
-controls, the table filter chip, Analysis deletion, and the ADR. Analysis deletion has **no**
-code — a store action for it was written during M5 and then deleted unused, because scaffolding
-for later is what M6 is for.
 
 If you leave a grammar field half-wired or an implementation ahead of its tests, add it here and
 leave its ledger item unticked.
