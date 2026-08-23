@@ -79,7 +79,7 @@ export function createAnthropicTranslator(): Translator {
             }
           }
         }
-        return finish(await stream.finalMessage(), req);
+        return readMessage(await stream.finalMessage(), req);
       } catch (e) {
         if (e instanceof Anthropic.APIUserAbortError || signal?.aborted) throw new Cancelled();
         throw e;
@@ -88,7 +88,7 @@ export function createAnthropicTranslator(): Translator {
   };
 }
 
-function finish(message: Anthropic.Message, req: TranslateRequest): Attempt {
+export function readMessage(message: Anthropic.Message, req: TranslateRequest): Attempt {
   const usage = readUsage(message.usage, req);
   const call = message.content.find((b) => b.type === 'tool_use');
 

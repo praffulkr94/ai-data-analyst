@@ -63,6 +63,13 @@ export interface Translator {
   ): Promise<Attempt>;
 }
 
+/** One seam, two implementations, picked per Request. Mode therefore decides only which
+    Translator answers — the Dataset, the Analyses and the Revisions are not this function's
+    business and it cannot touch them, which is why switching mode preserves all three for free. */
+export const switching = (pick: () => Translator): Translator => ({
+  translate: (req, events, signal) => pick().translate(req, events, signal),
+});
+
 /** Raised when the visitor cancelled. Not a failure of the Request — the caller drops it. */
 export class Cancelled extends Error {
   constructor() {

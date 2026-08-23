@@ -113,12 +113,15 @@ export function gated(port: DataPort): { port: DataPort; release: () => Promise<
 export const INITIAL = useApp.getState();
 export const reset = (): void => useApp.setState(INITIAL, true);
 
-export async function setup() {
+/** `translator` swaps in a different implementation of the one seam — the Fixture Translator in
+    the Demo-mode tests. Everything downstream of it is the same code either way, which is the
+    property those tests exist to hold. */
+export async function setup({ translator }: { translator?: Translator } = {}) {
   reset();
   const port = createLocalPort();
   const loader = createLoader(port);
   const script = scripted();
-  const workspace = createWorkspace({ translator: script.translator, port, loader });
+  const workspace = createWorkspace({ translator: translator ?? script.translator, port, loader });
   const res = await port.send({ type: 'parse', source: { text: CSV }, ref, label: 'm.csv' }).done;
   if (res.type !== 'parse:done') throw new Error('fixture failed to parse');
   useApp.getState().setDataset(res.handle, null);

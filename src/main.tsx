@@ -2,9 +2,12 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { createAnthropicTranslator } from './ai/anthropic';
+import { createFixtureTranslator } from './ai/fixtureTranslator';
+import { switching } from './ai/translator';
 import { createLoader } from './data/loader';
 import { createSliceCache } from './table/sliceCache';
 import { createTransport } from './worker/transport';
+import { useApp } from './store';
 import { createWorkspace } from './workspace/workspace';
 import './styles/tokens.css';
 import './styles/app.css';
@@ -16,10 +19,19 @@ const port = createTransport();
 const loader = createLoader(port);
 const cache = createSliceCache(port);
 
-/** The `Workspace` owns the Request lifecycle and is constructed with a Translator. In milestone
-    7 the Demo-mode Fixture Translator goes in the same slot; nothing else changes. */
+/** The `Workspace` owns the Request lifecycle and is constructed with a Translator. Both
+    implementations sit behind that one seam and the mode picks between them per Request, so a
+    mode switch changes the transport and nothing else. */
+const anthropic = createAnthropicTranslator();
+const fixtures = createFixtureTranslator({
+  dataset: () => {
+    const ref = useApp.getState().datasetHandle?.ref;
+    return ref?.kind === 'sample' ? ref.id : null;
+  },
+});
+
 const workspace = createWorkspace({
-  translator: createAnthropicTranslator(),
+  translator: switching(() => (useApp.getState().mode === 'byok' ? anthropic : fixtures)),
   port,
   loader,
 });
