@@ -45,8 +45,12 @@ npm test             # the two seams — engine (Node) and workspace (jsdom)
 npm run test:all     # adds the browser project, which needs a real Worker
 npm run typecheck    # tsc -b, run this often
 npm run build
+npm run audit:contrast            # every contrast pair, both themes; exits non-zero on a regression
 node scripts/build-datasets.mjs   # rebuilds public/data/*.csv.gz from data/raw/
+node scripts/bench-run.mjs --machine "…"   # drives #bench, writes docs/bench/. Needs the app up.
 ```
+
+`npm run test:e2e` is a stub: it calls `playwright test`, and `@playwright/test` is not installed.
 
 Chromium only, by decision. `npx playwright install chromium` once.
 
@@ -85,6 +89,14 @@ else is wiring around them.
   ADR-0023, read it before touching a cap.
 - `src/table/` — the SliceCache and its React window.
 - `src/ui/` — components.
+- `src/perf.ts` — the whole of the instrumentation: `timed`, `mark`, a `since` that refuses to
+  measure against a mark that is not there, and the two observers. No DOM, so `worker/kernel.ts`
+  imports it too — a worker has its own performance timeline, and the phases inside a round trip
+  are measured there and posted back as `Timings` on `parse:done` and `analyze:done`.
+- `src/bench/` — the `#bench` route, lazily imported by `main.tsx` and nothing else, so it is a
+  chunk nobody who does not ask for it downloads. `paths.ts` holds the three paths and the two
+  questions; `stats.ts` is the median, which every published number passes through and which is
+  therefore tested. Driven by `scripts/bench-run.mjs`, output committed to `docs/bench/`.
 
 ## Conventions that are not obvious from the code
 
@@ -186,39 +198,66 @@ else is wiring around them.
 - `zustand`'s plain `subscribe` fires on every `set`, narration frames included. Anything
   subscribing outside React — the hash writer does — needs its own cheap reference-equality guard
   on the values it actually cares about.
+- There is no `jest-dom`, so there is no `toHaveAccessibleName`. Assert an accessible name with
+  `screen.getByRole('img', { name: … })` — Testing Library computes it through
+  `dom-accessibility-api`, which is already a dependency of `@testing-library/dom`.
+- Chrome keeps a *sequential focus navigation starting point* that `blur()` does not move, so a
+  scripted Tab walk resumes from the last thing clicked rather than from the top of the document.
+  Rewind with Shift+Tab until focus falls off the top, then walk forward.
+- Playwright's `locator.focus()` does not match `:focus-visible`, so a focus ring read after it is
+  Chrome's default and not the application's. Read the ring after a real key press.
+- A `PerformanceObserver` disconnected before its last entry has been delivered hands that entry
+  to the *next* observer. Unfiltered, the worker path in `/bench` was credited with a 98 ms block
+  that belonged to the path before it; entries are now checked against the moment their own path
+  started.
+- `performance.memory` is quantized and reported the same 45.2 MB for all three bench paths. It
+  says nothing at this size and is not in the bench. `storeBytes` counts the ColumnStore exactly
+  instead, and the row-objects comparison stays a DevTools heap snapshot (§13).
+- A canvas frame that returns the pan to exactly `{0,0}` costs about five times one that moves it
+  further out — 21 ms against 4.4 ms at 98,899 points, reproducibly, cause not established. It is
+  recorded in `docs/bench/canvas-pan.json` under `anomaly`. Continuous panning never touches it.
+- A dimension value is not its own label: a bucket holds epoch milliseconds and a `date` column an
+  ISO day. `dimensionText` in `engine/result.ts` is the one place that knows, and `temporalLabel`
+  lives in `engine/time.ts` rather than in `chart/marks.tsx` so the engine can reach it. The
+  summary's extreme read "Highest: 1577836800000" until it did.
+- There is no `--text-faint`. `--text-muted` is 5.05:1 on white and the AA floor for 12px text is
+  4.5:1, so a third, fainter grey has nowhere legible to live. `npm run audit:contrast` fails if a
+  fourth series slot drops below 3:1, or if anything else regresses.
 
-## What M8 leaves standing under M9's ledger
+## Where M9 stands
 
-M9 is the accessibility pass, the evidence and the ship. Four of its items meet something M8 put
-there.
+Seven of the fifteen ledger items are ticked, one commit each, and `npm test` is green at 419.
+What is left, in the order it wants doing:
 
-**The canvas scatter has no keyboard path at all, and the pan is the new part.** Arrow-key
-traversal for scatter is explicitly cut (`DECISIONS.md` §15), so that is not the gap. The gap is
-that dragging is a pointer-only interaction that changes what is on screen, and its only keyboard
-affordance is the "Reset view" button that appears once it has been used — which nobody without a
-pointer can make appear. Either the full keyboard pass adds a keyboard way to pan, or the README
-says the pan is pointer-only. **Do not let the audit discover this; it is known.**
+**Two Playwright flows over canned SSE — ask→chart, and cancel→resubmit.** `playwright` the
+library is installed; `@playwright/test` is **not**, and `npm run test:e2e` therefore does not
+run. Do not add it: `scripts/bench-run.mjs` shows the shape that works — a plain `.mjs` driving
+`chromium.launch()` with asserts — and DECISIONS §14 asks for `page.route('**/v1/messages')`
+returning real SSE frames, which needs the library and nothing more. The fixtures in
+`src/ai/fixtures.ts` are the SSE bodies (that dual use is why they beat a proxy). Both observers
+are already installed before anything else runs in `main.tsx`, so a scripted scroll and submit is
+inside the window they cover, and `perfReadings()` is how the flow reads the INP number back —
+Event Timing only ever times a real interaction, so this is the only place an INP figure can come
+from at all.
 
-**A scatter cannot carry a direct label per mark, and the palette obligation still has to be
-met.** ADR-0012 makes direct labels and the "View as table" toggle hard requirements because
-aqua, yellow and magenta fall below 3:1 on white. A hundred thousand labelled points is not a
-chart, so the reliefs a scatter actually offers are the Series name drawn at each Series' own
-rightmost point and the table toggle, both present. A single-Series scatter encodes nothing in
-colour at all. The contrast audit should confirm that reading rather than flag a missing relief.
+**README.** The honest performance framing, the proxy trade-off, the grammar ceiling, the model
+comparison. Every number it needs is in `docs/bench/` already; the framing is §7 and ADR-0004, and
+the sentence that has to survive an interviewer is *aggregation is the cheapest step and is not the
+justification*. Lead with the last column — 0 ms of main-thread blocking against 2,627 ms — and say
+plainly that the worker path is 23 ms *slower* end to end on the 98,899-point question. Say 98,899
+and 99,040, never "100k". The scatter's shape is two small-integer measures overplotting onto a
+grid, because nothing in that Dataset is continuous.
 
-**`/bench`'s third path is the scatter, and the numbers in the M8 commit are a spot check, not the
-benchmark.** They are two medians from one browser on one machine with synthetic pointer events —
-8.3 ms hover, 11.5 ms pan at 98,899 points. `/bench` wants N≥7 with min and max, and the honest
-thing to instrument is the pair M8 never measured: the canvas draw loop, and the structured clone
-of ~99,000 result rows across the worker boundary, which ADR-0023 accepted on reasoning alone. The
-spec to drive it is in the dev panel — the `98,899-point scatter (team_matches)` preset, verbatim.
+**The three that need something this repository does not have.** A live API key: the model
+comparison over the same 20 Questions, and with it the two entries below that are ahead of their
+tests. A person: the 90-second recording. Credentials: the deploy. Leave them unticked rather than
+faked, and say in the README that they are outstanding if they still are.
 
-**Say 98,899, never 100k.** `team_matches.csv` is 99,040 rows and 98,899 distinct (date, team)
-pairs, because a few teams played twice in a day. `DECISIONS.md` §16 calls the milestone a
-100k-point scatter; the file's own ceiling is 98,899 and that is the number to write, for the same
-reason §A6 says 99,040 rather than "100k+". The README's performance framing should also say what
-the shape actually is: two small-integer measures overplot onto a grid, because nothing in this
-Dataset is continuous. What is demonstrated is 98,899 points drawn, panned and hit-tested.
+**`/ponytail-audit` then `/code-review`, then the ADR.** The audit is a separate critique pass and
+comes before the review, not instead of it. The paragraph reproduced at the top of this document is
+the thing the audit must be told: four areas of deliberate complexity are spec-mandated and are not
+findings. Everything else is fair game — and `src/bench/` and `src/perf.ts` are new, unaudited, and
+were written to be measured rather than to be small.
 
 ## Known to be ahead of its tests
 
