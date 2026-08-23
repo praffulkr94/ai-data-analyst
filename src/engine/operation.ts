@@ -5,7 +5,14 @@
     milliseconds. It is not the justification for the worker. See ADR-0004 before quoting a
     number from this file. */
 import { bucketStart } from './time';
-import type { AnalysisResult, ChartSummary, Fold, ResultField, ResultRow } from './result';
+import {
+  dimensionText,
+  type AnalysisResult,
+  type ChartSummary,
+  type Fold,
+  type ResultField,
+  type ResultRow,
+} from './result';
 import { cellText, cellValue, type Column, type ColumnStore } from './types';
 import type { Aggregation, ChartType, Filter, Operation } from '../spec/grammar';
 
@@ -433,7 +440,7 @@ function summarise({
       const value = r[measure] as number;
       if (best && best.value >= value) return best;
       const key = dimension ? r[dimension.field.name] : null;
-      return { label: key === null ? 'no value' : String(key), value };
+      return { label: dimensionText(dimension?.field, key), value };
     }, null);
 
   return {

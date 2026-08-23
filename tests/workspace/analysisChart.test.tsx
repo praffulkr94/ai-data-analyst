@@ -594,3 +594,56 @@ describe('the canvas a large scatter switches to', () => {
     expect(document.querySelectorAll('canvas')).toHaveLength(0);
   });
 });
+
+/** The `role="img"` label is the whole of what a screen reader gets before it reaches the
+    table: what kind of chart, what it measures, how many of them, where the extreme is. The
+    label text itself is tested at the engine seam (`tests/engine/summaryText.test.ts`); what
+    is asserted here is that every chart type actually carries it as its accessible name, and
+    that the name points at the table that holds the numbers. */
+describe('the accessible chart', () => {
+  const overTime = run(
+    [...YEARLY([2020, 2021, 2022], 'Brazil')],
+    op({ timeBucket: { column: 'date', unit: 'year' }, sort: { by: 'date', dir: 'asc' } }),
+  );
+
+  for (const [type, name] of [
+    ['bar', 'Bar chart'],
+    ['line', 'Line chart'],
+    ['area', 'Area chart'],
+  ] as const) {
+    it(`names a ${type} chart, its measure and its size`, () => {
+      render(<AnalysisChart result={overTime} visualization={viz({ type })} />);
+      expect(
+        screen.getByRole('img', { name: `${name}. matches by date by year, 3 categories. Highest: 2020, 1.` }),
+      ).toBeTruthy();
+    });
+  }
+
+  it('calls a scatter’s groups points, because its x is a measure and not a category', () => {
+    const result = run(
+      [
+        ['2020-06-15', 'Brazil', '3'],
+        ['2021-06-15', 'Peru', '1'],
+      ],
+      op({
+        groupBy: ['team'],
+        aggregations: [
+          { id: 'm', fn: 'count', column: null, label: 'matches' },
+          { id: 'g', fn: 'sum', column: 'goals', label: 'goals' },
+        ],
+      }),
+      { chartType: 'scatter' },
+    );
+    render(
+      <AnalysisChart result={result} visualization={{ type: 'scatter', x: 'g', y: 'm', seriesBy: null }} />,
+    );
+    expect(screen.getByRole('img', { name: /2 points\./ })).toBeTruthy();
+  });
+
+  it('describes every chart by the table that holds its numbers', () => {
+    render(<AnalysisChart result={overTime} visualization={viz()} />);
+    const describedBy = screen.getByRole('img').getAttribute('aria-describedby');
+    expect(describedBy).toBeTruthy();
+    expect(document.getElementById(describedBy!)).toBe(screen.getByRole('table', { hidden: true }));
+  });
+});

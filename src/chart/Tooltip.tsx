@@ -6,8 +6,8 @@
     `aria-live` region on hover announces a value per pixel of travel, which is spam rather than
     access (DECISIONS §15). */
 import { createPortal } from 'react-dom';
-import type { ResultField, ResultRow } from '../engine/result';
-import { formatValue, temporalLabel } from './marks';
+import { dimensionText, type ResultField, type ResultRow } from '../engine/result';
+import { formatValue } from './marks';
 
 export type Hover = { row: ResultRow; x: number; y: number };
 
@@ -35,14 +35,7 @@ export function Tooltip({
   if (!hover || !xField || !yField) return null;
   const { row } = hover;
 
-  const read = (field: ResultField) => {
-    const raw = row[field.name] ?? null;
-    return raw === null
-      ? 'no value'
-      : field.temporal || field.type === 'date'
-        ? temporalLabel(field.unit, raw)
-        : String(raw);
-  };
+  const read = (field: ResultField) => dimensionText(field, row[field.name]);
   // Every grouping dimension, because the group is the whole tuple: one of two names half
   // identifies the point.
   const at = groupFields?.length ? groupFields.map(read).join(' · ') : read(xField);

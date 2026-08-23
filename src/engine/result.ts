@@ -1,6 +1,7 @@
 /** The shape of an executed Operation. The chart layer, the accessible data table and the
     ChartSummary formatters all read this one value. */
 import type { TimeUnit } from '../spec/grammar';
+import { temporalLabel } from './time';
 import type { ColumnType } from './types';
 
 /** One output column. `dimension` fields come from `groupBy` and the `timeBucket`; `measure`
@@ -20,6 +21,20 @@ export type ResultField = {
 };
 
 export type ResultRow = Record<string, string | number | null>;
+
+/** One dimension value as the text that names it. A bucketed dimension holds epoch
+    milliseconds and a `date` column an ISO day, so every reader that names a group — the axis,
+    the tooltip, a bar's `aria-label`, the summary's extreme — goes through this or prints
+    1577836800000 at one of them. The axis had it and the summary did not. */
+export function dimensionText(
+  field: ResultField | undefined,
+  raw: string | number | null | undefined,
+): string {
+  if (raw === null || raw === undefined) return 'no value';
+  return field && (field.temporal || field.type === 'date')
+    ? temporalLabel(field.unit, raw)
+    : String(raw);
+}
 
 /** The deterministic facts about a result. Computed by the application, never written by the
     model. The chart layer owns two formatters over this — see ADR-0018. */

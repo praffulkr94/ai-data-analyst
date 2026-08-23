@@ -4,12 +4,12 @@
 import { format } from 'd3-format';
 import { quadtree } from 'd3-quadtree';
 import { area, line } from 'd3-shape';
-import { utcFormat } from 'd3-time-format';
 import { useEffect, useMemo, useRef } from 'react';
 import { CHART_BUDGET } from '../engine/operation';
+import { temporalLabel } from '../engine/time';
 import { useApp } from '../store';
 import type { ResultField, ResultRow } from '../engine/result';
-import type { ChartType, TimeUnit } from '../spec/grammar';
+import type { ChartType } from '../spec/grammar';
 import type { Scales } from './useScales';
 import type { ChartDimensions } from './useChartDimensions';
 
@@ -52,45 +52,6 @@ export function formatValue(v: number): string {
     a scale rather than as a value. */
 export const formatAxisValue = (v: number) =>
   Math.abs(v) >= 10_000 ? si(v) : formatValue(v);
-
-/* ---- temporal labels ----------------------------------------------------------------- */
-
-/** One format per TimeUnit, because a bucket should be labelled at the resolution it was
-    bucketed to: "01 Mar 2020" under a monthly bucket invites the reader to believe the point
-    describes that day. Built once — `utcFormat` compiles its pattern.
-
-    `utcFormat` and never `timeFormat`: a bucket start is a UTC midnight, and rendering it in
-    local time relabels every bucket boundary for every visitor west of Greenwich. The Dataset's
-    first match would read 1872-11-29 in New York. */
-const UNIT_FORMAT: Record<TimeUnit, string> = {
-  day: '%d %b %Y',
-  week: '%d %b %Y',
-  month: '%b %Y',
-  quarter: 'Q%q %Y',
-  year: '%Y',
-};
-
-const FORMATTERS = {
-  ...(Object.fromEntries(
-    Object.entries(UNIT_FORMAT).map(([unit, pattern]) => [unit, utcFormat(pattern)]),
-  ) as Record<TimeUnit, (d: Date) => string>),
-  /** A date column that was never bucketed — a raw timestamp on the x-axis. */
-  none: utcFormat('%d %b %Y'),
-};
-
-/** Label one temporal tick. The value arrives as a Date from a time scale, as a stringified
-    epoch from a band scale — a band domain is strings — and as an ISO day from a `date` column
-    that was grouped by rather than bucketed, which is what `cellText` gives a date. All three
-    are accepted here rather than at three call sites; a bar chart grouped by a raw date column
-    labelled every tick "no value" until the third one was. */
-export function temporalLabel(unit: TimeUnit | undefined, v: number | string | Date): string {
-  // `Number('')` is 0, so an empty band key would otherwise be labelled 1970.
-  if (v === '') return 'no value';
-  const epoch = typeof v === 'string' && !/^-?\d+$/.test(v);
-  const d = v instanceof Date ? v : epoch ? new Date(v) : new Date(Number(v));
-  if (Number.isNaN(d.valueOf())) return 'no value';
-  return FORMATTERS[unit ?? 'none'](d);
-}
 
 /* ---- axes and grid, from scale.ticks() as React elements ----------------------------- */
 

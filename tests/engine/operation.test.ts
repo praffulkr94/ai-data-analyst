@@ -448,6 +448,20 @@ describe('the extreme in the summary', () => {
     expect(r.summary.extreme).toEqual({ label: 'Brazil', value: 2 });
   });
 
+  /** The label is read aloud by the `role="img"` chart label, so an epoch here is an epoch in
+      somebody's ear. Both readings of a date go through the same formatter as the axis: a bucket
+      holds epoch milliseconds, and a `date` column grouped by rather than bucketed holds an ISO
+      day. */
+  it('names a bucketed extreme at the resolution it was bucketed to', () => {
+    const r = executeOperation(hero(), op({ timeBucket: { column: 'date', unit: 'year' } }));
+    expect(r.summary.extreme).toEqual({ label: '2020', value: 3 });
+  });
+
+  it('names an unbucketed date extreme as a day and never as a number', () => {
+    const r = executeOperation(hero(), op({ groupBy: ['date'], sort: { by: 'm', dir: 'desc' } }));
+    expect(r.summary.extreme!.label).toBe('01 Jan 2020');
+  });
+
   it('has no extreme to name when the result is empty', () => {
     const r = executeOperation(
       hero(),

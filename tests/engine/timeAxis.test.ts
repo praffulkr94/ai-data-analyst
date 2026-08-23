@@ -5,7 +5,7 @@
     if the axis ever formats a bucket start in local time. Run the suite under
     `TZ=America/Los_Angeles` and nothing here may move. */
 import { describe, expect, it } from 'vitest';
-import { temporalLabel } from '../../src/chart/marks';
+import { temporalLabel } from '../../src/engine/time';
 import { bucketStart } from '../../src/engine/time';
 import { TIME_UNITS } from '../../src/spec/grammar';
 
