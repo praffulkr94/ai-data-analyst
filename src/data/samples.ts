@@ -25,6 +25,24 @@ export const SAMPLES: Sample[] = [
     rowCount: 99_040,
     note: 'One row per team per match, derived from the same source by a committed script.',
   },
+  {
+    id: 'goals',
+    label: 'Goals scored',
+    filename: 'goals.csv.gz',
+    rowCount: 47_914,
+    note:
+      'The inference showcase: 254 goal minutes are written as the string NA rather than left ' +
+      'blank, and 79 rows are exact duplicates.',
+  },
+  {
+    id: 'messy',
+    label: 'Deliberately messy export',
+    filename: 'messy.csv.gz',
+    rowCount: 2_021,
+    note:
+      'Dirtied on purpose — a BOM, CRLF endings, dates mixed between two formats, ' +
+      'attendances written with thousands separators, every null token, and 34 malformed rows.',
+  },
 ];
 
 export const sampleById = (id: string): Sample | undefined => SAMPLES.find((s) => s.id === id);
