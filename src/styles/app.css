@@ -136,7 +136,7 @@ button:hover {
 }
 
 /* Focus is always visible. */
-:where(button, select, input, a, summary):focus-visible {
+:where(button, select, input, textarea, a, summary):focus-visible {
   outline: 2px solid var(--accent-focus-tint);
   outline-offset: 2px;
 }

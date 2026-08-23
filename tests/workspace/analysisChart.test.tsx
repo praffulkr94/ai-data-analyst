@@ -580,6 +580,20 @@ describe('the canvas a large scatter switches to', () => {
     expect(screen.queryByRole('button', { name: 'Reset view' })).toBeNull();
   });
 
+  /** The pan was pointer-only, and its only way back was a button that appears once a pointer
+      has been used — which is no way back at all for anybody without one. */
+  it('pans from the keyboard, and Home is the way back', () => {
+    render(<AnalysisChart result={result} visualization={scatter} />);
+    const surface = screen.getByRole('application');
+    expect(surface).toHaveProperty('tabIndex', 0);
+
+    fireEvent.keyDown(surface, { key: 'ArrowRight' });
+    expect(screen.getByRole('button', { name: 'Reset view' })).toBeTruthy();
+
+    fireEvent.keyDown(surface, { key: 'Home' });
+    expect(screen.queryByRole('button', { name: 'Reset view' })).toBeNull();
+  });
+
   it('does not offer a drag on a scatter small enough to be whole on the screen', () => {
     const small = run(
       Array.from({ length: 10 }, (_, i) => ['2020-06-15', `t${i}`, String(i)]),
@@ -590,8 +604,11 @@ describe('the canvas a large scatter switches to', () => {
     const surface = document.querySelector('svg rect[fill="transparent"]')!;
     fireEvent.pointerDown(surface, { clientX: 100, clientY: 100, pointerId: 1 });
     fireEvent.pointerMove(surface, { clientX: 160, clientY: 130, pointerId: 1 });
+    fireEvent.keyDown(surface, { key: 'ArrowRight' });
     expect(screen.queryByRole('button', { name: 'Reset view' })).toBeNull();
     expect(document.querySelectorAll('canvas')).toHaveLength(0);
+    // Nothing to pan is nothing to focus: the surface is not a control on this chart.
+    expect(screen.queryByRole('application')).toBeNull();
   });
 });
 

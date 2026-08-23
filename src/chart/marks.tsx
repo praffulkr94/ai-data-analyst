@@ -553,12 +553,44 @@ export function PointsHover({
       drag would move one pixel and stop. */
   const from = useRef<{ x: number; y: number; pan: Pan } | null>(null);
 
+  /** A tenth of the plot per press: small enough to aim with, large enough that crossing the
+      chart is not forty keystrokes. */
+  const stride = Math.round(dimensions.innerWidth / 10);
+
   return (
     <rect
       width={dimensions.innerWidth}
       height={dimensions.innerHeight}
       fill="transparent"
-      aria-hidden="true"
+      /** Focusable only where there is something to pan, and then it is not decoration: a drag
+          changes what is on screen, and until this existed the only way back from one was a
+          "Reset view" button that nobody without a pointer could make appear. `application` is
+          the honest role — this region answers the arrow keys itself, which is exactly what the
+          role tells a screen reader. It is not the bare `tabindex="0"` on an SVG that
+          DECISIONS §15 rules out: that one does nothing when the keys arrive. */
+      {...(onPan
+        ? {
+            tabIndex: 0,
+            role: 'application',
+            'aria-label':
+              'Plot area. The arrow keys pan the view and Home resets it. The numbers behind ' +
+              'the chart are in the table below.',
+          }
+        : { 'aria-hidden': true as const })}
+      onKeyDown={(e) => {
+        if (!onPan) return;
+        const by: Record<string, Pan> = {
+          ArrowRight: { x: -stride, y: 0 },
+          ArrowLeft: { x: stride, y: 0 },
+          ArrowUp: { x: 0, y: stride },
+          ArrowDown: { x: 0, y: -stride },
+        };
+        if (e.key === 'Home') onPan(NO_PAN);
+        else if (by[e.key]) onPan({ x: pan.x + by[e.key]!.x, y: pan.y + by[e.key]!.y });
+        else return;
+        // The page would scroll under the reader instead of the plot moving.
+        e.preventDefault();
+      }}
       style={onPan ? { cursor: 'grab', touchAction: 'none' } : undefined}
       onPointerDown={(e) => {
         if (!onPan) return;
