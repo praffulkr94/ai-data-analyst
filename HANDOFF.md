@@ -48,9 +48,8 @@ npm run build
 npm run audit:contrast            # every contrast pair, both themes; exits non-zero on a regression
 node scripts/build-datasets.mjs   # rebuilds public/data/*.csv.gz from data/raw/
 node scripts/bench-run.mjs --machine "…"   # drives #bench, writes docs/bench/. Needs the app up.
+npm run test:e2e                  # the two Playwright flows over canned SSE. Needs the app up.
 ```
-
-`npm run test:e2e` is a stub: it calls `playwright test`, and `@playwright/test` is not installed.
 
 Chromium only, by decision. `npx playwright install chromium` once.
 
@@ -220,25 +219,31 @@ else is wiring around them.
   ISO day. `dimensionText` in `engine/result.ts` is the one place that knows, and `temporalLabel`
   lives in `engine/time.ts` rather than in `chart/marks.tsx` so the engine can reach it. The
   summary's extreme read "Highest: 1577836800000" until it did.
+- A `route.fulfill` body arrives whole, so a canned SSE stream is read in one task and React
+  coalesces every narration delta into a single render: the stream strip can appear and vanish
+  between two Playwright polls, and asserting it was there from outside the page is a race.
+  `scripts/e2e-run.mjs` records it with an in-page `MutationObserver` instead, and cancels while
+  the fulfil is deliberately held rather than between two frames.
+- Extensionless imports are why a `.mjs` script can `import '../src/ai/fixtures.ts'` (Node strips
+  the types) but not `tool.ts`, which imports `../spec/grammar` without an extension and fails to
+  resolve. A script that needs a name from a module like that copies the three-line map.
 - There is no `--text-faint`. `--text-muted` is 5.05:1 on white and the AA floor for 12px text is
   4.5:1, so a third, fainter grey has nowhere legible to live. `npm run audit:contrast` fails if a
   fourth series slot drops below 3:1, or if anything else regresses.
 
 ## Where M9 stands
 
-Seven of the fifteen ledger items are ticked, one commit each, and `npm test` is green at 419.
-What is left, in the order it wants doing:
+Eight of the fifteen ledger items are ticked, one commit each, and `npm test` is green at 419.
+`npm run test:e2e` is now real — `scripts/e2e-run.mjs`, a plain `.mjs` with `assert`, no
+`@playwright/test`, needing the app up the way `bench-run.mjs` does. It routes `**/v1/messages`
+for both calls the application makes (the one-token key check and the streamed tool use) and
+builds the SSE frames from `src/ai/fixtures.ts`. One thing the stub cannot make faithful:
+`route.fulfill` hands over the whole body at once, so the deltas are read in one task, React
+coalesces the narration into a single render, and the cancel therefore lands mid-request rather
+than between two frames — the abort path is the same either way. What the transient strip showed
+is recorded by a `MutationObserver` inside the page rather than polled for from outside.
 
-**Two Playwright flows over canned SSE — ask→chart, and cancel→resubmit.** `playwright` the
-library is installed; `@playwright/test` is **not**, and `npm run test:e2e` therefore does not
-run. Do not add it: `scripts/bench-run.mjs` shows the shape that works — a plain `.mjs` driving
-`chromium.launch()` with asserts — and DECISIONS §14 asks for `page.route('**/v1/messages')`
-returning real SSE frames, which needs the library and nothing more. The fixtures in
-`src/ai/fixtures.ts` are the SSE bodies (that dual use is why they beat a proxy). Both observers
-are already installed before anything else runs in `main.tsx`, so a scripted scroll and submit is
-inside the window they cover, and `perfReadings()` is how the flow reads the INP number back —
-Event Timing only ever times a real interaction, so this is the only place an INP figure can come
-from at all.
+What is left, in the order it wants doing:
 
 **README.** The honest performance framing, the proxy trade-off, the grammar ceiling, the model
 comparison. Every number it needs is in `docs/bench/` already; the framing is §7 and ADR-0004, and
