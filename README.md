@@ -103,10 +103,12 @@ Two more things the table says out loud rather than hiding:
 naive against 108 ms columnar on the main thread and 111 ms through the worker, blocking 459 ms,
 824 ms and 0 ms respectively across the nine runs.
 
-**Memory.** The ColumnStore is counted exactly rather than estimated: 2.23 MB for 49,520 rows,
-4.83 MB for 99,040. The row-objects comparison is a DevTools heap snapshot and has not been taken,
-so no ratio is claimed here. `performance.memory` is quantized and reported the same 45.2 MB for all
-three paths, so it is not in the bench at all.
+**Memory.** The ColumnStore is counted rather than sampled: 2.23 MB for 49,520 rows, 4.83 MB for
+99,040. Exactly, for the typed arrays, which know their own `byteLength`; as V8's worst case for
+the strings a dictionary holds, charged at 16 bytes of header plus two per code unit, so the
+figure is an upper bound and never rounds down. The row-objects comparison is a DevTools heap
+snapshot and has not been taken, so no ratio is claimed here. `performance.memory` is quantized
+and reported the same 45.2 MB for all three paths, so it is not in the bench at all.
 
 **Rendering.** A scatter switches from SVG circles to one canvas per Series past 5,000 points; the
 `d3-quadtree` hit-test feeds the same tooltip either way, so hovering behaves identically across the

@@ -458,6 +458,10 @@ export function Points({
   );
 }
 
+/** Frames of `canvas:draw` kept on the performance timeline. Four seconds of continuous panning,
+    which is more than any readout shows and enough for a bench run of arrow-key presses. */
+const DRAWS_KEPT = 240;
+
 /** The same points, drawn once into a canvas rather than as thousands of elements.
 
     One canvas per Series rather than one for the chart, so the composition stays what it is
@@ -508,6 +512,14 @@ export function PointsCanvas({
         ctx.fillRect(p.at + pan.x - POINT_RADIUS, p.value! + pan.y - POINT_RADIUS, size, size);
       }
     });
+    /** A mark and a measure per frame is an unbounded buffer: a continuous drag is sixty of them
+        a second and nothing evicts user timing. Everything that reads them — the dev panel's
+        readout, `scripts/bench-run.mjs` — reads the last few, so the timeline keeps the last few
+        hundred and drops the rest. */
+    if (performance.getEntriesByName('canvas:draw', 'measure').length > DRAWS_KEPT) {
+      performance.clearMeasures('canvas:draw');
+      performance.clearMarks('canvas:draw:start');
+    }
   }, [ps, innerWidth, innerHeight, pan, slot, theme]);
 
   return (
