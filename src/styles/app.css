@@ -461,13 +461,18 @@ input[type='password'] {
   color: var(--text-muted);
 }
 
+/* A utility, so the clamp has to beat whatever the element's own rule says — a `width: 100%`
+   further down the sheet otherwise wins on source order and leaves a "hidden" element at full
+   size. `clip` paints nothing but still contributes scrollable overflow, so the 1px box is the
+   part that has to hold: without it the hidden result table dragged 24,000px of document
+   scroll behind the app. */
 .visually-hidden {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  width: 1px !important;
+  height: 1px !important;
   padding: 0;
   margin: -1px;
-  overflow: hidden;
+  overflow: hidden !important;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
@@ -1669,10 +1674,16 @@ h2 {
   color: var(--text-muted);
 }
 
+/* The table can be a thousand rows; the card is not allowed to become a thousand rows tall. */
+.result-scroll {
+  max-height: 420px;
+  overflow: auto;
+  margin-top: 10px;
+}
+
 .result-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 10px;
   font-size: var(--text-sm);
 }
 

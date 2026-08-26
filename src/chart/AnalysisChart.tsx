@@ -228,53 +228,60 @@ export function AnalysisChart({
 
   return (
     <figure className="analysis-chart">
-      {/* Bars carry their Series only in colour, so grouped bars need the names spelled out.
-          A line says its own name at its end, which is why this is bar-only. */}
-      {drawable && series.length > 1 && visualization.type === 'bar' && (
-        <ul className="chart-legend">
-          {series.map((s, i) => (
-            <li key={s.key}>
-              <span className="swatch" style={{ background: seriesColor(i) }} aria-hidden="true" />
-              {s.label}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {drawable ? (
-        <ChartFrame
-          dimensions={dimensions}
-          containerRef={containerRef}
-          result={result}
-          type={visualization.type}
-          describedBy={tableId}
-          overlay={
-            onCanvas &&
-            series.map((s, i) => <PointsCanvas key={s.key} {...common(s, i)} pan={pan} />)
-          }
-        >
-          {/* The axes move with the data: a panned chart whose ticks stayed put is mislabelled. */}
-          <Grid scales={scales} dimensions={dimensions} pan={pan} />
-          <YAxis scales={scales} dimensions={dimensions} pan={pan} />
-          <XAxis scales={scales} dimensions={dimensions} field={xField} pan={pan} />
-          {series.map(mark)}
-          {/* Above the marks, so it receives the pointer for all of them at once. A scatter has
-              marks the pointer can be over and hundreds of thousands of them, so it hit-tests a
-              quadtree instead of inverting the x scale. */}
-          {visualization.type === 'scatter' ? (
-            <PointsHover {...surface} pan={pan} onPan={onCanvas ? setPan : undefined} />
-          ) : (
-            <HoverArea {...surface} />
+      {/* "View as table" is a toggle, not an addition: the table replaces the chart rather than
+          appearing beneath it. A hundred thousand canvas points are not drawn behind a table
+          nobody can see through. */}
+      {!showTable && (
+        <>
+          {/* Bars carry their Series only in colour, so grouped bars need the names spelled out.
+              A line says its own name at its end, which is why this is bar-only. */}
+          {drawable && series.length > 1 && visualization.type === 'bar' && (
+            <ul className="chart-legend">
+              {series.map((s, i) => (
+                <li key={s.key}>
+                  <span className="swatch" style={{ background: seriesColor(i) }} aria-hidden="true" />
+                  {s.label}
+                </li>
+              ))}
+            </ul>
           )}
-        </ChartFrame>
-      ) : (
-        <DegenerateState
-          state={state}
-          marks={marksNeeded(result, visualization.x)}
-          cap={MARK_CAP[visualization.type]}
-          pointCap={CHART_BUDGET[visualization.type].points}
-          truncated={result.truncated}
-        />
+
+          {drawable ? (
+            <ChartFrame
+              dimensions={dimensions}
+              containerRef={containerRef}
+              result={result}
+              type={visualization.type}
+              describedBy={tableId}
+              overlay={
+                onCanvas &&
+                series.map((s, i) => <PointsCanvas key={s.key} {...common(s, i)} pan={pan} />)
+              }
+            >
+              {/* The axes move with the data: a panned chart whose ticks stayed put is mislabelled. */}
+              <Grid scales={scales} dimensions={dimensions} pan={pan} />
+              <YAxis scales={scales} dimensions={dimensions} pan={pan} />
+              <XAxis scales={scales} dimensions={dimensions} field={xField} pan={pan} />
+              {series.map(mark)}
+              {/* Above the marks, so it receives the pointer for all of them at once. A scatter has
+                  marks the pointer can be over and hundreds of thousands of them, so it hit-tests a
+                  quadtree instead of inverting the x scale. */}
+              {visualization.type === 'scatter' ? (
+                <PointsHover {...surface} pan={pan} onPan={onCanvas ? setPan : undefined} />
+              ) : (
+                <HoverArea {...surface} />
+              )}
+            </ChartFrame>
+          ) : (
+            <DegenerateState
+              state={state}
+              marks={marksNeeded(result, visualization.x)}
+              cap={MARK_CAP[visualization.type]}
+              pointCap={CHART_BUDGET[visualization.type].points}
+              truncated={result.truncated}
+            />
+          )}
+        </>
       )}
 
       <figcaption>
@@ -294,7 +301,7 @@ export function AnalysisChart({
       </figcaption>
 
       <Tooltip
-        hover={drawable ? hover : null}
+        hover={drawable && !showTable ? hover : null}
         xField={xField}
         yField={yField}
         seriesBy={visualization.seriesBy}

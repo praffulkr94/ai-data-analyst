@@ -4,7 +4,7 @@
     The margin convention: the caller says how much room the axes need, and this returns the
     inner box the marks are drawn in. Every mark component then works in inner coordinates and
     never has to know a margin exists. */
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 
 export type Margin = { top: number; right: number; bottom: number; left: number };
 
@@ -20,18 +20,20 @@ export type ChartDimensions = {
 const DEFAULT_MARGIN: Margin = { top: 12, right: 16, bottom: 28, left: 52 };
 
 export function useChartDimensions(margin: Partial<Margin> = {}, height = 320) {
-  const ref = useRef<HTMLDivElement>(null);
+  /** A callback ref rather than a `useRef`, because the element it measures comes and goes:
+      "View as table" unmounts the frame, and an observer set up once against the first element
+      goes on observing a detached node — the chart comes back at zero width and stays there. */
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
 
   useLayoutEffect(() => {
-    const el = ref.current;
     if (!el) return;
     const observer = new ResizeObserver(([entry]) => {
       if (entry) setWidth(entry.contentRect.width);
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [el]);
 
   const m = { ...DEFAULT_MARGIN, ...margin };
   const dimensions: ChartDimensions = {
@@ -41,5 +43,5 @@ export function useChartDimensions(margin: Partial<Margin> = {}, height = 320) {
     innerWidth: Math.max(0, width - m.left - m.right),
     innerHeight: Math.max(0, height - m.top - m.bottom),
   };
-  return [ref, dimensions] as const;
+  return [setEl, dimensions] as const;
 }

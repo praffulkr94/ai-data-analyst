@@ -825,14 +825,22 @@ describe('the palette reliefs', () => {
 
   it('offers the table as a visible toggle and not only to a screen reader', () => {
     render(<AnalysisChart result={overTime} visualization={viz({ type: 'bar' })} />);
-    const table = screen.getByRole('table', { hidden: true });
+    // The clamp is on the wrapper: `visually-hidden` on the `<table>` itself loses to the
+    // table's own width and leaks a thousand rows of document scroll.
+    const wrapper = () => screen.getByRole('table', { hidden: true }).parentElement!;
+    const chart = () => document.querySelector('.chart');
     // Hidden from sight, never from the accessibility tree: that is the whole point of it.
-    expect(table.className).toContain('visually-hidden');
+    expect(wrapper().className).toContain('visually-hidden');
+    expect(chart()).not.toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'View as table' }));
-    expect(table.className).not.toContain('visually-hidden');
+    expect(wrapper().className).not.toContain('visually-hidden');
+    // A toggle, not an addition: the chart is not still sitting above the table.
+    expect(chart()).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Hide table' }));
-    expect(table.className).toContain('visually-hidden');
+    expect(wrapper().className).toContain('visually-hidden');
+    // And it comes back measured — a re-attached ResizeObserver, not a zero-width frame.
+    expect(chart()!.querySelector('svg')).not.toBeNull();
   });
 });

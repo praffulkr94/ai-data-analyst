@@ -36,46 +36,52 @@ export const ResultTable = memo(function ResultTable({
   hidden: boolean;
 }) {
   return (
-    <table id={id} className={hidden ? 'result-table visually-hidden' : 'result-table'}>
-      <caption>
-        {result.rows.length > TABLE_CAP
-          ? `The numbers behind this chart — the first ${TABLE_CAP.toLocaleString('en-US')} of ` +
-            `${result.rows.length.toLocaleString('en-US')} rows`
-          : 'The numbers behind this chart'}
-      </caption>
-      <thead>
-        <tr>
-          {result.fields.map((f) => (
-            <th key={f.name} scope="col">
-              {f.label}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {result.rows.slice(0, TABLE_CAP).map((row, i) => (
-          <tr key={i}>
-            {result.fields.map((f, j) => {
-              const value = row[f.name] ?? null;
-              const text =
-                value === null
-                  ? 'no value'
-                  : f.temporal && typeof value === 'number'
-                    ? isoDay(new Date(value))
-                    : typeof value === 'number'
-                      ? formatValue(value)
-                      : value;
-              return j === 0 ? (
-                <th key={f.name} scope="row">
-                  {text}
-                </th>
-              ) : (
-                <td key={f.name}>{text}</td>
-              );
-            })}
+    /* The clamp is on the wrapper, not the table: `visually-hidden` on a `<table>` cannot hold a
+       1px box against the table's own intrinsic width, and the overflow it leaked was the whole
+       document's — a thousand hidden rows dragged 24,000px of scroll behind the app. The same
+       wrapper is what bounds the table when it *is* shown. */
+    <div className={hidden ? 'result-scroll visually-hidden' : 'result-scroll'}>
+      <table id={id} className="result-table">
+        <caption>
+          {result.rows.length > TABLE_CAP
+            ? `The numbers behind this chart — the first ${TABLE_CAP.toLocaleString('en-US')} of ` +
+              `${result.rows.length.toLocaleString('en-US')} rows`
+            : 'The numbers behind this chart'}
+        </caption>
+        <thead>
+          <tr>
+            {result.fields.map((f) => (
+              <th key={f.name} scope="col">
+                {f.label}
+              </th>
+            ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {result.rows.slice(0, TABLE_CAP).map((row, i) => (
+            <tr key={i}>
+              {result.fields.map((f, j) => {
+                const value = row[f.name] ?? null;
+                const text =
+                  value === null
+                    ? 'no value'
+                    : f.temporal && typeof value === 'number'
+                      ? isoDay(new Date(value))
+                      : typeof value === 'number'
+                        ? formatValue(value)
+                        : value;
+                return j === 0 ? (
+                  <th key={f.name} scope="row">
+                    {text}
+                  </th>
+                ) : (
+                  <td key={f.name}>{text}</td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 });
