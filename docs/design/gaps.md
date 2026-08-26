@@ -118,3 +118,63 @@ sitting behind it. Two things came out with it:
   the status back, so the interface sat on a load that had stopped.
 
 ADR-0027 §4.
+
+---
+
+## GAP-4 · A manual edit acknowledges itself before the chart it changes · `open`
+
+Both manual editors — the aggregation dropdown and the Revision stepper — change their own
+control immediately and leave the chart on the previous answer for a few hundred milliseconds,
+with nothing on screen saying so. On the 99,040-row scatter the counter reads `2/2` while the
+plot is still the first Revision's.
+
+Measured in the **production build** (`npm run build && npm run preview`), one aggregation
+change, four functions, medians consistent across runs:
+
+| | |
+|---|---|
+| the control updates | ~3ms |
+| React commits the new chart (caption, axes) | ~277ms |
+| `canvas:draw` runs, the points appear | ~305ms |
+| longest frame gap (the visible hitch) | 38–49ms |
+
+The work itself is not the problem and there is nothing to optimise. The aggregation already
+runs in the worker; `points()` over 98,899 rows is 15ms, the quadtree 20ms, the canvas draw 10ms,
+the scales 8ms. What is left is React's render and commit plus the browser's layout and paint,
+which are main-thread by nature.
+
+Two findings that a fix has to start from:
+
+- **The points land one paint after everything else.** `<PointsCanvas>` draws inside a
+  `useEffect`, and React runs passive effects *after* the browser has painted the commit. So the
+  order is always: commit (new caption, new axes) → paint → `canvas:draw` → paint (points). There
+  is always at least one painted frame carrying the new axes and the old points. Any progress
+  indicator keyed on "the async work finished" therefore ends one paint early, by construction —
+  `src/chart/marks.tsx:491`.
+- **Almost all of the felt slowness is `vite dev`, not the app.** The same stepper click is
+  ~2,100ms in one blocked task on the dev server and ~40ms in the production build. StrictMode
+  double-invokes every memo (visible as paired `probe:points`, `probe:quadtree` measures, and six
+  `probe:scales` per step) and React's DEV build emits a `performance.measure` per component.
+  Anyone diagnosing this must measure a built bundle; a dev-server profile is off by ~50×.
+
+Two attempts that do **not** work, so the next pass does not repeat them:
+
+- A spinner set in the same commit as the store update never reaches the screen. React flushes
+  passive effects inside the same task, so the flag is set and cleared without an intervening
+  paint. Measured: one 1,115ms task containing both mutations.
+- `startTransition` cannot defer a Revision step. The Revision lives in a `useSyncExternalStore`
+  store and React is required to apply those synchronously. `useDeferredValue` *does* work — it
+  defers a plain value rather than the subscription — but it splits the card's data source in
+  two (chart from the deferred Analysis, counter from the live one), which is a standing
+  invariant to buy a fix for a problem the production build does not have.
+
+A prototype of the whole thing — deferred Analysis, one spinner in the control bar spanning both
+halves of the wait, cleared a frame after the points paint — measured correct
+(`spinner ON 2.7ms → chart swaps 286.8ms → points appear 315.5ms → spinner OFF 331.7ms`) and was
+**reverted deliberately**: at 300ms with a 40ms hitch it is not yet worth the invariant. It
+becomes worth it at the 500,000-row cap, or on a slower machine, and that is the trigger to
+revisit.
+
+Design impact: **yes** — where a per-card busy state lives is a canvas question. The card has a
+control bar, a title row with the stepper, and no drawn state for "this card is recomputing".
+`InFlight` is the Request card and is the wrong size for a 300ms manual edit.
