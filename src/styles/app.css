@@ -1,4 +1,14 @@
-/* Linear as the visual reference: dense, hairline borders over shadows, restrained motion. */
+/* Linear as the visual reference: dense, hairline borders over shadows, restrained motion.
+
+   The shell is three boxes and one rule. A 48px top bar, a rail that is 44px of icons until
+   asked for, and a content pane that is `flex: 1; min-width: 0`. That `min-width: 0` is the
+   whole of the horizontal-scroll fix: a flex track's automatic minimum is its content, so one
+   wide `white-space: nowrap` descendant otherwise drags the entire shell past the viewport.
+
+   Inside the pane, everything a visitor reads lives in one 1040px column, and the composer is
+   docked to the bottom *of that column* rather than to the window. That bound is what separates
+   this from a chat shell, so the column width and the composer's fixed height are load-bearing
+   rather than taste. */
 
 *,
 *::before,
@@ -18,28 +28,28 @@ body {
   color: var(--text);
   font: var(--text-md) / 1.5 var(--font);
   -webkit-font-smoothing: antialiased;
+  /* Every number in this interface is compared against another one directly above it — token
+     counts, row counts, measures in a table. Proportional figures make those columns ragged. */
+  font-variant-numeric: tabular-nums;
 }
 
+/* ---- the shell ------------------------------------------------------------------------ */
+
 .app {
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  grid-template-rows: 48px 1fr auto;
-  grid-template-areas:
-    'header header'
-    'rail canvas'
-    'composer composer';
+  display: flex;
+  flex-direction: column;
   height: 100%;
 }
 
-/* ---- chrome ------------------------------------------------------------------------- */
-
 .header {
-  grid-area: header;
+  height: 48px;
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 12px;
+  gap: 10px;
+  padding: 0 10px 0 8px;
   border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
 }
 
 .brand {
@@ -47,12 +57,43 @@ body {
   letter-spacing: -0.01em;
 }
 
+.divider {
+  width: 1px;
+  height: 16px;
+  flex: none;
+  background: var(--border);
+  margin: 0 2px;
+}
+
 .dataset-chip {
-  padding: 2px 8px;
+  height: 24px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
   font-size: var(--text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* The design's own laptop note: at 1280 the column drops to about 1000px and the dataset chip
+   gives up its row count. The count is on `#/data`, which the chip itself leads to. */
+@media (max-width: 1280px) {
+  .dataset-chip .muted {
+    display: none;
+  }
+}
+
+.dataset-chip .dot {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--series-3);
 }
 
 .header-right {
@@ -62,60 +103,241 @@ body {
   align-items: center;
 }
 
-.rail {
-  grid-area: rail;
-  border-right: 1px solid var(--border);
-  padding: 12px;
-  overflow-y: auto;
+/* Square, borderless, icon only — the rail toggle and the theme switch. */
+.icon-button {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 0;
+  border-color: transparent;
+  background: none;
+  color: var(--text-muted);
 }
 
-/* A mode the visitor did not choose has to be said out loud, above whatever they came for. */
-.announcement {
-  margin: 0 0 12px;
+.icon-button:hover {
+  background: var(--surface-sunken);
+  color: var(--text);
+}
+
+.icon-button.bordered {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  gap: 10px;
-  align-items: baseline;
+}
+
+/* The pane. `min-width: 0` — see the note at the top of this file. */
+.content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--surface);
+}
+
+/* One column for everything the visitor reads, and the composer is docked inside it. */
+.column {
+  max-width: 1040px;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 20px 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Narrower surfaces that are a stage rather than a workspace: the picker, the parse progress,
+   the inference gate. */
+.stage {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 56px 24px 40px;
+}
+
+.stage.narrow {
+  max-width: 640px;
+}
+
+/* ---- the rail --------------------------------------------------------------------------
+   Two shapes of the same nav: 44px of icons at rest, 240px when asked for. It starts shut,
+   because a list of analyses is worth a quarter of the width only once there are some. */
+
+.rail {
+  width: 240px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.rail-head {
+  height: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
   justify-content: space-between;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.rail-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.rail-foot {
+  flex: none;
+  border-top: 1px solid var(--border);
+  padding: 8px 12px;
+}
+
+.rail-foot button {
+  width: 100%;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  background: var(--surface);
+}
+
+.rail-strip {
+  width: 44px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.rail-strip .icon-button {
+  width: 28px;
+  height: 28px;
+}
+
+/* The dot is the only thing that says a Revision landed somewhere you cannot see. */
+.updated-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rail-row {
+  display: flex;
+  align-items: center;
+  height: var(--row-height);
+  border-radius: var(--radius-sm);
+}
+
+.rail-row:hover {
+  background: var(--surface-sunken);
+}
+
+.rail-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--row-height);
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: var(--text-sm);
+}
+
+.rail-item.on {
+  background: var(--surface-sunken);
+  font-weight: 500;
+}
+
+.rail-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-updated {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 0 4px;
+  line-height: 15px;
+}
+
+.rail-rev {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* Only on hover or keyboard focus: a delete affordance on every row at rest is a rail that
+   reads as a list of things about to be deleted. */
+.rail-delete {
+  opacity: 0;
+  padding: 2px 6px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+}
+
+.rail-row:hover .rail-delete,
+.rail-delete:focus-visible {
+  opacity: 1;
 }
 
 .rail-note {
-  margin: 12px 0 0;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
+  margin: 8px 4px 4px;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--status-warning);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  font-size: var(--text-xs);
+  line-height: 1.5;
   color: var(--text-muted);
-  font-size: var(--text-sm);
 }
 
 .rail-empty {
   color: var(--text-muted);
   font-size: var(--text-sm);
-  margin: 0;
-}
-
-.canvas {
-  grid-area: canvas;
-  overflow: auto;
-  padding: 16px;
-}
-
-.composer {
-  grid-area: composer;
-  border-top: 1px solid var(--border);
-  padding: 10px 12px;
-  /* The readout and the inspector expand in place, so the composer is capped rather than
-     allowed to push the canvas off the screen. */
-  max-height: 45vh;
-  overflow-y: auto;
-}
-
-.composer input {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-raised);
-  color: var(--text);
-  font: inherit;
+  margin: 8px;
 }
 
 /* ---- controls ----------------------------------------------------------------------- */
@@ -123,10 +345,10 @@ body {
 button {
   font: inherit;
   color: var(--text);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background: var(--surface-raised);
-  padding: 5px 10px;
+  background: var(--surface);
+  padding: 4px 9px;
   cursor: pointer;
   transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
 }
@@ -156,6 +378,12 @@ button.primary:hover {
 
 button.ghost {
   background: transparent;
+  border-color: transparent;
+}
+
+button.ghost:hover {
+  background: var(--surface-sunken);
+  border-color: transparent;
 }
 
 button.link {
@@ -166,159 +394,71 @@ button.link {
   text-decoration: underline;
 }
 
+button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* A pill of mutually exclusive options: the pressed one is raised out of a sunken track, which
+   reads as a switch rather than as two buttons one of which is coloured. */
 .segmented {
   display: flex;
+  height: 26px;
+  padding: 2px;
+  gap: 2px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
+  border-radius: 5px;
+  background: var(--surface-sunken);
 }
 
 .segmented button {
   border: 0;
-  border-radius: 0;
-  background: transparent;
+  border-radius: 3px;
+  background: none;
+  padding: 0 9px;
+  color: var(--text-muted);
   font-size: var(--text-sm);
 }
 
-.segmented button.on,
+.segmented button:hover {
+  color: var(--text);
+}
+
 .segmented button[aria-pressed='true'] {
-  background: var(--accent);
-  color: var(--accent-on);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
 }
 
 select {
   font: inherit;
   font-size: var(--text-sm);
+  height: 26px;
   color: var(--text);
-  background: var(--surface-raised);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 2px 4px;
+  border-radius: 5px;
+  padding: 0 4px;
 }
 
-/* ---- panels ------------------------------------------------------------------------- */
+select:hover {
+  border-color: var(--border-strong);
+}
 
-.panel {
+input[type='text'],
+input[type='password'] {
+  height: 30px;
+  padding: 0 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-  padding: 16px;
-}
-
-.panel.centred {
-  max-width: 620px;
-  margin: 40px auto;
-}
-
-.panel.drop-target {
-  border-color: var(--accent);
-  background: var(--surface-sunken);
-}
-
-.panel-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-h1 {
-  font-size: 20px;
-  letter-spacing: -0.02em;
-  margin: 0 0 8px;
-}
-
-h2 {
-  font-size: var(--text-lg);
-  margin: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-md);
 }
 
 .muted {
   color: var(--text-muted);
-}
-
-.sample-list {
-  list-style: none;
-  padding: 0;
-  margin: 16px 0;
-  display: grid;
-  gap: 6px;
-}
-
-.sample-note {
-  display: block;
-  font-size: var(--text-sm);
-  margin: 2px 0 8px;
-}
-
-/* ---- notices ------------------------------------------------------------------------ */
-
-/* A status colour never carries meaning alone, so every notice is also labelled in words. */
-.notice {
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  font-size: var(--text-sm);
-  margin: 8px 0;
-}
-
-.notice-error {
-  border-left-color: var(--status-critical);
-}
-
-.notice-warning {
-  border-left-color: var(--status-warning);
-}
-
-.bad-rows {
-  margin: 6px 0 0;
-  padding-left: 20px;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-}
-
-/* ---- schema table ------------------------------------------------------------------- */
-
-.schema {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--text-sm);
-}
-
-.schema th,
-.schema td {
-  text-align: left;
-  padding: 4px 8px;
-  height: var(--row-height);
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-
-.schema thead th {
-  color: var(--text-muted);
-  font-weight: 500;
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.schema tbody th {
-  font-weight: 500;
-  font-family: var(--font-mono);
-}
-
-.schema .values {
-  color: var(--text-muted);
-  max-width: 380px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tag {
-  margin-left: 6px;
-  font-size: var(--text-xs);
-  color: var(--accent);
 }
 
 .visually-hidden {
@@ -333,18 +473,691 @@ h2 {
   border: 0;
 }
 
-/* ---- data table ---------------------------------------------------------------------- */
+h1 {
+  margin: 0 0 8px;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
 
-.table-wrap {
-  margin-top: 16px;
+h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* ---- cards and notices ---------------------------------------------------------------- */
+
+.card {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--surface-raised);
+  background: var(--surface);
   overflow: hidden;
 }
 
+.card-head {
+  padding: 13px 14px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-head .narration {
+  margin: 5px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* The one row of controls the card offers. Axis and field pickers are a chart builder, which
+   is a different product (DECISIONS §11). */
+.card-bar {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.card-bar .spacer {
+  flex: 1;
+}
+
+.card-body {
+  padding: 16px 16px 10px;
+}
+
+.card-foot {
+  border-top: 1px solid var(--border);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  padding: 7px 12px;
+}
+
+/* Every list inside a card is rows, never bullets. */
+.card ul,
+.card ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A section header row: uppercase, 30px, sunken. */
+.strip {
+  height: var(--row-height);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-sunken);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.strip .plain {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* A status colour never carries meaning alone: every notice is also labelled in words, and the
+   colour is a 2px left stripe rather than a fill. */
+.notice {
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 12px 14px;
+  font-size: var(--text-sm);
+}
+
+.notice-good {
+  border-left-color: var(--status-good);
+}
+
+.notice-warning {
+  border-left-color: var(--status-warning);
+}
+
+.notice-serious {
+  border-left-color: var(--status-serious);
+}
+
+.notice-error {
+  border-left-color: var(--status-error);
+}
+
+.notice-critical {
+  border-left-color: var(--status-critical);
+}
+
+.notice-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.notice-head .title {
+  font-size: var(--text-md);
+  font-weight: 500;
+}
+
+.notice-head .aside {
+  flex: 1;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.notice-body {
+  margin: 5px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.6;
+  max-width: 640px;
+}
+
+/* The violations, as rows rather than a bulleted list: the path and the sentence line up down
+   the page, which is how a reader finds the one that names their column. */
+.violations {
+  margin: 9px 0 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  list-style: none;
+  padding: 0;
+  font-size: var(--text-sm);
+}
+
+.violations li {
+  min-height: var(--row-height);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-sunken);
+}
+
+.violations li:last-child {
+  border-bottom: 0;
+}
+
+.violations code {
+  width: 150px;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* A dismiss affordance, wherever one is offered. */
+.close {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1;
+}
+
+.close:hover {
+  color: var(--text);
+}
+
+/* ---- chips ---------------------------------------------------------------------------- */
+
+.chip-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  animation: chip-in var(--motion) var(--ease);
+}
+
+.chip-button {
+  cursor: pointer;
+  color: var(--text);
+  background: var(--surface);
+}
+
+.chip-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.chip-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* The specification's fields as they become readable, in the words the grammar uses. */
+.spec-chip {
+  height: 22px;
+  border-radius: var(--radius-sm);
+  padding: 0 8px;
+  gap: 5px;
+  font-size: var(--text-xs);
+}
+
+.spec-chip .key {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---- in flight -------------------------------------------------------------------------
+   One card for the whole of a Request: the phase, the narration typing itself, and the chips.
+   It is the payoff — a sentence typed live says the visitor was understood before any data
+   moves. */
+
+.inflight {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 14px 16px 15px;
+}
+
+.inflight-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.inflight-head .phase {
+  font-size: var(--text-md);
+  font-weight: 500;
+}
+
+.inflight-head .note {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.inflight .narration {
+  margin: 12px 0 0;
+  font-size: var(--text-md);
+  line-height: 1.6;
+  min-height: 21px;
+}
+
+.inflight .chip-strip {
+  margin-top: 11px;
+  min-height: 22px;
+  gap: 5px;
+}
+
+.spinner {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: spin 700ms linear infinite;
+}
+
+.spinner.held {
+  border-color: var(--status-warning);
+  animation: none;
+}
+
+.caret {
+  width: 1px;
+  height: 14px;
+  display: inline-block;
+  vertical-align: -2px;
+  background: var(--text);
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ---- the composer ----------------------------------------------------------------------
+   Sticky to the bottom of the 1040px column and not to the window, with a gradient behind it so
+   content scrolls *under* rather than being clipped by a hard edge. Fixed height: the readout
+   is one line, and nothing here expands in place. */
+
+.composer {
+  position: sticky;
+  bottom: 0;
+  z-index: 8;
+  margin-top: auto;
+  padding: 14px 0 16px;
+  background: linear-gradient(to top, var(--surface) 62%, transparent);
+}
+
+.composer-box {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  padding: 10px 10px 8px;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.05);
+}
+
+.composer-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.composer-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.composer-row .segmented,
+.composer-row button[type='submit'],
+.composer-row button.cancel {
+  height: 30px;
+  flex: none;
+}
+
+.composer-row button[type='submit'],
+.composer-row button.cancel {
+  padding: 0 14px;
+  border-radius: var(--radius);
+  font-weight: 500;
+  font-size: var(--text-sm);
+}
+
+/* One 11px line. The `<details>` readout and the request inspector that used to live here
+   inflated the bar to 45vh, which is the whole reason the composer had to be bounded. */
+.composer-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  padding: 0 2px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.composer-foot .mode-note {
+  flex: 1;
+  line-height: 1.5;
+}
+
+.composer-foot .usage-cache {
+  color: var(--status-good);
+}
+
+.tag {
+  flex: none;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+  font-size: 10px;
+  font-style: normal;
+  color: var(--text-muted);
+}
+
+/* ---- the empty state -------------------------------------------------------------------
+   The repertoire, in full. Free text is disabled in Demo mode, so these are not a suggestion
+   strip — they are the whole set of Questions that can be asked, and saying so is the
+   difference between a fixed repertoire and an interface that appears broken. */
+
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  font-size: var(--text-md);
+  transition: background var(--motion-fast) var(--ease);
+}
+
+.list-row:hover {
+  background: var(--surface-sunken);
+  border-color: var(--border);
+}
+
+.list-row .n {
+  width: 16px;
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.list-row .label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-row .kind {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.list-row .chevron {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.list-row.tall {
+  height: auto;
+  padding: 9px 12px;
+}
+
+.list-row .sub {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ---- the analysis card's disclosures --------------------------------------------------- */
+
+.disclosure > summary {
+  height: var(--row-height);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  list-style: none;
+}
+
+.disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure > summary:hover {
+  background: var(--surface-sunken);
+}
+
+.disclosure > summary::before {
+  content: '\25b8';
+  width: 9px;
+  font-size: 9px;
+}
+
+.disclosure[open] > summary::before {
+  content: '\25be';
+}
+
+.disclosure + .disclosure {
+  border-top: 1px solid var(--border);
+}
+
+/* The specification, read back as the compact DSL `spec/format.ts` writes. Not JSON: JSON in a
+   textarea invited editing, and the specification is edited through the controls above. */
+.dsl {
+  margin: 0 12px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.8;
+  color: var(--text-muted);
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.dsl-note {
+  margin: -6px 12px 10px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* The rows behind the chart, inside the card. */
+.drill-head {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.drill-head .spacer {
+  flex: 1;
+}
+
+/* ---- the inference gate ------------------------------------------------------------------
+   A stage between parsing and the workspace. Inference is where a live demo breaks, so the
+   uncertain columns are put in front of the visitor once, with the confident ones folded away —
+   rather than hidden in a panel nobody opens (DECISIONS §21.1). */
+
+.gate-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.gate-row .col {
+  width: 180px;
+  flex: none;
+}
+
+.gate-row .name {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.gate-row .why {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.gate-row .sample {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gate-row .spacer {
+  flex: 1;
+}
+
+.gate-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  background: var(--surface-raised);
+}
+
+.gate-confident {
+  height: var(--row-height);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  border-top: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+.gate-confident .name {
+  width: 180px;
+  font-family: var(--font-mono);
+}
+
+.gate-confident .type {
+  width: 90px;
+  flex: none;
+  color: var(--text-muted);
+}
+
+.gate-confident .sample {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- the data surface --------------------------------------------------------------------
+   Metadata and rows are one surface, not two: the type control is a chip in the column header,
+   next to the values that let you see the problem. */
+
+.data-surface {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.data-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-head .spacer {
+  flex: 1;
+}
+
 .table-scroll {
-  height: 460px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+}
+
+.table-foot {
+  flex: none;
+  height: var(--row-height);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* The drill-down uses the same grid in a fixed-height box inside the card. */
+.drill-scroll {
+  max-height: 180px;
   overflow: auto;
   position: relative;
 }
@@ -361,33 +1174,113 @@ h2 {
 .grid thead th {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 3;
   height: var(--row-height);
-  padding: 0;
+  padding: 0 8px;
   background: var(--surface-sunken);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-strong);
+  border-right: 1px solid var(--border);
   text-align: left;
-  font-weight: 500;
+  font-weight: 400;
 }
 
-.grid thead button {
-  width: 100%;
+.grid thead th:last-child {
+  border-right: 0;
+}
+
+.head-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--row-height);
+}
+
+.head-cell .sort {
+  flex: 1;
+  min-width: 0;
   height: var(--row-height);
   border: 0;
   border-radius: 0;
   background: none;
+  padding: 0;
   text-align: left;
-  padding: 0 8px;
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sort-mark {
+  color: var(--accent);
+}
+
+/* An 18px chip that opens the four types. `<details>` is the whole popover: no focus trap to
+   hand-roll, and Escape already closes it. */
+.type-menu {
+  position: relative;
+  flex: none;
+}
+
+.type-menu > summary {
+  height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.type-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.type-menu > summary:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.type-menu ul {
+  position: absolute;
+  top: 22px;
+  right: 0;
+  z-index: 9;
+  width: 118px;
+  margin: 0;
+  padding: 3px;
+  list-style: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-overlay);
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.12);
+}
+
+.type-menu li button {
+  width: 100%;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 7px;
+  border: 0;
+  background: none;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.type-menu li button:hover {
+  background: var(--surface-sunken);
+}
+
+.type-menu .tick {
+  width: 9px;
   color: var(--accent);
 }
 
@@ -399,10 +1292,14 @@ h2 {
   height: var(--row-height);
   padding: 0 8px;
   border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-variant-numeric: tabular-nums;
+}
+
+.grid td:last-child {
+  border-right: 0;
 }
 
 .null-cell {
@@ -425,50 +1322,142 @@ h2 {
   }
 }
 
+.grid .spacer {
+  padding: 0;
+  border: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .skeleton {
+  .skeleton,
+  .chip,
+  .spinner,
+  .caret {
     animation: none;
   }
 }
 
-.table-foot {
-  padding: 6px 10px;
-  border-top: 1px solid var(--border);
-  font-size: var(--text-xs);
-  margin: 0;
-}
+/* ---- first run and parsing ---------------------------------------------------------------- */
 
-.column-menu {
-  border-bottom: 1px solid var(--border);
+.drop-hint {
+  flex: 1;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
   font-size: var(--text-sm);
-}
-
-.column-menu summary {
-  padding: 6px 10px;
-  cursor: pointer;
   color: var(--text-muted);
 }
 
-.column-menu ul {
-  list-style: none;
-  margin: 0;
-  padding: 0 10px 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
+.drop-target .drop-hint {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
-.column-menu label {
+.picker-foot {
+  padding: 14px 12px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 10px;
+  background: var(--surface-raised);
+}
+
+.progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.progress > div {
+  height: 4px;
+  background: var(--accent);
+  transition: width var(--motion) var(--ease);
+}
+
+.bad-rows {
+  margin: 6px 0 0;
+  padding-left: 20px;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
 
-.grid .spacer {
+/* ---- the key dialog ------------------------------------------------------------------------ */
+
+.key-dialog {
+  width: 440px;
   padding: 0;
-  border: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-overlay);
+  color: var(--text);
+  font: var(--text-md) / 1.5 var(--font);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.22);
+  overflow: hidden;
+}
+
+.key-dialog::backdrop {
+  background: rgb(8 9 10 / 0.34);
+}
+
+.key-dialog .card-head {
+  padding: 16px 18px 14px;
+  border-bottom: 0;
+}
+
+.key-dialog p {
+  margin: 8px 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+.key-dialog input {
+  width: 100%;
+  margin-top: 13px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.key-dialog .rejected {
+  margin: 9px 0 0;
+  border-left: 2px solid var(--status-error);
+  padding-left: 9px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.key-dialog .rejected strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.dialog-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 11px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.dialog-foot button {
+  height: 30px;
+  border-radius: var(--radius);
+  padding: 0 13px;
+  font-size: var(--text-sm);
+}
+
+/* The benchmark page keeps its own plain action row. */
+.dev-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
 }
 
 /* ---- charts -------------------------------------------------------------------------- */
@@ -616,366 +1605,3 @@ h2 {
   letter-spacing: 0.04em;
 }
 
-/* ---- dev panel ----------------------------------------------------------------------- */
-
-.dev-panel {
-  margin-top: 16px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-  padding: 12px 16px;
-}
-
-.dev-panel summary {
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.dev-panel textarea {
-  width: 100%;
-  font: var(--text-xs) / 1.5 var(--font-mono);
-  color: var(--text);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 8px;
-  resize: vertical;
-}
-
-.dev-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 8px 0;
-  padding: 0;
-  list-style: none;
-}
-
-.dev-failures {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
-}
-
-.dev-failures h3 {
-  margin: 0;
-  font-size: var(--text-sm);
-}
-
-.dev-panel pre {
-  white-space: pre-wrap;
-  font-family: var(--font-mono);
-  margin: 8px 0;
-}
-
-.dev-panel ul {
-  margin: 6px 0 0;
-  padding-left: 18px;
-}
-
-.analysis h3 {
-  margin: 12px 0 2px;
-  font-size: var(--text-lg);
-}
-
-.narration {
-  margin: 0 0 10px;
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-}
-
-/* ---- the composer, the stream and the readout ---------------------------------------- */
-
-.composer-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.composer-row input {
-  flex: 1;
-}
-
-.composer-hint {
-  margin: 6px 0 0;
-  font-size: var(--text-sm);
-}
-
-.stream {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.stream-status {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  animation: shimmer 1.4s var(--ease) infinite;
-}
-
-@keyframes shimmer {
-  50% {
-    opacity: 0.45;
-  }
-}
-
-.stream .narration {
-  margin: 0;
-  color: var(--text);
-  flex: 1 1 240px;
-}
-
-.chip-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.chip {
-  display: inline-block;
-  padding: 1px 7px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-sunken);
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  font-family: var(--font-mono);
-  animation: chip-in var(--motion) var(--ease);
-}
-
-.chip-button {
-  cursor: pointer;
-  font-family: var(--font);
-  color: var(--text);
-}
-
-.chip-button:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.chip-button:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-/* The demo repertoire is the whole set of Questions that can be asked, not a suggestion
-   strip, so it sits above the disabled input rather than beside it. */
-.repertoire {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.repertoire .chip-strip {
-  gap: 6px;
-}
-
-.repertoire .chip {
-  padding: 3px 10px;
-}
-
-@keyframes chip-in {
-  from {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chip,
-  .stream-status {
-    animation: none;
-  }
-}
-
-.usage {
-  margin-top: 8px;
-  font-size: var(--text-sm);
-}
-
-.usage > summary {
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.usage-cache {
-  color: var(--status-good);
-}
-
-.usage-total {
-  margin-left: auto;
-}
-
-.usage-table {
-  border-collapse: collapse;
-  margin: 8px 0;
-}
-
-.usage-table th,
-.usage-table td {
-  text-align: left;
-  padding: 2px 16px 2px 0;
-  font-weight: 400;
-}
-
-.usage-table th {
-  color: var(--text-muted);
-}
-
-.usage-table td {
-  font-family: var(--font-mono);
-}
-
-.inspector pre {
-  max-height: 320px;
-  overflow: auto;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-sunken);
-  font-size: var(--text-xs);
-  font-family: var(--font-mono);
-}
-
-/* ---- the rail, notices and the analysis card ----------------------------------------- */
-
-.rail-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.rail-item {
-  width: 100%;
-  text-align: left;
-  border: 0;
-  background: transparent;
-  font-size: var(--text-sm);
-  padding: 6px 8px;
-}
-
-.rail-item.on {
-  background: var(--surface-sunken);
-  font-weight: 500;
-}
-
-.rail-row {
-  display: flex;
-  align-items: center;
-}
-
-/* Only on hover or keyboard focus: a delete affordance on every row at rest is a rail that
-   reads as a list of things about to be deleted. */
-.rail-delete {
-  opacity: 0;
-  padding: 2px 6px;
-  color: var(--text-muted);
-}
-
-.rail-row:hover .rail-delete,
-.rail-delete:focus-visible {
-  opacity: 1;
-}
-
-.rail-updated {
-  margin-left: 6px;
-  color: var(--accent);
-  font-size: var(--text-xs);
-}
-
-.notice-card {
-  margin-bottom: 12px;
-}
-
-.notice-card p {
-  margin: 0 0 10px;
-}
-
-.violations {
-  margin: 0 0 10px;
-  padding-left: 18px;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
-
-.stepper {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.stepper button {
-  padding: 0 6px;
-}
-
-.controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.table-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding-right: 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-.table-head .column-menu {
-  border-bottom: 0;
-  flex: 1;
-}
-
-.analysis h2 {
-  margin: 0;
-  font-size: var(--text-lg);
-}
-
-.key-dialog {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface-overlay);
-  color: var(--text);
-  max-width: 460px;
-  padding: 16px;
-}
-
-.key-dialog::backdrop {
-  background: rgb(0 0 0 / 0.4);
-}
-
-.key-dialog h2 {
-  margin: 0 0 8px;
-  font-size: var(--text-lg);
-}
-
-.key-dialog input {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-raised);
-  color: var(--text);
-  font: inherit;
-  font-family: var(--font-mono);
-  margin: 8px 0;
-}

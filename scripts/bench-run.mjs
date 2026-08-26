@@ -1,4 +1,4 @@
-/** Drives `#bench` and commits its JSON, so the numbers in the README are reproducible by
+/** Drives `#/bench` and commits its JSON, so the numbers in the README are reproducible by
  * somebody who is not me — which is the whole of DECISIONS §13's argument.
  *
  * Start the app first (`npm run dev`, or `npm run build && npm run preview`), then:
@@ -31,7 +31,7 @@ page.on('pageerror', (e) => console.error('page error:', String(e)));
 
 /** One question of the bench page, N runs of each of its three paths. */
 async function bench(index) {
-  await page.goto(`${base}/#bench`);
+  await page.goto(`${base}/#/bench`);
   await page.waitForSelector('h1');
   await page.selectOption('select', String(index));
   await page.fill('input[type=number]', String(runs));
@@ -63,7 +63,9 @@ async function bench(index) {
 async function pan() {
   await page.goto(base);
   await page.getByRole('button', { name: /Team-match results/ }).click();
-  await page.getByRole('button', { name: /98,899-point scatter/ }).click();
+  // The inference gate stands between parsing and the workspace (ADR-0026).
+  await page.getByRole('button', { name: 'Continue' }).click({ timeout: 120_000 });
+  await page.getByRole('button', { name: /goals scored compare with goals conceded/ }).click();
   await page.waitForSelector('canvas', { timeout: 120_000 });
   await page.waitForTimeout(2_000);
 

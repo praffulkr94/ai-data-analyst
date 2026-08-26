@@ -60,6 +60,11 @@ let watching = false;
 export function watchPerformance(): void {
   if (watching || typeof PerformanceObserver === 'undefined') return;
   watching = true;
+  /** The one reader of these numbers is `scripts/e2e-run.mjs`, which reports them at the end of
+      a scripted session. It used to read them out of a panel on the canvas; M10 deleted that
+      panel, because evidence for a reviewer is not a product surface (ADR-0026) — so the
+      readings are handed to the driver directly instead of being rendered at a visitor. */
+  (globalThis as { __perf?: () => PerfReadings }).__perf = perfReadings;
   try {
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {

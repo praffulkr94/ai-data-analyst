@@ -1,12 +1,11 @@
-/** The active Analysis on the canvas: its title, the Revision on screen, the stepper between
-    Revisions, and the two manual controls.
+/** The active Analysis: its title, the Revision on screen, the stepper between Revisions, the
+    two manual controls, the chart, and the two disclosures under it.
 
     The controls are the milestone's argument. A spec only the model can write is
     indistinguishable from blindly rendered model output; a spec two editors can write is
     demonstrably an object the application owns. Both editors produce the same Revision. */
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnalysisChart } from '../chart/AnalysisChart';
-import { MODELS } from '../ai/models';
 import {
   aggregationOptions,
   chartTypeOptions,
@@ -14,14 +13,26 @@ import {
   withAggregation,
   withChartType,
 } from '../spec/edits';
+import { formatSpec } from '../spec/format';
 import type { AggregationFn, AnalysisSpec } from '../spec/grammar';
 import { useApp } from '../store';
+import type { SliceCache } from '../table/sliceCache';
 import type { Workspace } from '../workspace/workspace';
+import { DrillDown } from './DataTable';
 
-export function AnalysisCard({ workspace }: { workspace: Workspace }) {
+export function AnalysisCard({
+  workspace,
+  cache,
+}: {
+  workspace: Workspace;
+  /** Absent where there is no worker to read rows from — the card is then the chart and its
+      specification, with no drill-down under them. */
+  cache?: SliceCache;
+}) {
   const analysis = useApp((s) => s.analyses.find((a) => a.id === s.activeAnalysisId) ?? null);
   const stepRevision = useApp((s) => s.stepRevision);
   const id = analysis?.id ?? null;
+  const [asTable, setAsTable] = useState(false);
 
   /** Cmd+Z steps back one Revision, Shift+Cmd+Z forward again. Undo is a Revision step and not
       a history of every action, which is why the hash is written with `replaceState` and Back
@@ -44,63 +55,115 @@ export function AnalysisCard({ workspace }: { workspace: Workspace }) {
   if (!analysis) return null;
   const revision = analysis.revisions[analysis.at]!;
   const count = analysis.revisions.length;
+  const spec = revision.spec;
 
   return (
-    <section className="panel analysis">
-      <div className="panel-head">
-        <h2>{analysis.title}</h2>
-        <span className="tag" title={MODELS[revision.model].note}>
-          {MODELS[revision.model].label}
-        </span>
-        {count > 1 && (
-          <div className="stepper" role="group" aria-label="Revisions">
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => stepRevision(analysis.id, -1)}
-              disabled={analysis.at === 0}
-              aria-label="Previous revision"
-            >
-              &lsaquo;
-            </button>
-            <span aria-live="polite">
-              {analysis.at + 1}/{count}
-            </span>
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => stepRevision(analysis.id, 1)}
-              disabled={analysis.at === count - 1}
-              aria-label="Next revision"
-            >
-              &rsaquo;
-            </button>
-          </div>
-        )}
+    <section className="card analysis">
+      <div className="card-head">
+        <div className="card-title-row">
+          <h2>{analysis.title}</h2>
+          <span className="spacer" style={{ flex: 1 }} />
+          {count > 1 && (
+            <div className="stepper segmented" role="group" aria-label="Revisions">
+              <button
+                type="button"
+                onClick={() => stepRevision(analysis.id, -1)}
+                disabled={analysis.at === 0}
+                aria-label="Previous revision"
+                title="Cmd+Z"
+              >
+                &lsaquo;
+              </button>
+              <span aria-live="polite">
+                {analysis.at + 1}/{count}
+              </span>
+              <button
+                type="button"
+                onClick={() => stepRevision(analysis.id, 1)}
+                disabled={analysis.at === count - 1}
+                aria-label="Next revision"
+                title="Shift+Cmd+Z"
+              >
+                &rsaquo;
+              </button>
+            </div>
+          )}
+          <CopyLink />
+        </div>
+        <p className="narration">{spec.narration}</p>
       </div>
-      <p className="narration">{revision.spec.narration}</p>
-      <Controls workspace={workspace} spec={revision.spec} />
-      <AnalysisChart result={revision.result} visualization={revision.spec.visualization} />
+
+      <Controls
+        workspace={workspace}
+        spec={spec}
+        asTable={asTable}
+        onToggleTable={() => setAsTable((v) => !v)}
+      />
+
+      <div className="card-body">
+        <AnalysisChart
+          result={revision.result}
+          visualization={spec.visualization}
+          table={{ shown: asTable, onToggle: () => setAsTable((v) => !v) }}
+        />
+      </div>
+
+      <div>
+        <details className="disclosure">
+          <summary>view the query the model wrote</summary>
+          <pre className="dsl">{formatSpec(spec)}</pre>
+          <p className="dsl-note">
+            Read-only. The specification is edited through the controls above, never as text.
+          </p>
+        </details>
+        {cache && <DrillDown cache={cache} />}
+      </div>
     </section>
   );
 }
 
-/** The chart-type toggle and the aggregation dropdown, and nothing else. Axis and field pickers
+/** The link is the hash, which `trackSession` already keeps in step with the Analysis on screen
+    — so this copies the address bar rather than building anything. */
+function CopyLink() {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard?.writeText(location.href);
+        setDone(true);
+        setTimeout(() => setDone(false), 1_500);
+      }}
+    >
+      {done ? 'Copied' : 'Copy link'}
+    </button>
+  );
+}
+
+/** The chart-type toggle, the aggregation dropdown, and the table switch. Axis and field pickers
     are a chart builder, which is a different product (DECISIONS §11).
 
-    Both offer only what the semantic validator accepts, so a control cannot propose an analysis
-    the application would then refuse. */
-function Controls({ workspace, spec }: { workspace: Workspace; spec: AnalysisSpec }) {
+    Both editors offer only what the semantic validator accepts, so a control cannot propose an
+    analysis the application would then refuse. */
+function Controls({
+  workspace,
+  spec,
+  asTable,
+  onToggleTable,
+}: {
+  workspace: Workspace;
+  spec: AnalysisSpec;
+  asTable: boolean;
+  onToggleTable: () => void;
+}) {
   const columns = useApp((s) => s.columns);
   const schema = useMemo(() => ({ columns }), [columns]);
   const types = chartTypeOptions(spec, schema);
   const fns = aggregationOptions(spec, schema);
   const metric = metricAggregation(spec);
 
-  if (types.length < 2 && fns.length < 2) return null;
-
   return (
-    <div className="controls">
+    <div className="card-bar">
       {types.length > 1 && (
         <div className="segmented" role="group" aria-label="Chart type">
           {types.map((type) => (
@@ -130,6 +193,10 @@ function Controls({ workspace, spec }: { workspace: Workspace; spec: AnalysisSpe
           </select>
         </label>
       )}
+      <span className="spacer" />
+      <button type="button" aria-pressed={asTable} onClick={onToggleTable}>
+        {asTable ? 'View as chart' : 'View as table'}
+      </button>
     </div>
   );
 }

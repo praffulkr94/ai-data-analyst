@@ -1,7 +1,7 @@
 /** `/bench` — the performance evidence, run by whoever is reading it.
  *
  * Not linked from the interface and code-split, so it costs a visitor nothing; reachable at
- * `#bench` in any build, including the deployed one, because a number a stranger cannot
+ * `#/bench` in any build, including the deployed one, because a number a stranger cannot
  * reproduce is a number in a README (DECISIONS §13). It runs each of the three paths N times,
  * reports the median of every phase with its range, watches the main thread for long tasks
  * while each one runs, and hands the whole thing over as JSON to commit.

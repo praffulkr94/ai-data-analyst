@@ -128,7 +128,12 @@ export function createWorkspace({
   }
 
   function notice(id: number, value: Notice): void {
-    store.getState().setNotice(value);
+    // The Request is torn down on the next line, so a failure carries its Question with it —
+    // that is what lets the notice offer a fix and ask the same thing again.
+    const question = store.getState().request?.question;
+    store.getState().setNotice(
+      value.kind === 'failed' && question ? { ...value, question } : value,
+    );
     store.getState().endRequest(id);
   }
 

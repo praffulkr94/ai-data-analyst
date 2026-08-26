@@ -1,14 +1,14 @@
-/** The composer: the Question, the model picker, and the readout of what it cost.
+/** The composer: the Question, the model picker, and one line saying what it cost.
 
-    The streaming strip above the input is the payoff — a narration sentence typed live tells the
-    visitor they were understood before any data moves, and the chip strip beside it fills in as
-    the specification's fields become readable. Both are display only. */
-import { useEffect, useState, type FormEvent } from 'react';
-import { repertoireFor } from '../ai/fixtures';
-import { MODELS, MODEL_CHOICES, type ModelChoice } from '../ai/models';
+    It is sticky to the bottom of the 1040px content column rather than to the window, and it is
+    a fixed height. Both of those are load-bearing: a bottom-docked input that spans the viewport
+    and grows is a chat shell, and this is not one. The readout that used to expand in place here
+    — a `<details>` table and a JSON inspector — inflated the bar to 45vh, and it is now the
+    single 11px line below the input. */
+import { useState, type FormEvent } from 'react';
+import { MODELS, MODEL_CHOICES } from '../ai/models';
 import { useApp } from '../store';
 import type { Workspace } from '../workspace/workspace';
-import { UsageReadout } from './UsageReadout';
 
 export function Composer({ workspace }: { workspace: Workspace }) {
   const ready = useApp((s) => s.load.status === 'ready');
@@ -30,148 +30,104 @@ export function Composer({ workspace }: { workspace: Workspace }) {
   }
 
   return (
-    <footer className="composer">
-      <StreamStrip />
-      {ready && mode === 'demo' && <Repertoire workspace={workspace} />}
-      <form className="composer-row" onSubmit={submit}>
-        <input
-          type="text"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder={
-            !ready
-              ? 'Load a Dataset to ask a question'
-              : canAsk
-                ? 'Ask a question about this Dataset…'
-                : 'Demo mode answers the Questions above — add a key to ask anything'
-          }
-          disabled={!canAsk}
-          aria-label="Question"
-        />
-        <label className="model-picker">
-          <span className="visually-hidden">Model</span>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value as ModelChoice)}
-            title={MODELS[model].note}
-          >
+    <div className="composer">
+      <div className="composer-box">
+        <form className="composer-row" onSubmit={submit}>
+          <input
+            type="text"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder={
+              !ready
+                ? 'Load a Dataset to ask a question'
+                : canAsk
+                  ? 'Ask a question about this Dataset…'
+                  : 'Demo mode answers the Questions above — add a key to ask anything'
+            }
+            disabled={!canAsk}
+            aria-label="Question"
+          />
+          <div className="segmented" role="group" aria-label="Model">
             {MODEL_CHOICES.map((choice) => (
-              <option key={choice} value={choice}>
+              <button
+                key={choice}
+                type="button"
+                aria-pressed={model === choice}
+                title={MODELS[choice].note}
+                onClick={() => setModel(choice)}
+              >
                 {MODELS[choice].label}
-              </option>
+              </button>
             ))}
-          </select>
-        </label>
-        {inFlight ? (
-          <button type="button" className="ghost" onClick={() => workspace.cancel()}>
-            Cancel
-          </button>
-        ) : (
-          <button type="submit" className="primary" disabled={!canAsk || question.trim() === ''}>
-            Ask
-          </button>
-        )}
-      </form>
-      {ready && <UsageReadout />}
-    </footer>
-  );
-}
-
-/** The demo repertoire, as chips. Free text is disabled in Demo mode, so these are not a
-    convenience — they are the whole set of Questions that can be asked, and saying which they are
-    is the difference between a fixed repertoire and an interface that appears broken.
-
-    A Fixture names columns, so only the ones recorded against the Dataset actually loaded are
-    offered. A refining Question needs something to refine, so it appears only once there is an
-    Analysis on screen. */
-function Repertoire({ workspace }: { workspace: Workspace }) {
-  const ref = useApp((s) => s.datasetHandle?.ref);
-  const hasAnalysis = useApp((s) => s.activeAnalysisId !== null);
-  const inFlight = useApp((s) => s.request !== null);
-
-  const fixtures = repertoireFor(ref?.kind === 'sample' ? ref.id : null).filter(
-    (f) => hasAnalysis || f.input.kind !== 'analysis' || f.input.intent !== 'refine',
-  );
-
-  if (fixtures.length === 0) {
-    return (
-      <p className="composer-hint muted">
-        Demo mode replays recorded answers, and none were recorded against this Dataset. Load{' '}
-        <strong>International football matches</strong>, or switch to{' '}
-        <strong>Your API key</strong> to ask anything.
-      </p>
-    );
-  }
-
-  return (
-    <div className="repertoire">
-      <p className="composer-hint muted" id="repertoire-hint">
-        Demo mode answers these {fixtures.length} Questions, replaying recorded responses through
-        the real validation and execution path. Switch to <strong>Your API key</strong> to ask
-        anything.
-      </p>
-      <ul className="chip-strip" aria-labelledby="repertoire-hint">
-        {fixtures.map((f) => (
-          <li key={f.question}>
-            <button
-              type="button"
-              className="chip chip-button"
-              disabled={inFlight}
-              onClick={() => void workspace.ask(f.question)}
-            >
-              {f.question}
+          </div>
+          {inFlight ? (
+            <button type="button" className="cancel" onClick={() => workspace.cancel()}>
+              Cancel
             </button>
-          </li>
-        ))}
-      </ul>
+          ) : (
+            <button type="submit" className="primary" disabled={!canAsk || question.trim() === ''}>
+              Ask
+            </button>
+          )}
+        </form>
+        <UsageLine />
+      </div>
     </div>
   );
 }
 
-/** Ticks once a second, and only while there is something to count down. The deadline is in the
-    store and the tick is not: a store that re-published every second would re-render everything
-    subscribed to it for a number one element shows. */
-function useCountdown(until: number | null): number {
-  const [left, setLeft] = useState(() => remaining(until));
-  useEffect(() => {
-    setLeft(remaining(until));
-    if (until === null) return;
-    const timer = setInterval(() => setLeft(remaining(until)), 1000);
-    return () => clearInterval(timer);
-  }, [until]);
-  return left;
-}
+/** Tokens and cost, in one line.
 
-const remaining = (until: number | null) =>
-  until === null ? 0 : Math.max(0, Math.ceil((until - Date.now()) / 1000));
+    Every number is what the API reported on the stream — `message_start` for input and cache
+    reads, `message_delta` for output. Never estimated, and never a second `count_tokens` call,
+    which would cost a round trip to report on a round trip. The cached figure is shown
+    separately on purpose: the minimum cacheable prefix is roughly 1,024 tokens and a shorter one
+    silently fails to cache, so a caching claim that is not visible is one that is not checked. */
+function UsageLine() {
+  const usage = useApp((s) => s.usage);
+  const mode = useApp((s) => s.mode);
+  const model = useApp((s) => s.model);
 
-/** Subscribes to the Request slice and nothing else, so sixty narration flushes a second never
-    re-render the rail or the chart. */
-function StreamStrip() {
-  const request = useApp((s) => s.request);
-  const secondsLeft = useCountdown(request?.retryAt ?? null);
-  if (!request) return null;
+  const last = usage.last;
+  const recorded = last?.recorded ?? mode === 'demo';
+
   return (
-    <div className="stream" aria-live="polite">
-      <span className="stream-status">
-        {request.status === 'thinking'
-          ? 'Thinking…'
-          : request.status === 'repairing'
-            ? 'Correcting…'
-            : request.status === 'waiting'
-              ? `${request.waiting} Retrying in ${secondsLeft}s`
-              : 'Computing…'}
+    <p className="composer-foot">
+      <span className="mode-note">
+        {mode === 'demo'
+          ? 'Demo mode replays recorded replies through the real validation and execution path.'
+          : 'Your key, held in memory for this tab. Requests go straight from this browser to the API.'}
       </span>
-      <p className="narration">{request.narration}</p>
-      {request.chips.length > 0 && (
-        <ul className="chip-strip">
-          {request.chips.map((chip, i) => (
-            <li key={`${chip}-${i}`} className="chip">
-              {chip}
-            </li>
-          ))}
-        </ul>
+      <span>{MODELS[last?.model ?? model].note}</span>
+      <span className="divider" aria-hidden="true" />
+      <span>
+        {last ? (
+          <>
+            {num(last.inputTokens + last.cacheReadTokens)} in · {num(last.outputTokens)} out
+            {last.cacheReadTokens > 0 && (
+              <>
+                {' · '}
+                <span className="usage-cache" title="Served from the prompt cache at a tenth the price">
+                  {num(last.cacheReadTokens)} cached
+                </span>
+              </>
+            )}
+            {' · '}
+            {money(usage.cost)}
+          </>
+        ) : (
+          'No questions asked yet'
+        )}
+      </span>
+      {recorded && (
+        <em className="tag" title="Replayed from a recording — nothing was charged">
+          recorded
+        </em>
       )}
-    </div>
+    </p>
   );
 }
+
+const num = (n: number) => n.toLocaleString('en-US');
+/** Sub-cent costs are the normal case here, so two decimals would read as free. */
+const money = (n: number) => (n === 0 ? '$0.00' : n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);

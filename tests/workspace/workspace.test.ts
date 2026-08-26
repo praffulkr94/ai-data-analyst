@@ -211,6 +211,8 @@ describe('the single Repair', () => {
     expect(script.calls).toHaveLength(2);
     expect(useApp.getState().pendingNotice).toEqual({
       kind: 'failed',
+      // Carried out of the dying Request so the notice can offer a fix and ask it again.
+      question: 'matches by team',
       message: 'operation: required',
       violations: [],
     });

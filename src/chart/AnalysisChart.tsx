@@ -61,11 +61,17 @@ function splitSeries(rows: ResultRow[], by: string | null): Series[] {
 export function AnalysisChart({
   result,
   visualization,
+  table,
 }: {
   result: AnalysisResult;
   visualization: Visualization;
+  /** The card owns this switch when it renders a control bar, because that is where the design
+      puts it — but the table itself stays here, hidden rather than unmounted, because that is
+      the accessible reading of the chart and it must not depend on a control being pressed. */
+  table?: { shown: boolean; onToggle: () => void };
 }) {
-  const [showTable, setShowTable] = useState(false);
+  const [ownTable, setOwnTable] = useState(false);
+  const showTable = table ? table.shown : ownTable;
   /** A drag offset, and only a canvas scatter has one: an SVG chart is whole on the screen
       already. Reset when a new result arrives, because it is a view of that result and not of
       the chart element. */
@@ -280,9 +286,11 @@ export function AnalysisChart({
             Reset view
           </button>
         )}
-        <button type="button" className="ghost" onClick={() => setShowTable((v) => !v)}>
-          {showTable ? 'Hide table' : 'View as table'}
-        </button>
+        {!table && (
+          <button type="button" className="ghost" onClick={() => setOwnTable((v) => !v)}>
+            {showTable ? 'Hide table' : 'View as table'}
+          </button>
+        )}
       </figcaption>
 
       <Tooltip

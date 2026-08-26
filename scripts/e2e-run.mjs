@@ -148,6 +148,8 @@ async function ready() {
   await route(page);
   await page.goto(base);
   await page.getByRole('button', { name: /International football matches/ }).click();
+  // The inference gate stands between parsing and the workspace (ADR-0026).
+  await page.getByRole('button', { name: 'Continue' }).click({ timeout: 120_000 });
   await page.getByRole('button', { name: 'Your API key' }).click();
   await page.getByLabel('API key').fill(KEY);
   await page.getByRole('button', { name: 'Verify and switch' }).click();
@@ -156,20 +158,20 @@ async function ready() {
   return page;
 }
 
-const analyses = (page) => page.locator('section.panel.analysis');
+const analyses = (page) => page.locator('section.card.analysis');
 
-/** The stream strip is transient — `route.fulfill` hands over the whole body at once, so every
-    delta is read in one task, React coalesces them into a single render and the strip can come and
-    go between two Playwright polls. What the strip showed is therefore recorded from inside the
-    page: the last narration is what the `text_delta` frames added up to, and the chips are what
-    the tolerant partial reader made of the `input_json_delta` ones. */
+/** The in-flight card is transient — `route.fulfill` hands over the whole body at once, so every
+    delta is read in one task, React coalesces them into a single render and the card can come and
+    go between two Playwright polls. What it showed is therefore recorded from inside the page:
+    the last narration is what the `text_delta` frames added up to, and the chips are what the
+    tolerant partial reader made of the `input_json_delta` ones. */
 const watchStream = (page) =>
   page.evaluate(() => {
     const seen = (globalThis.__stream = { narration: [], chips: [] });
     new MutationObserver(() => {
-      const text = document.querySelector('.stream .narration')?.textContent;
+      const text = document.querySelector('.inflight .narration')?.textContent;
       if (text && seen.narration.at(-1) !== text) seen.narration.push(text);
-      const chips = [...document.querySelectorAll('.stream .chip')].map((c) => c.textContent);
+      const chips = [...document.querySelectorAll('.inflight .chip')].map((c) => c.textContent);
       if (chips.length > seen.chips.length) seen.chips = chips;
     }).observe(document.body, { subtree: true, childList: true, characterData: true });
   });
@@ -223,11 +225,11 @@ async function cancelToResubmit(page) {
   await ask(page);
   const cancel = page.locator('.composer').getByRole('button', { name: 'Cancel', exact: true });
   await cancel.waitFor({ timeout: 30_000 });
-  await page.locator('.stream-status').filter({ hasText: 'Thinking…' }).waitFor({ timeout: 30_000 });
+  await page.locator('.inflight .phase').filter({ hasText: 'Thinking' }).waitFor({ timeout: 30_000 });
   await cancel.click();
 
   await page.getByRole('button', { name: 'Ask' }).waitFor({ timeout: 30_000 });
-  assert.equal(await page.locator('.stream').count(), 0, 'the cancelled Request is still on screen');
+  assert.equal(await page.locator('.inflight').count(), 0, 'the cancelled Request is still on screen');
   assert.equal(await analyses(page).count(), 0, 'the cancelled Request left an Analysis behind');
   assert.equal(await page.getByRole('alert').count(), 0, 'a cancel reported an error');
   assert.equal(stub.streams, before + 1, 'the cancelled Request never reached the transport');
@@ -247,9 +249,15 @@ async function cancelToResubmit(page) {
     place an INP figure can come from at all — and it is reported, not asserted: a click that
     stays under one frame legitimately produces no reading. */
 async function instrumentation(page) {
-  await page.getByRole('button', { name: 'Read again' }).click();
-  const text = await page.locator('.dev-failures p.muted').last().innerText();
-  console.log(`instrumentation: ${text.replace(/\s+/g, ' ')}`);
+  const r = await page.evaluate(() => globalThis.__perf?.() ?? null);
+  assert.ok(r, 'the performance observers were never installed');
+  console.log(
+    `instrumentation: ${r.longTasks} long tasks on the main thread, ` +
+      `${r.blockedMs.toFixed(0)} ms in all · ` +
+      (r.worstInteractionMs > 0
+        ? `slowest interaction ${r.worstInteractionMs.toFixed(0)} ms (${r.worstInteraction})`
+        : 'no interaction over one frame'),
+  );
 }
 
 try {

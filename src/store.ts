@@ -45,7 +45,14 @@ export type Analysis = {
 export type Notice =
   | { kind: 'clarification'; question: string; options: string[] }
   | { kind: 'unsupported'; reason: string; suggestions: string[] }
-  | { kind: 'failed'; message: string; violations: SpecViolation[] };
+  | {
+      kind: 'failed';
+      message: string;
+      violations: SpecViolation[];
+      /** The Question that produced it, so a fix offered on the notice can re-ask it. Stamped by
+          the dispatcher on the way out, because the Request is gone by the time this renders. */
+      question?: string;
+    };
 
 /** The one Request in flight. Per-token narration lives here and never in `analyses`, so the
     streaming element re-renders and the rail does not. */
@@ -83,9 +90,15 @@ const NO_TOTAL: TokenCounts = {
   outputTokens: 0,
 };
 
+/** `inferring` is a gate, not a spinner: parsing is done and the types are guessed, and the
+    visitor gets one look at them before the workspace opens. Inference is where a live demo
+    breaks, so the guesses are put in front of a person once rather than hidden in a panel
+    (DECISIONS §21.1). A retype does not re-open it, and neither does a shared link — that
+    visitor came for a chart, not for a schema review. */
 export type LoadState =
   | { status: 'idle' }
   | { status: 'loading'; label: string; rows: number; warning: string | null }
+  | { status: 'inferring' }
   | { status: 'ready' }
   | { status: 'failed'; message: string };
 
@@ -139,6 +152,8 @@ export type AppState = {
   landRevision: (target: string | null, id: string, title: string, revision: Revision) => void;
   awaitRestore: (restore: AppState['restore']) => void;
   readSaveNote: () => void;
+  /** Leave the inference gate. The types on screen are the ones the workspace will use. */
+  confirmInference: () => void;
   toggleTheme: () => void;
   beginLoad: (label: string, warning?: string) => void;
   reportProgress: (rows: number) => void;
@@ -319,6 +334,7 @@ export const useApp = create<AppState>((set) => ({
     }),
   awaitRestore: (restore) => set({ restore }),
   readSaveNote: () => set({ saveNoteRead: true }),
+  confirmInference: () => set({ load: { status: 'ready' } }),
   toggleTheme: () => set((s) => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),
   beginLoad: (label, warning = undefined) =>
     set({ load: { status: 'loading', label, rows: 0, warning: warning ?? null } }),
@@ -330,7 +346,12 @@ export const useApp = create<AppState>((set) => ({
       datasetHandle: handle,
       columns: handle.schema.columns,
       parseReport: report,
-      load: { status: 'ready' },
+      // The gate opens for a Dataset that was not already here — never for a retype, which
+      // arrives through this same action, and never for a link that carries an Analysis.
+      load:
+        s.datasetHandle?.label === handle.label || s.restore?.spec
+          ? { status: 'ready' }
+          : { status: 'inferring' },
       // A different Dataset has different columns, so a sort or a hidden column carried over
       // from the last one would name something that no longer exists.
       viewState: s.datasetHandle?.label === handle.label ? s.viewState : { sort: null, filters: [], hidden: [] },

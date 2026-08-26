@@ -75,6 +75,9 @@ describe('a failure worth waiting out', () => {
     expect(useApp.getState().pendingNotice).toMatchObject({
       kind: 'failed',
       message: 'The API rate-limited this request.',
+      // The Request is torn down with the notice, so the Question rides along — it is what
+      // lets a fix chip ask the same thing again.
+      question: 'how many matches per team?',
     });
   });
 

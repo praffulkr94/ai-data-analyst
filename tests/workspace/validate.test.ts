@@ -310,6 +310,8 @@ describe('time bucketing', () => {
     );
     expect(v.code).toBe('not-temporal');
     expect(v.message).toContain('date');
+    // The notice's fix chip retypes this column and re-asks, so naming it is the whole repair.
+    expect(v.column).toBe('home_team');
   });
 
   it('rejects bucketing a column that does not exist', () => {

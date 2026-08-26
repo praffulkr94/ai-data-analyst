@@ -62,7 +62,9 @@
   --motion-slow: 180ms;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
 
-  --font: ui-sans-serif, -apple-system, 'Inter', 'Segoe UI', system-ui, sans-serif;
+  /* Inter leads. It used to sit behind `ui-sans-serif`, which resolves on every platform, so
+     the face the design is drawn in was never once used. `index.html` loads it. */
+  --font: 'Inter', ui-sans-serif, -apple-system, 'Segoe UI', system-ui, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'Menlo', monospace;
   --text-xs: 11px;
   --text-sm: 12px;

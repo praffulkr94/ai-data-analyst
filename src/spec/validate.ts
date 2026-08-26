@@ -2,8 +2,8 @@
     list of SpecViolations.
 
     Deliberately not Zod refinements with a context object. Zod's job is structure — shapes,
-    enums, required fields, dataset-independent — and `strict: true` on the tool makes that a
-    backstop rather than the headline. This layer is the one that knows what the visitor actually
+    enums, required fields, dataset-independent — and it is the only layer checking that, since
+    the tool cannot be `strict`. This layer is the one that knows what the visitor actually
     loaded, it is the highest-value unit-test target in the codebase, and it has to return a rich
     typed error list that the single Repair hands back to the model. Plain TypeScript gives all
     three; a refinement gives none of them. */
@@ -29,6 +29,9 @@ export type SpecViolation = {
   /** Names the offender and lists what would have been valid. Handed back verbatim in the
       Repair's `tool_result`, so it has to be useful to a reader who cannot see the Dataset. */
   message: string;
+  /** The column the violation is about, when the fix is to retype that column rather than to
+      rewrite the spec. The notice turns this into an action: the chip *is* the fix. */
+  column?: string;
 };
 
 /** Refused before rendering, with a top-N offered instead — a bad Question must not be able to
@@ -109,6 +112,7 @@ export function validateSpec(spec: AnalysisSpec, schema: DatasetSchema): SpecVio
       out.push({
         code: 'not-temporal',
         path: 'operation.timeBucket.column',
+        column: col.name,
         message: `Column \`${col.name}\` is ${col.type}, so it cannot be bucketed by time. Date columns: ${list(
           named(schema, ['date']),
         )}.`,

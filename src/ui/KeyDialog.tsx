@@ -42,31 +42,34 @@ export function KeyDialog({ open, onClose }: { open: boolean; onClose: () => voi
 
   return (
     <dialog className="key-dialog" ref={ref} onCancel={onClose} onClose={onClose}>
-      <h2>Your Anthropic API key</h2>
-      <p className="muted">
-        Held in memory for this tab only — never written to storage and never put in the link.
-        Closing the tab is all it takes to be rid of it. Requests go from your browser straight to
-        the API; there is no server in between.
-      </p>
-      <p className="muted">
-        A few example values per column are sent with each question so the model knows what your
-        columns hold. Your rows are not sent — open “What the model sees” to check.
-      </p>
-      <input
-        type="password"
-        value={key}
-        onChange={(e) => setKey(e.target.value)}
-        placeholder="sk-ant-…"
-        aria-label="API key"
-        autoComplete="off"
-        spellCheck={false}
-      />
-      {state.error && (
-        <p className="notice notice-error" role="alert">
-          {state.error}
+      <div className="card-head">
+        <h2>Use your own API key</h2>
+        <p>
+          The key is held in memory for this tab only. It is never written to storage and never
+          put in the link. Requests go straight from this browser to the API — there is no server
+          in between. A few example values per column go with each question so the model knows
+          what your columns hold; your rows do not.
         </p>
-      )}
-      <div className="dev-actions">
+        <input
+          type="password"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          placeholder="sk-ant-…"
+          aria-label="API key"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        {state.error && (
+          <p className="rejected" role="alert">
+            <strong>key rejected</strong> — verified with a one-token call before switching, so
+            nothing was in flight. {state.error}
+          </p>
+        )}
+      </div>
+      <div className="dialog-foot">
+        <button type="button" onClick={onClose}>
+          {hasApiKey() ? 'Cancel' : 'Stay in Demo mode'}
+        </button>
         <button
           type="button"
           className="primary"
@@ -74,9 +77,6 @@ export function KeyDialog({ open, onClose }: { open: boolean; onClose: () => voi
           onClick={() => void submit()}
         >
           {state.busy ? 'Checking…' : 'Verify and switch'}
-        </button>
-        <button type="button" className="ghost" onClick={onClose}>
-          {hasApiKey() ? 'Cancel' : 'Stay in Demo mode'}
         </button>
       </div>
     </dialog>

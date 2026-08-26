@@ -7,7 +7,9 @@
     having no backend; it is losing it *silently*, so a visitor reloads and concludes the
     application is broken.
 
-    Written with `replaceState`. `pushState` would hijack the Back button, and undo is Cmd+Z. */
+    Written with `replaceState`, into the `s` parameter of the hash — the route occupies the path
+    (see `route.ts`). `pushState` would hijack the Back button, and undo is Cmd+Z. */
+import { formatHash, parseHash } from '../route';
 import { specFromReply, ModelReply, type AnalysisSpec } from '../spec/grammar';
 import { useApp, type AppState, type Mode } from '../store';
 import type { DatasetRef } from '../engine/handle';
@@ -31,7 +33,7 @@ const encode = (session: Session): string =>
   base64url(JSON.stringify({ v: VERSION, ...session }));
 
 function decode(hash: string): Session | null {
-  const raw = hash.replace(/^#/, '');
+  const raw = parseHash(hash).payload;
   if (!raw) return null;
   let parsed: unknown;
   try {
@@ -81,7 +83,12 @@ export function trackSession(store = useApp): () => void {
     // Nothing to carry yet. A first-run visitor's address bar stays clean rather than picking
     // up a hash that encodes an empty workspace.
     if (!session.dataset && !session.spec) return;
-    history.replaceState(null, '', `${location.pathname}${location.search}#${encode(session)}`);
+    const { route } = parseHash();
+    history.replaceState(
+      null,
+      '',
+      `${location.pathname}${location.search}${formatHash(route, encode(session))}`,
+    );
   });
 }
 
