@@ -36,6 +36,26 @@ const MATCHES: DatasetSchema = {
   ],
 };
 
+/** `team_matches.csv` — the header `scripts/build-datasets.mjs` writes, by hand for the same
+    reason as above. */
+const TEAM_MATCHES: DatasetSchema = {
+  columns: [
+    col('date', 'date'),
+    col('team', 'categorical', 328),
+    col('opponent', 'categorical', 328),
+    col('at_home', 'boolean', 2),
+    col('goals_for', 'number'),
+    col('goals_against', 'number'),
+    col('result', 'categorical', 3),
+    col('tournament', 'categorical', 145),
+    col('city', 'categorical', 2_092),
+    col('country', 'categorical', 275),
+    col('neutral', 'boolean', 2),
+  ],
+};
+
+const SCHEMAS: Record<string, DatasetSchema> = { matches: MATCHES, team_matches: TEAM_MATCHES };
+
 const questions = new Set(DEMO_REPERTOIRE.map((f) => f.question.trim().toLowerCase()));
 
 describe('the demo repertoire', () => {
@@ -51,9 +71,10 @@ describe('the demo repertoire', () => {
     (_question, fixture) => {
       const parsed = ModelReply.safeParse(fixture.input);
       expect(parsed.success, parsed.error?.message).toBe(true);
-      expect(fixture.dataset).toBe('matches');
+      const schema = SCHEMAS[fixture.dataset];
+      expect(schema, `no schema for ${fixture.dataset}`).toBeDefined();
       if (fixture.input.kind !== 'analysis') return;
-      expect(validateSpec(specFromReply(fixture.input), MATCHES)).toEqual([]);
+      expect(validateSpec(specFromReply(fixture.input), schema!)).toEqual([]);
     },
   );
 

@@ -287,6 +287,84 @@ export const DEMO_REPERTOIRE: Fixture[] = [
     },
     usage: usage(233),
   },
+  /** The three degenerate executions, as ordinary Questions. Their specifications are valid —
+      what is degenerate is the *result*, which is the only way to reach an empty chart, the
+      cardinality guard and the 98,899-point scatter without a hand-typed spec. They were the
+      three preset buttons on the deleted developer panel. */
+  {
+    dataset: 'matches',
+    question: 'How many matches has Atlantis hosted?',
+    narration: 'Filtering to Atlantis, which has never hosted one.',
+    input: {
+      kind: 'analysis',
+      intent: 'new',
+      title: 'Matches hosted by Atlantis',
+      narration: 'Filtering to Atlantis, which has never hosted one.',
+      operation: {
+        filters: [{ op: 'eq', column: 'country', value: 'Atlantis' }],
+        groupBy: ['city'],
+        timeBucket: null,
+        aggregations: [count()],
+        derived: [],
+        sort: { by: 'm', dir: 'desc' },
+        limit: null,
+      },
+      visualization: { type: 'bar', x: 'city', y: 'm', seriesBy: null },
+    },
+    usage: usage(244),
+  },
+  {
+    dataset: 'matches',
+    question: 'How many matches were played each day?',
+    narration: 'Counting matches for every single day on record.',
+    input: {
+      kind: 'analysis',
+      intent: 'new',
+      title: 'Matches per day',
+      narration: 'Counting matches for every single day on record.',
+      operation: {
+        filters: [],
+        groupBy: [],
+        timeBucket: { column: 'date', unit: 'day' },
+        aggregations: [count()],
+        derived: [],
+        sort: { by: 'date', dir: 'asc' },
+        limit: null,
+      },
+      visualization: { type: 'bar', x: 'date', y: 'm', seriesBy: null },
+    },
+    usage: usage(249),
+  },
+  {
+    /** 98,899 (date, team) pairs — one per row of the file bar the teams that played twice in a
+        day — and both axes are measures, which is what makes it a scatter rather than a bar
+        chart of pairs. Two small integers overplot onto a grid, because nothing in this Dataset
+        is continuous; what is being demonstrated is 98,899 points drawn, panned and hit-tested,
+        and the count is in the caption and the table. */
+    dataset: 'team_matches',
+    question: 'How do goals scored compare with goals conceded?',
+    narration: 'One point per team-match, both axes measures.',
+    input: {
+      kind: 'analysis',
+      intent: 'new',
+      title: 'Goals for against goals against',
+      narration: 'One point per team-match, both axes measures.',
+      operation: {
+        filters: [],
+        groupBy: ['date', 'team'],
+        timeBucket: null,
+        aggregations: [
+          { id: 'gf', fn: 'sum', column: 'goals_for', label: 'goals for' },
+          { id: 'ga', fn: 'sum', column: 'goals_against', label: 'goals against' },
+        ],
+        derived: [],
+        sort: null,
+        limit: null,
+      },
+      visualization: { type: 'scatter', x: 'gf', y: 'ga', seriesBy: null },
+    },
+    usage: usage(301),
+  },
   {
     dataset: 'matches',
     question: 'Who is the best team?',
