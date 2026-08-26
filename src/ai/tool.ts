@@ -11,7 +11,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { ModelReply } from '../spec/grammar';
 
-/** The string formats strict tool use accepts. Anything else is dropped rather than sent. */
+/** The string formats the tool schema keeps. Anything else is dropped rather than sent. */
 const FORMATS = new Set([
   'date-time',
   'time',
@@ -27,11 +27,11 @@ const FORMATS = new Set([
 
 type Schema = Record<string, unknown>;
 
-/** Rewrite a Zod-emitted JSON Schema into the subset strict tool use accepts.
+/** Rewrite a Zod-emitted JSON Schema into the subset the tool API accepts.
 
     Three things happen here. `oneOf` becomes `anyOf`, because Zod renders a discriminated union
     as the former and the API takes the latter. Every object gains `additionalProperties: false`,
-    which strict mode requires. And every keyword outside the supported set is dropped —
+    which closes each object. And every keyword outside the supported set is dropped —
     `maxLength`, `maxItems`, `minItems` and the numeric bounds among them. Those limits are not
     lost: Zod still enforces every one of them at `message_stop`, and the ones the model needs to
     know about are stated in the system prompt's rules, where a sentence reads better than a
@@ -84,11 +84,17 @@ const TOOLS_BY_KIND = {
 
 export type ReplyKind = keyof typeof TOOLS_BY_KIND;
 
+/** Not `strict: true`, though the schema is shaped for it. Strict tool use compiles a decoding
+    grammar server-side, and this grammar — a seven-field Operation holding a six-variant Filter
+    union, under a six-field reply — compiles to one the API rejects outright: "The compiled
+    grammar is too large". Nothing here shrinks it enough to fit without gutting the grammar
+    itself, so the schema is a strong hint rather than an enforced shape, and the two layers that
+    were always going to run anyway do the enforcing: `ModelReply.safeParse` at `message_stop`
+    and the semantic validator after it, both feeding the single Repair. */
 export const TOOLS: Anthropic.Tool[] = ModelReply.options.map((member) => {
   const kind = member.shape.kind.value as ReplyKind;
   return {
     ...TOOLS_BY_KIND[kind],
-    strict: true,
     input_schema: toStrictSchema(
       z.toJSONSchema(member, { io: 'input' }) as Schema,
     ) as Anthropic.Tool.InputSchema,

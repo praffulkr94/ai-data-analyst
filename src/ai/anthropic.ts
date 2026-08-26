@@ -1,4 +1,4 @@
-/** The Anthropic Translator: streamed strict tool use, straight from the browser.
+/** The Anthropic Translator: streamed tool use, straight from the browser.
 
     There is no backend, so the visitor's key goes directly to the API with
     `dangerouslyAllowBrowser` and the header that acknowledges it. That is a real trade and the
@@ -8,7 +8,8 @@
 
     `messages.stream()` rather than `messages.parse()`: parse is non-streaming, and the narration
     is the whole point of streaming here. The reply is hand-validated with the same Zod grammar at
-    `message_stop`. */
+    `message_stop` — which is the only thing validating it, since the tools cannot be `strict`
+    (see `tool.ts` on the compiled grammar). */
 import Anthropic from '@anthropic-ai/sdk';
 import { ModelReply } from '../spec/grammar';
 import { MODELS, normalize } from './models';

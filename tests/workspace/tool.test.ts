@@ -1,5 +1,5 @@
 /** The generated tool schemas. The point of generating them is that they cannot drift from the
-    Zod grammar, so what is asserted here is the correspondence and the strict-mode subset —
+    Zod grammar, so what is asserted here is the correspondence and the accepted subset —
     never a copy of the schema, which would only assert that the generator ran twice. */
 import { describe, expect, it } from 'vitest';
 import { KIND_BY_TOOL_NAME, TOOLS, toStrictSchema } from '../../src/ai/tool';
@@ -19,7 +19,7 @@ function* nodes(schema: Schema): Generator<Schema> {
   if (schema.items) yield* nodes(schema.items as Schema);
 }
 
-/** Keywords strict tool use does not accept. Zod emits most of these from the grammar's
+/** Keywords the generator drops. Zod emits most of these from the grammar's
     `.max()`, `.min()` and `.default()` calls, so the generator has to remove them. */
 const UNSUPPORTED = [
   '$schema',
@@ -39,13 +39,15 @@ const UNSUPPORTED = [
 ];
 
 describe('the tool schemas generated from the grammar', () => {
-  it('offers one tool per ModelReply kind, each strict', () => {
+  it('offers one tool per ModelReply kind, none of them strict', () => {
     expect(TOOLS.map((t) => t.name)).toEqual([
       'submit_analysis',
       'ask_clarification',
       'report_unsupported',
     ]);
-    for (const tool of TOOLS) expect(tool.strict).toBe(true);
+    // `strict: true` on this grammar is a 400 — the compiled decoding grammar is too large. The
+    // Zod parse at `message_stop` is what enforces the shape; see the note in tool.ts.
+    for (const tool of TOOLS) expect(tool.strict).toBeUndefined();
     expect(KIND_BY_TOOL_NAME.submit_analysis).toBe('analysis');
   });
 
@@ -74,7 +76,7 @@ describe('the tool schemas generated from the grammar', () => {
     ]);
   });
 
-  it('closes every object and uses no keyword outside the strict subset', () => {
+  it('closes every object and uses no keyword outside the accepted subset', () => {
     for (const tool of TOOLS) {
       for (const node of nodes(tool.input_schema as unknown as Schema)) {
         if (node.type === 'object') expect(node.additionalProperties).toBe(false);
