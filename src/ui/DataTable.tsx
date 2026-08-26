@@ -147,6 +147,40 @@ function Grid({
     return () => observer.disconnect();
   }, []);
 
+  /** Light-dismiss for the header type menus, which `<details>` has none of natively: it shuts
+      when you pick something, and when another header's menu opens, and on nothing else — not
+      Escape, not a click away, not a tab out.
+
+      `pointerdown` rather than `focusout`, because a macOS button does not take focus when it is
+      clicked: a focus-based dismiss would shut the menu on the way down and the item's own click
+      would never fire. One listener for the whole grid rather than one per header — `name` makes
+      the menus an exclusive group, so document-wide there is at most one open.
+
+      Selected on `[name]` rather than on the class: the exclusive group is what this behaviour is
+      about, and it is a browser mechanism with document scope, not a styling hook that a
+      stylesheet tidy-up is free to rename. */
+  useEffect(() => {
+    const open = () =>
+      document.querySelector<HTMLDetailsElement>('details[name="column-type"][open]');
+    const away = (e: PointerEvent) => {
+      const menu = open();
+      if (menu && !menu.contains(e.target as Node)) menu.removeAttribute('open');
+    };
+    // Not `preventDefault`: an Escape that shuts a menu must still reach whatever else wants it.
+    const escape = (e: KeyboardEvent) => {
+      const menu = e.key === 'Escape' ? open() : null;
+      if (!menu) return;
+      menu.removeAttribute('open');
+      menu.querySelector<HTMLElement>('summary')?.focus();
+    };
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      document.removeEventListener('keydown', escape);
+    };
+  }, []);
+
   const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
   const count = Math.ceil(viewportHeight / ROW_HEIGHT) + OVERSCAN * 2;
   const { revision, rowCount, columns, row } = useRowSlice(cache, first, first + count);
@@ -267,10 +301,15 @@ function Grid({
 
     `<details name>` is the whole menu: the shared name makes it an exclusive group, so opening
     one header's types shuts every other, and there is no focus trap because focus never left the
-    page. Escape and a click on the page background do not shut it — that is the ceiling of the
-    native element.
-    ponytail: no light-dismiss; reach for Radix Popover (or the Popover API once CSS anchor
-    positioning is Baseline) if it starts to grate. */
+    page. Light-dismiss is the one thing the native element does not give, and `Grid` adds it —
+    see the listener there for why it is a `pointerdown` and why it lives in one place.
+
+    Still a disclosure rather than a `role="menu"`: no arrow-key roving, no `aria-haspopup`. The
+    items are ordinary buttons, so a screen reader gets a summary and a list it can tab through,
+    which is honest about what this is.
+    ponytail: if it ever needs to behave like a real menu — arrow keys, typeahead, focus
+    returning to the trigger on every path — that is the point to take Radix's Dropdown Menu
+    rather than grow the keyboard handling here. */
 function TypeMenu({
   name,
   type,
