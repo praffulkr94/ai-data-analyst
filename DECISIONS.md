@@ -368,7 +368,8 @@ scope are in `docs/ui-primitives.md`.
 
 ## 16. Milestones
 
-Each leaves a working app and adds one ADR.
+Each leaves a working app and adds an ADR — M10 needed two, because the tool-schema finding
+had nothing to do with the restructure that surfaced it.
 
 1. **Shell + sample dataset + schema inference.** Done: loads `sales.csv` in a worker,
    shows inferred schema with type overrides. No chart yet.
@@ -391,6 +392,16 @@ Each leaves a working app and adds one ADR.
    pans and hovers smoothly.
 9. **A11y pass, `/bench`, Playwright suite, README + ADRs + recording, deploy.** Done:
    live URL, real numbers, the §24 questions answered in writing.
+10. **The UI restructure — a shell, a rail, a routed content pane, nine surfaces.** Not spec
+    scope: this is what the M9 audit passes turned up, which is why issue #1's ledger stops at
+    M9 and should not be back-filled. `docs/ux-restructure.md` is the audit, ADR-0026 the
+    decision. Done: the developer panel, schema panel and usage readout are deleted and their
+    three keyless-only states are ordinary demo Questions; `#/data` carries schema editing next
+    to the rows that show the problem; a load-time inference gate puts uncertain columns in
+    front of a person once; and no surface scrolls horizontally at 1280, 1024, 900 or 760.
+    ADR-0025 came out of the same stretch and is unrelated to the shell: strict tool use
+    compiles a grammar the API rejects outright, so `ModelReply.safeParse` is what enforces the
+    reply shape. §15 carries the primitives decision the restructure forced into the open.
 
 ## 17. Datasets
 
