@@ -20,7 +20,7 @@ they win. Precedence is `DECISIONS.md` → `docs/adr/*` → `CONTEXT.md` → iss
   "store". RowSlice — never "window". ModelReply — never `SpecResponse`. Translator — never
   `SpecGenerator`. A concept you need that is missing from the glossary is a signal, not a
   licence to invent one.
-- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are twenty-four.
+- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are twenty-six.
 - Issue #1 — the whole spec, and the only place the work is decomposed.
 
 ## The constraint that has to travel with you
@@ -235,10 +235,49 @@ else is wiring around them.
   4.5:1, so a third, fainter grey has nowhere legible to live. `npm run audit:contrast` fails if a
   fourth series slot drops below 3:1, or if anything else regresses.
 
+## Where M10 stands
+
+The UI restructure. Four commits on top of M9, `npm test` green at 439 across 30 files,
+`npm run test:e2e` on both flows, `npm run audit:contrast` unchanged.
+
+**M10 has no ledger items in issue #1.** The whole restructure was done outside the progress
+ledger, so the state of record — which this document says wins over it — does not know M10
+happened. Whoever picks this up should add the items and tick them, or decide the ledger closed
+at M9 and say so there. Do not read the unticked M9 list as the whole of what is outstanding.
+
+What landed:
+
+- **The shell and nine surfaces** — `docs/ux-restructure.md` is the audit that produced it,
+  ADR-0026 the decision. `main.tsx` hoists the worker, loader, cache and Workspace to module
+  scope so `#/bench` and back does not re-parse. `DevPanel`, `SchemaPanel` and `UsageReadout` are
+  deleted. New: `route.ts`, `spec/format.ts`, `EmptyState`, `InFlight`, `InferenceGate`.
+- **The tools are no longer `strict`** — the grammar compiles to one the API rejects outright.
+  ADR-0025. `ModelReply.safeParse` at `message_stop` is now the only thing enforcing shape.
+- **Three degenerate Fixtures** landed before the preset buttons came down, so the keyless demo
+  still reaches an empty result, the cardinality guard and the 98,899-point scatter.
+- **The type menu got light-dismiss** — Escape and click-away, 17 lines in `Grid`,
+  `typeMenu.test.tsx`. `pointerdown` not `focusout`, and the test that proves why is the one
+  firing `pointerdown` on a menu item: a focus-based dismiss would shut the menu before its own
+  click fired, on every browser where a button does not take focus when clicked.
+- **`docs/ui-primitives.md`** — the assessment behind DECISIONS §15's *Radix first for new work*.
+
+Verified by hand in a browser, over stubbed SSE, and **not covered by any automated test** — if
+you change these paths, re-drive them:
+
+- The `not-temporal` fix chip: two attempts spent → notice → *treat `x` as a date and retry* →
+  retype → re-ask → Analysis lands. Reachable by bucketing a categorical column by time.
+- The key dialog's `rejected` branch, on a 401 from the one-token verify.
+- The rail's `updated` dot: dispatch a refine against one Analysis, navigate to another while it
+  is in flight. Marker on the expanded row, dot on the collapsed 44px strip, cleared on read.
+
+The unit tests that do guard the halves of the first one are `validate.test.ts` (the violation
+carries `column`) and `failures.test.ts` (the failed notice carries `question`).
+
 ## Where M9 stands
 
-Twelve of the fifteen ledger items are ticked, and `npm test` is green at 419, `npm run
-test:browser` at 5, `npm run test:e2e` on both flows. **The three that are left all need
+Twelve of the fifteen ledger items are ticked, and at the close of M9 `npm test` was green at
+419, `npm run test:browser` at 5, `npm run test:e2e` on both flows. (Current counts are in the
+M10 section above; the numbers here are left as they were when the milestone closed.) **The three that are left all need
 something this repository does not have**, and they are unticked rather than faked:
 
 - A live API key — the model comparison over the same 20 Questions, and with it the two entries
@@ -309,13 +348,21 @@ played each day?"*, and *"How do goals scored compare with goals conceded?"* aga
 `team_matches`. Their specifications are valid; what is degenerate is the execution. They join the
 re-recording debt above: the scatter one in particular claims a `usage` figure nobody measured.
 
-**The primitives are hand-rolled, and one of them has a ceiling.** The M10 design needs roughly
-six overlay primitives; all six are `<details>`, `<dialog>` and CSS. The one with a real limit is
-the column type menu on `#/data`: `<details name="column-type">` makes the group exclusive and it
-closes when you pick, but a click on the page background leaves it open. There is a `ponytail:`
-comment on it at `DataTable.tsx`. Radix Primitives is the answer if a second primitive develops
-the same problem; the Popover API is the other, and it needs CSS anchor positioning, which is not
-Baseline yet. One menu that stays open is not worth a dependency.
+**The primitives are hand-rolled, and that was never a recorded decision.** `docs/ui-primitives.md`
+is the assessment: which drawn components are hand-rolled, what each is missing against the
+design, and what a retrofit costs in measured bytes and tab stops. The short version is that four
+surfaces build the same segmented toggle independently, the `#/data` type control is drawn as a
+dropdown and built as a disclosure, and `<dialog>`/`<details>`/`<select>` should stay native
+whatever else happens.
+
+**The standing decision is in DECISIONS §15: new overlay work reaches for Radix first, installed
+on first use.** It is not in `package.json` today — check before you import it. Existing controls
+are not retrofitted; §5.3 of the assessment costs that out if it is ever wanted.
+
+The type menu's light-dismiss ceiling is closed: Escape and click-away are handled in `Grid`
+(`typeMenu.test.tsx`). What is still missing there is arrow-key navigation and `role="menu"`, and
+there is a `ponytail:` comment at `DataTable.tsx` naming Radix's Dropdown Menu as the point to
+stop growing the keyboard handling by hand.
 
 **The 1280 laptop breakpoint is one media query, not a reviewed layout.** The design's own note —
 the dataset chip drops its row count at ≤1280 — is implemented. Nothing else at that width has

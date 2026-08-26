@@ -350,6 +350,22 @@ alone.
 **Cut:** arrow-key traversal for line/area/scatter; `aria-live` on tooltip hover
 (announcement spam); a bare `tabindex="0"` on the SVG passed off as keyboard support.
 
+**Known gap — the segmented groups have no roving focus.** Four surfaces build the same
+single-select toggle by hand (chart type, mode, model, per-column type) as `aria-pressed`
+buttons in a labelled `role="group"`. Valid ARIA, and the selection is discoverable, but every
+option is its own tab stop: the loud inference gate is 18 tab stops where roving focus would
+make it 11. Not fixed by hand, because the fix and the `ToggleGroup` swap below are the same
+job — `docs/ui-primitives.md` §5.2.
+
+**UI primitives — Radix first for new work, native where the platform won.** The library
+question was discussed early and never recorded, so it got answered ten times by accumulation,
+each component individually too small to justify a dependency. The standing decision: any *new*
+overlay, menu or toggle surface reaches for Radix first, installed on first use — it is not in
+`package.json` today. Existing controls are not retrofitted. `<dialog>`, `<details>` and
+`<select>` stay native regardless: the platform caught up after Radix was designed and the
+equivalents are more bytes for less. Measurements, the surface-by-surface gaps and the retrofit
+scope are in `docs/ui-primitives.md`.
+
 ## 16. Milestones
 
 Each leaves a working app and adds one ADR.
