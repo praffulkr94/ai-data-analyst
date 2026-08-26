@@ -17,8 +17,13 @@ plan derives from. Every decision here is settled unless marked OPEN.
 - Browser-direct Anthropic calls work: TS SDK `dangerouslyAllowBrowser: true`, CORS via
   the `anthropic-dangerous-direct-browser-access: true` request header.
 - `messages.parse()` is non-streaming, so it is incompatible with the streaming
-  decision below. Use `client.messages.stream()` + a `strict: true` tool and validate
-  with the same Zod schema by hand at `message_stop`.
+  decision below. Use `client.messages.stream()` and validate with the same Zod schema
+  by hand at `message_stop`.
+- **Corrected in M9 (2026-08-25):** the `strict: true` half of that fact does not hold for
+  *this* grammar. Every request 400s with "The compiled grammar is too large" — a strict tool
+  compiles a decoding grammar server-side, and a seven-field Operation carrying a six-variant
+  Filter union under a six-field reply exceeds what the API will compile. The tools ship
+  without `strict`. See ADR-0025.
 
 ---
 
@@ -29,8 +34,11 @@ number, a finding, or a claim about the data.** New explicit non-goal: *"This is
 chatbot."* Chart captions are computed deterministically by the app from the
 aggregation result — never written by the model.
 
-Because `strict: true` enforces schema conformance server-side, "we Zod-validate
-untrusted LLM output" is NOT the headline. The **semantic** validation layer is.
+"We Zod-validate untrusted LLM output" is NOT the headline — the **semantic** validation
+layer is, because it is the one that knows about *this* Dataset. (The original wording here
+credited `strict: true` with enforcing structure server-side. It cannot be used at this schema
+size — ADR-0025 — so the Zod parse is load-bearing rather than a backstop. The ranking of the
+two layers is unchanged.)
 
 ## 2. The no-key visitor — Demo Mode (highest-ROI addition)
 
@@ -188,8 +196,9 @@ Three headline numbers:
 
 ## 8. AI layer
 
-**Mechanism:** streamed strict tool use. Zod is the single source of truth; the tool's
-`input_schema` is generated from it at module init so drift is impossible.
+**Mechanism:** streamed tool use — not `strict`, which this grammar is too large to compile
+(ADR-0025). Zod is the single source of truth; the tool's `input_schema` is generated from it at
+module init so drift is impossible.
 
 **Two validation layers, deliberately separated:**
 
@@ -352,14 +361,16 @@ Each leaves a working app and adds one ADR.
 3. **Spec → worker → bar chart, hardcoded spec, no AI.** Done: a hand-typed spec in a dev
    panel renders a correct bar chart. *This milestone proves the pipeline is app-owned.*
 4. **Line + area + time bucketing.** Done: monthly revenue renders from a `timeBucket` spec.
-5. **AI layer.** Streamed strict tool use, Zod + semantic validation, one repair retry,
+5. **AI layer.** Streamed tool use, Zod + semantic validation, one repair retry,
    cancellation/staleness. Done: BYOK entry, real question → chart, and the
    3-questions-in-4-seconds test renders exactly one chart.
 6. **Analysis cards, revisions, refine-vs-new, manual controls, undo.** Done: "change this
    to a line chart" mutates revision 2 of the same card.
 7. **Demo mode + fixtures + full error taxonomy + degenerate-result states.** Done: a
-   visitor with no key completes the 90-second flow; every error state reachable from a
-   dev panel.
+   visitor with no key completes the 90-second flow. The error taxonomy is proven in
+   `tests/workspace/failures.test.ts` — M10 deleted the panel of buttons that armed each one,
+   because a state belongs in the product only if a person can arrive at it by doing something,
+   and a 529 from Anthropic is not something a person does.
 8. **Scatter + canvas above 5k points + quadtree hit-testing.** Done: 100k-point scatter
    pans and hovers smoothly.
 9. **A11y pass, `/bench`, Playwright suite, README + ADRs + recording, deploy.** Done:
@@ -510,7 +521,8 @@ A model picker in the composer, ChatGPT/Claude-style. Two options only:
 | Fast | `claude-haiku-4-5` | $1.00 | $5.00 |
 
 Verified: **both support structured outputs / strict tool use**, so the validation
-architecture is identical across models. Selection is persisted per session and recorded on
+architecture is identical across models. (Moot in the end — the grammar is too large for
+strict on either model. ADR-0025.) Selection is persisted per session and recorded on
 each analysis revision, so a card shows which model produced it.
 
 **Implementation note that must not be missed —** the two models do not take the same

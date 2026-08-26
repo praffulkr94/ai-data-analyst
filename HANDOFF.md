@@ -47,7 +47,7 @@ npm run typecheck    # tsc -b, run this often
 npm run build
 npm run audit:contrast            # every contrast pair, both themes; exits non-zero on a regression
 node scripts/build-datasets.mjs   # rebuilds public/data/*.csv.gz from data/raw/
-node scripts/bench-run.mjs --machine "…"   # drives #bench, writes docs/bench/. Needs the app up.
+node scripts/bench-run.mjs --machine "…"   # drives #/bench, writes docs/bench/. Needs the app up.
 npm run test:e2e                  # the two Playwright flows over canned SSE. Needs the app up.
 ```
 
@@ -92,7 +92,7 @@ else is wiring around them.
   measure against a mark that is not there, and the two observers. No DOM, so `worker/kernel.ts`
   imports it too — a worker has its own performance timeline, and the phases inside a round trip
   are measured there and posted back as `Timings` on `parse:done` and `analyze:done`.
-- `src/bench/` — the `#bench` route, lazily imported by `main.tsx` and nothing else, so it is a
+- `src/bench/` — the `#/bench` route, lazily imported by `main.tsx` and nothing else, so it is a
   chunk nobody who does not ask for it downloads. `paths.ts` holds the three paths and the two
   questions; `stats.ts` is the median, which every published number passes through and which is
   therefore tested. Driven by `scripts/bench-run.mjs`, output committed to `docs/bench/`.
@@ -245,7 +245,7 @@ something this repository does not have**, and they are unticked rather than fak
   in the next section that are ahead of their tests.
 - A person — the 90-second recording that belongs at the top of the README. The README says it
   is outstanding; delete that paragraph when it is not.
-- Credentials — the deploy. `#bench` is deliberately not dev-gated so it works on the deployed
+- Credentials — the deploy. `#/bench` is deliberately not dev-gated so it works on the deployed
   URL (ADR-0024); check that it does.
 
 What landed in this last stretch, and the parts of it worth knowing before touching anything:
@@ -301,14 +301,25 @@ back. The narration is the text before the tool call, the input is the tool call
 usage is the four numbers from the readout. `fixtures.test.ts` will fail loudly if a re-recorded
 reply drifts outside the grammar or names a column that does not exist. Then tick the item.
 
-**No Fixture asks a scatter Question, so Demo mode cannot show one.** The whole of M8 is
-reachable without a key only from the dev panel's `98,899-point scatter (team_matches)` preset. A
-fourteenth hand-authored Fixture was deliberately *not* added: the thirteen that exist are already
-owed a re-recording, and adding to that debt to fill a gap a key closes properly is the wrong
-trade. Whoever re-records them should add one against the `matches` Dataset — "Do teams that
-score at home also concede at home?", `groupBy ["home_team"]`, `avg home_score` against
-`avg away_score`, `type: "scatter"` — which is ~320 points and so exercises the SVG path, and note
-that the canvas path needs a Dataset with a fine enough grouping to pass 5,000.
+**Three of the Fixtures are degenerate on purpose, and they are hand-authored like the rest.**
+M10 deleted the developer panel, whose three preset buttons were the only way to reach an empty
+result, the cardinality guard and the 98,899-point scatter without a key. Those three are now
+ordinary repertoire Questions — *"How many matches has Atlantis hosted?"*, *"How many matches were
+played each day?"*, and *"How do goals scored compare with goals conceded?"* against
+`team_matches`. Their specifications are valid; what is degenerate is the execution. They join the
+re-recording debt above: the scatter one in particular claims a `usage` figure nobody measured.
+
+**The primitives are hand-rolled, and one of them has a ceiling.** The M10 design needs roughly
+six overlay primitives; all six are `<details>`, `<dialog>` and CSS. The one with a real limit is
+the column type menu on `#/data`: `<details name="column-type">` makes the group exclusive and it
+closes when you pick, but a click on the page background leaves it open. There is a `ponytail:`
+comment on it at `DataTable.tsx`. Radix Primitives is the answer if a second primitive develops
+the same problem; the Popover API is the other, and it needs CSS anchor positioning, which is not
+Baseline yet. One menu that stays open is not worth a dependency.
+
+**The 1280 laptop breakpoint is one media query, not a reviewed layout.** The design's own note —
+the dataset chip drops its row count at ≤1280 — is implemented. Nothing else at that width has
+been looked at. The four widths that *were* measured for horizontal overflow are in ADR-0026.
 
 If you leave a grammar field half-wired or an implementation ahead of its tests, add it here and
 leave its ledger item unticked.

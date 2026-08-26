@@ -34,7 +34,7 @@ tab, and is never written to `localStorage` and never put in the link.
 
 ## What the model does, and what it never does
 
-One Question plus the DatasetSchema goes out; a ModelReply comes back as **streamed strict tool
+One Question plus the DatasetSchema goes out; a ModelReply comes back as **streamed tool
 use**, and it is exactly one of three kinds: an AnalysisSpec, a Clarification with 2–4 options, or
 an Unsupported notice with nearby Questions that are inside the grammar.
 
@@ -47,9 +47,11 @@ A reply then passes two deliberately separate layers:
   survivable, do the Visualization's fields exist in the **output** of the Operation rather than
   merely in the source columns.
 
-Because `strict: true` already enforces the schema server-side, "we Zod-validate untrusted LLM
-output" is not the interesting part. The semantic layer is: it is the one that knows about *this*
-Dataset. A reply that fails it gets exactly one **Repair** — the SpecViolations are sent back for
+The tools are deliberately **not** `strict`: a strict tool makes the API compile a decoding
+grammar, and this one — a seven-field Operation carrying a six-variant Filter union — is too
+large for it to compile at all, so every request 400s. The Zod parse at `message_stop` is what
+enforces the shape (ADR-0025). Even so, "we Zod-validate untrusted LLM output" is not the
+interesting part. The semantic layer is: it is the one that knows about *this* Dataset. A reply that fails it gets exactly one **Repair** — the SpecViolations are sent back for
 the model to correct — and then a recoverable error on the card. Transport failures (429, 529, a
 dropped connection) are a different bounded loop with a visible countdown, and a wait never
 consumes the Repair.
@@ -59,7 +61,8 @@ shown before any data moves. It is the only model-written text in the interface.
 is a ChartSummary, computed by the application from the AnalysisResult.
 
 What is sent: the column names, their inferred types, and a few example values per column. What is
-not sent: the rows. Open **What the model sees** in the app and check.
+not sent: the rows. `src/ai/prompt.ts` builds that request and `tests/workspace/prompt.test.ts`
+asserts no row of the Dataset reaches it.
 
 ## Performance, honestly
 
@@ -70,7 +73,7 @@ more serialization than the compute it escapes. The worker exists to **own the D
 CSV parsing, type inference and coercion, column encoding, RowIndex construction and locale-aware
 string sorting off the main thread. Aggregation runs there because that is where the data lives.
 
-The `#bench` route runs three paths — naive row-objects on the main thread, columnar on the main
+The `#/bench` route runs three paths — naive row-objects on the main thread, columnar on the main
 thread, columnar in the worker — nine times each, reporting medians with min/max. Raw JSON is
 committed in [`docs/bench/`](docs/bench/), each file naming its own machine, browser and headless
 flag. On a MacBook Pro (Apple M3 Max, 36 GB, macOS 26.5.1) in HeadlessChrome 151:
@@ -120,7 +123,7 @@ Dataset draws is two small-integer measures overplotting onto a grid, because no
 continuous.
 
 **Interaction.** Long-task and Event Timing observers are installed before anything else in
-`main.tsx`, so they cover a whole session, and the dev panel reads them back. INP can only come from
+`main.tsx`, so they cover a whole session, and `#/bench` reports them. INP can only come from
 a real interaction, so the scripted Playwright flow is where a figure comes from at all: one such
 session reported 0 long tasks, 0 ms blocked, and a slowest interaction of 32 ms.
 
@@ -222,7 +225,7 @@ Two modules carry the testable behaviour; everything else is wiring around them
 - `src/chart/` — dimensions, scales, and dumb marks, on `d3-scale`/`d3-shape`/`d3-quadtree` with
   hand-rendered axes.
 - `src/table/` — the SliceCache: the worker returns a RowIndex and RowSlices, never the row set.
-- `src/bench/` — the `#bench` route, lazily imported so nobody who does not ask for it downloads it.
+- `src/bench/` — the `#/bench` route, lazily imported so nobody who does not ask for it downloads it.
 
 `DECISIONS.md` is the architecture and every decision behind it, `CONTEXT.md` is the vocabulary
 (Analysis, Revision, Request, ColumnStore, RowSlice — used consistently in code, tests and commits),

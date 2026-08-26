@@ -1,4 +1,9 @@
-# The evidence is a page a stranger can re-run, and it reports the worker losing
+# The evidence is a page a stranger can re-run
+
+> **Amended by ADR-0026 (M10).** The route is `#/bench`; the bare `#bench` of this ADR still
+> resolves to it. And the dev panel this ADR names as the source of an INP figure is gone — the
+> observers are unchanged and `scripts/e2e-run.mjs` reads them directly off the page, because
+> evidence for a reviewer is not a product surface., and it reports the worker losing
 
 M9 had to turn the performance story into numbers. DECISIONS §7 fixes the framing —
 *aggregation is the cheapest step and is not the justification for the worker* — and §13 asks

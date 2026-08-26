@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet"><style>
+body{margin:0;background:#f0eee9;font-family:Inter,system-ui,sans-serif}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 Inter,sans-serif;color:#1a1a1a}
+.dv-intro{max-width:760px;margin:0 0 26px;font:400 12px/1.65 Inter,sans-serif;color:rgba(0,0,0,.6)}
+.dv-intro b{color:#1a1a1a;font-weight:600}
+.dv-opts{display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 Inter,sans-serif;color:rgba(0,0,0,.55)}
+.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
+.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+.dv-next{margin:26px 0 0;font:12px/1.6 Inter,sans-serif;color:rgba(0,0,0,.5)}
+.dv-meta{max-width:540px;font:400 11.5px/1.6 Inter,sans-serif;color:rgba(0,0,0,.55)}
+.dv-meta b{color:#1a1a1a;font-weight:600}
+.jump{display:flex;flex-wrap:wrap;gap:5px;max-width:1440px;margin:0 0 2px}
+.jump button{font:500 10px ui-monospace,Menlo,monospace;letter-spacing:.02em;padding:4px 7px;border-radius:4px;border:1px solid rgba(0,0,0,.14);background:rgba(255,255,255,.7);color:rgba(0,0,0,.62);cursor:pointer}
+.jump button:hover{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.art{--accent:#5e6ad2;--accent-hover:#4f5bd5;--accent-on:#ffffff;--surface:#ffffff;--raised:#fbfbfc;--sunken:#f6f7f8;--overlay:#ffffff;--border:#e6e7eb;--border-strong:#d0d2d9;--text:#17181c;--muted:#6b6f76;--c1:#2a78d6;--c2:#eb6834;--c3:#1baf7a;--c4:#eda100;--c5:#e87ba4;--c6:#008300;--good:#0a7f0a;--warning:#fab219;--serious:#ec835a;--critical:#d03b3b;--error:#e34948;--seq:#cde2fb;font-family:Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+.art.dk{--accent-hover:#828fff;--accent-on:#ffffff;--surface:#08090a;--raised:#101113;--sunken:#0c0d0f;--overlay:#16171a;--border:#23252a;--border-strong:#33363d;--text:#f2f3f5;--muted:#9ba0a8;--c1:#3987e5;--c2:#d95926;--c3:#199e70;--c4:#c98500;--c5:#d55181;--c6:#008300;--seq:#0d366b}
+.art,.art *{box-sizing:border-box}
+.art button{font-family:inherit;font-variant-numeric:tabular-nums}
+.row30:hover{background:var(--sunken)}
+@keyframes car{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadein{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.art *{transition-duration:0ms!important;animation:none!important}}
+</style></helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Workbench shell — the chosen architecture, interactive</span></div>
+<p class="dv-intro">Assumptions I made: the fixed visual system in the brief is law (Inter, the two greys, 30px rows, hairlines, radii 4/6/8), copy and content are reconciled against the codebase — the 13 Questions are the real demo repertoire from <b>ai/fixtures.ts</b>, and narrations, sample notes, placeholders, the validator message and the palette are taken verbatim from source — and the four brief failures are treated as acceptance criteria — <b>the ask never spans the viewport, the rail starts collapsed, non-analysis material gets its own route, and nothing scrolls horizontally.</b> Two alternate shells — a full-bleed canvas with a ⌘K palette, and a persistent specification pane beside the result — were explored and set aside in favour of this one. Artboard width 1440; laptop notes under the artboard. Every state is reachable from the jump strip above it.</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a><span><b style="color:#1a1a1a;font-weight:600">Workbench</b> — axis: <i>asking is the analysis's own header.</i> Built, interactive.</span></div>
+<div class="jump">
+<button onClick="{{ jNoData }}">1 · first run</button>
+<button onClick="{{ jParsing }}">2 · parsing</button>
+<button onClick="{{ jQuiet }}">3 · infer quiet</button>
+<button onClick="{{ jLoud }}">3 · infer loud</button>
+<button onClick="{{ jEmpty }}">4 · home empty</button>
+<button onClick="{{ jThinking }}">5 · thinking</button>
+<button onClick="{{ jCorrecting }}">5 · correcting</button>
+<button onClick="{{ jWaiting }}">5 · rate limited</button>
+<button onClick="{{ jComputing }}">5 · computing</button>
+<button onClick="{{ jChart }}">6 · analysis</button>
+<button onClick="{{ jOpen }}">6 · disclosures open</button>
+<button onClick="{{ jData }}">7 · data surface</button>
+<button onClick="{{ jModal }}">8 · key modal</button>
+<button onClick="{{ jRejected }}">8 · key rejected</button>
+<button onClick="{{ jClarify }}">9 · clarification</button>
+<button onClick="{{ jUnsupported }}">9 · unsupported</button>
+<button onClick="{{ jFailed }}">9 · failed</button>
+<button onClick="{{ jTruncated }}">10 · truncation</button>
+</div>
+<div class="dv-card" style="width:1440px;padding:0;border-radius:8px">
+<div class="art {{ themeClass }}" style="width:1440px;height:900px;display:flex;flex-direction:column;background:var(--surface);color:var(--text);font-size:13px;position:relative;overflow:hidden">
+
+  <div style="height:48px;flex:none;display:flex;align-items:center;gap:10px;padding:0 10px 0 8px;border-bottom:1px solid var(--border);background:var(--raised)">
+    <button onClick="{{ toggleRail }}" title="Analyses" style="width:26px;height:26px;flex:none;display:flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:4px;background:none;color:var(--muted);cursor:pointer;transition:background 120ms cubic-bezier(.4,0,.2,1)" style-hover="background:var(--sunken);color:var(--text)">
+      <div style="width:12px;display:flex;flex-direction:column;gap:2.5px"><div style="height:1.5px;background:currentColor"></div><div style="height:1.5px;background:currentColor"></div><div style="height:1.5px;background:currentColor"></div></div>
+    </button>
+    <span style="font-weight:600;font-size:13px;letter-spacing:-.01em">Analyst</span>
+    <span style="width:1px;height:16px;background:var(--border);margin:0 2px"></span>
+    <button onClick="{{ jNoData }}" style="height:24px;display:flex;align-items:center;gap:7px;padding:0 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:12px;cursor:pointer" style-hover="border-color:var(--border-strong)">
+      <span style="width:5px;height:5px;border-radius:50%;background:var(--c3)"></span>International football matches<span style="color:var(--muted)">49,520 rows</span>
+    </button>
+    <div style="flex:1"></div>
+    <button onClick="{{ goData }}" style="height:24px;padding:0 8px;border:1px solid transparent;border-radius:4px;background:{{ dataBg }};color:var(--text);font-size:12px;cursor:pointer" style-hover="background:var(--sunken)">Data</button>
+    <div style="display:flex;height:24px;padding:2px;gap:2px;border:1px solid var(--border);border-radius:5px;background:var(--sunken)">
+      <button onClick="{{ setDemo }}" style="padding:0 8px;border:none;border-radius:3px;font-size:12px;cursor:pointer;background:{{ demoBg }};color:{{ demoFg }};box-shadow:{{ demoSh }}">Demo</button>
+      <button onClick="{{ setKey }}" style="padding:0 8px;border:none;border-radius:3px;font-size:12px;cursor:pointer;background:{{ keyBg }};color:{{ keyFg }};box-shadow:{{ keySh }}">Your API key</button>
+    </div>
+    <button onClick="{{ toggleTheme }}" title="Theme" style="width:26px;height:26px;flex:none;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--muted);cursor:pointer" style-hover="border-color:var(--border-strong);color:var(--text)">
+      <span style="width:11px;height:11px;border-radius:50%;border:1.5px solid currentColor;background:linear-gradient(90deg,currentColor 50%,transparent 50%)"></span>
+    </button>
+  </div>
+
+  <div style="flex:1;min-height:0;display:flex">
+
+    <sc-if value="{{ railOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="width:240px;flex:none;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--raised)">
+        <div style="height:30px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 12px;border-bottom:1px solid var(--border)">
+          <span style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">Analyses</span>
+          <button onClick="{{ toggleRail }}" style="width:20px;height:20px;border:none;border-radius:4px;background:none;color:var(--muted);font-size:13px;cursor:pointer" style-hover="background:var(--sunken);color:var(--text)">‹</button>
+        </div>
+        <div style="flex:1;min-height:0;overflow-y:auto;padding:4px">
+          <sc-for list="{{ analyses }}" as="a" hint-placeholder-count="3">
+            <div class="row30" onClick="{{ a.open }}" style="height:30px;display:flex;align-items:center;gap:6px;padding:0 8px;border-radius:4px;cursor:pointer;background:{{ a.bg }}">
+              <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">{{ a.title }}</span>
+              <sc-if value="{{ a.updated }}" hint-placeholder-val="{{ false }}">
+                <span style="flex:none;font-size:11px;color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 4px;line-height:15px">updated</span>
+              </sc-if>
+              <span style="flex:none;font-size:11px;color:var(--muted)">{{ a.rev }}</span>
+            </div>
+          </sc-for>
+          <sc-if value="{{ showSaveNote }}" hint-placeholder-val="{{ false }}">
+            <div style="margin:8px 4px 4px;padding:8px 9px;border:1px solid var(--border);border-left:2px solid var(--warning);border-radius:4px;background:var(--sunken);display:flex;gap:6px;align-items:flex-start">
+              <span style="flex:1;font-size:11px;line-height:1.5;color:var(--muted)">Analyses aren't saved — copy the link to keep the one you're looking at.</span>
+              <button onClick="{{ dismissNote }}" style="flex:none;width:16px;height:16px;border:none;background:none;color:var(--muted);font-size:12px;line-height:1;cursor:pointer;padding:0">×</button>
+            </div>
+          </sc-if>
+        </div>
+        <div style="flex:none;border-top:1px solid var(--border);padding:8px 12px">
+          <button onClick="{{ jEmpty }}" style="width:100%;height:26px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:12px;cursor:pointer" style-hover="border-color:var(--border-strong)"><span style="color:var(--muted)">+</span>New analysis</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ railShut }}" hint-placeholder-val="{{ true }}">
+      <div style="width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;border-right:1px solid var(--border);background:var(--raised)">
+        <button onClick="{{ toggleRail }}" title="Analyses (3)" style="width:28px;height:28px;position:relative;display:flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:4px;background:none;color:var(--muted);cursor:pointer" style-hover="background:var(--sunken);color:var(--text)">
+          <div style="width:13px;height:12px;display:flex;align-items:flex-end;gap:2px"><div style="flex:1;height:5px;border-radius:1px 1px 0 0;background:currentColor"></div><div style="flex:1;height:12px;border-radius:1px 1px 0 0;background:currentColor"></div><div style="flex:1;height:8px;border-radius:1px 1px 0 0;background:currentColor"></div></div>
+          <sc-if value="{{ anyUpdated }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:4px;right:4px;width:5px;height:5px;border-radius:50%;background:var(--accent)"></span></sc-if>
+        </button>
+        <button onClick="{{ jEmpty }}" title="New analysis" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:4px;background:none;color:var(--muted);font-size:15px;cursor:pointer" style-hover="background:var(--sunken);color:var(--text)">+</button>
+      </div>
+    </sc-if>
+
+    <div style="flex:1;min-width:0;overflow-y:auto;overflow-x:hidden;background:var(--surface)">
+
+      <sc-if value="{{ isNoData }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:720px;margin:0 auto;padding:64px 24px 40px">
+          <h1 style="margin:0 0 8px;font-size:15px;font-weight:600;letter-spacing:-.01em">Ask a question about a table</h1>
+          <p style="margin:0 0 22px;font-size:13px;line-height:1.65;color:var(--muted);text-wrap:pretty;max-width:600px">You type a question in plain English. A language model translates it into a query specification; this application computes the answer and draws the chart. The model never sees a row of your data — <span style="color:var(--text)">the rows never leave the browser</span>.</p>
+          <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
+            <div style="height:30px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--border);background:var(--sunken);font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">Start with a sample</div>
+            <sc-for list="{{ samples }}" as="s" hint-placeholder-count="4">
+              <div class="row30" onClick="{{ s.pick }}" style="display:flex;align-items:center;gap:12px;padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 120ms cubic-bezier(.4,0,.2,1)">
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:13px;font-weight:500">{{ s.name }}</span><span style="font-size:12px;color:var(--muted)">{{ s.rows }}</span></div>
+                  <div style="font-size:12px;color:var(--muted);margin-top:2px">{{ s.note }}</div>
+                </div>
+                <span style="flex:none;font-size:12px;color:var(--muted)">›</span>
+              </div>
+            </sc-for>
+            <div style="padding:14px 12px;display:flex;align-items:center;gap:10px;background:var(--raised)">
+              <div style="flex:1;height:52px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--border-strong);border-radius:6px;font-size:12px;color:var(--muted)">Drop a CSV anywhere on this panel</div>
+              <button style="height:30px;padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:12px;cursor:pointer" style-hover="border-color:var(--border-strong)">Pick a file…</button>
+            </div>
+          </div>
+          <p style="margin:12px 0 0;font-size:11px;color:var(--muted)">Warns at 20 MB · hard cap 50 MB · rows capped at 500,000 with a truncation banner. Malformed rows never fail the file.</p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isParsing }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:640px;margin:0 auto;padding:64px 24px">
+          <div style="border:1px solid var(--border);border-radius:8px;padding:18px 18px 16px;background:var(--surface)">
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px">
+              <span style="width:11px;height:11px;border-radius:50%;border:1.5px solid var(--border-strong);border-top-color:var(--accent);animation:spin 700ms linear infinite"></span>
+              <span style="font-size:13px;font-weight:500">Loading International football matches</span>
+              <div style="flex:1"></div>
+              <button onClick="{{ jNoData }}" style="height:26px;padding:0 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:12px;cursor:pointer" style-hover="border-color:var(--border-strong)">Cancel</button>
+            </div>
+            <div style="height:4px;border-radius:2px;background:var(--sunken);overflow:hidden"><div style="height:4px;background:var(--accent);width:{{ parsePct }}%;transition:width 160ms cubic-bezier(.4,0,.2,1)"></div></div>
+            <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--muted)"><span>{{ parsedRows }} rows parsed</span><span>the interface stays responsive — this is not a blocking spinner</span></div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isInfer }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:760px;margin:0 auto;padding:56px 24px">
+          <sc-if value="{{ inferQuiet }}" hint-placeholder-val="{{ true }}">
+            <div style="border:1px solid var(--border);border-left:2px solid var(--good);border-radius:6px;padding:12px 14px;display:flex;align-items:center;gap:10px;background:var(--surface)">
+              <span style="font-size:13px">All 9 columns typed.</span>
+              <span style="font-size:12px;color:var(--muted);flex:1">1 date · 2 numbers · 5 categorical · 1 boolean</span>
+              <button onClick="{{ jEmpty }}" style="height:26px;padding:0 12px;border:1px solid transparent;border-radius:4px;background:var(--accent);color:var(--accent-on);font-size:12px;font-weight:500;cursor:pointer" style-hover="background:var(--accent-hover)">Continue</button>
+            </div>
+            <button onClick="{{ jLoud }}" style="margin-top:10px;height:24px;padding:0 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--muted);font-size:11px;cursor:pointer" style-hover="border-color:var(--border-strong);color:var(--text)">show the loud variant (2 uncertain)</button>
+          </sc-if>
+          <sc-if value="{{ inferLoud }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid var(--border);border-radius:8px;background:var(--surface);overflow:hidden">
+              <div style="padding:12px 14px;border-bottom:1px solid var(--border);border-left:2px solid var(--warning)">
+                <div style="font-size:13px;font-weight:500">2 of 9 columns need a decision</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px">Everything else was typed confidently. Correct these two and continue.</div>
+              </div>
+              <sc-for list="{{ uncertain }}" as="u" hint-placeholder-count="2">
+                <div style="padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
+                  <div style="width:180px;flex:none">
+                    <div style="font-family:ui-monospace,Menlo,monospace;font-size:12px">{{ u.col }}</div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:2px">{{ u.why }}</div>
+                  </div>
+                  <div style="display:flex;height:30px;padding:2px;gap:2px;border:1px solid var(--border);border-radius:5px;background:var(--sunken)">
+                    <sc-for list="{{ u.opts }}" as="o" hint-placeholder-count="4">
+                      <button onClick="{{ o.pick }}" style="padding:0 9px;border:none;border-radius:3px;font-size:12px;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }};box-shadow:{{ o.sh }}">{{ o.label }}</button>
+                    </sc-for>
+                  </div>
+                  <div style="flex:1"></div>
+                  <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--muted)">{{ u.sample }}</span>
+                </div>
+              </sc-for>
+              <div style="padding:9px 14px;display:flex;align-items:center;gap:10px;background:var(--raised)">
+                <button onClick="{{ toggleConfident }}" style="height:26px;padding:0 9px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:12px;cursor:pointer" style-hover="border-color:var(--border-strong)">{{ confidentLabel }}</button>
+                <div style="flex:1"></div>
+                <button onClick="{{ jEmpty }}" style="height:26px;padding:0 12px;border:1px solid transparent;border-radius:4px;background:var(--accent);color:var(--accent-on);font-size:12px;font-weight:500;cursor:pointer" style-hover="background:var(--accent-hover)">Continue</button>
+              </div>
+              <sc-if value="{{ confidentOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="border-top:1px solid var(--border)">
+                  <sc-for list="{{ confident }}" as="c" hint-placeholder-count="7">
+                    <div style="height:30px;display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid var(--border)">
+                      <span style="width:180px;font-family:ui-monospace,Menlo,monospace;font-size:12px">{{ c.col }}</span>
+                      <span style="font-size:12px;color:var(--muted);width:90px">{{ c.type }}</span>
+                      <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--muted)">{{ c.sample }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isHomeReady }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width:1040px;min-height:100%;margin:0 auto;padding:20px 24px 0;display:flex;flex-direction:column;gap:14px">
+
+          <sc-if value="{{ truncated }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid var(--border);border-left:2px solid var(--serious);border-radius:6px;padding:10px 12px;display:flex;align-items:center;gap:10px;background:var(--raised)">
+              <span style="font-size:12px">Parsed 4,981 of 5,000 · 19 skipped · row cap 500,000 not reached</span>
+              <button style="height:24px;padding:0 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:11px;cursor:pointer" style-hover="border-color:var(--border-strong)">Show the first ten</button>
+              <div style="flex:1"></div>
+              <button onClick="{{ clearTrunc }}" style="width:18px;height:18px;border:none;background:none;color:var(--muted);font-size:12px;cursor:pointer;padding:0">×</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ notice }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid var(--border);border-left:2px solid {{ noticeStripe }};border-radius:6px;background:var(--surface);padding:12px 14px">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="font-size:13px;font-weight:500">{{ noticeTitle }}</span>
+                <span style="font-size:11px;color:var(--muted);flex:1">not saved as an analysis</span>
+                <button onClick="{{ clearNotice }}" style="width:18px;height:18px;border:none;background:none;color:var(--muted);font-size:12px;cursor:pointer;padding:0">×</button>
+              </div>
+              <div style="font-size:12px;color:var(--muted);margin-top:5px;line-height:1.6;max-width:640px">{{ noticeBody }}</div>
+              <sc-if value="{{ noticeViolations }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:9px;border:1px solid var(--border);border-radius:4px;overflow:hidden">
+                  <sc-for list="{{ violations }}" as="v" hint-placeholder-count="2">
+                    <div style="height:30px;display:flex;align-items:center;gap:10px;padding:0 10px;border-bottom:1px solid var(--border);background:var(--sunken)">
+                      <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--muted);width:150px">{{ v.path }}</span>
+                      <span style="font-size:12px">{{ v.msg }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+                <sc-for list="{{ noticeChips }}" as="c" hint-placeholder-count="3">
+                  <button onClick="{{ c.pick }}" style="height:26px;padding:0 10px;border:1px solid {{ c.border }};border-radius:13px;background:{{ c.bg }};color:{{ c.fg }};font-size:12px;cursor:pointer">{{ c.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ inflight }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:14px 16px 15px">
+              <div style="display:flex;align-items:center;gap:9px">
+                <sc-if value="{{ phaseSpin }}" hint-placeholder-val="{{ true }}"><span style="width:11px;height:11px;flex:none;border-radius:50%;border:1.5px solid var(--border-strong);border-top-color:{{ phaseColor }};animation:spin 700ms linear infinite"></span></sc-if>
+                <sc-if value="{{ phaseWait }}" hint-placeholder-val="{{ false }}"><span style="width:11px;height:11px;flex:none;border-radius:50%;border:1.5px solid var(--warning)"></span></sc-if>
+                <span style="font-size:13px;font-weight:500;color:{{ phaseColor }}">{{ phaseLabel }}</span>
+                <span style="font-size:12px;color:var(--muted);flex:1">{{ phaseNote }}</span>
+                <span style="font-size:11px;color:var(--muted)">{{ flightCost }}</span>
+              </div>
+              <div style="margin-top:12px;font-size:13px;line-height:1.6;min-height:21px">{{ narration }}<span style="width:1px;height:14px;display:inline-block;vertical-align:-2px;background:var(--text);animation:car 1s steps(1) infinite"></span></div>
+              <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:11px;min-height:22px">
+                <sc-for list="{{ specChips }}" as="c" hint-placeholder-count="0">
+                  <span style="height:22px;display:flex;align-items:center;gap:5px;padding:0 8px;border:1px solid var(--border);border-radius:4px;background:var(--sunken);font-size:11px;animation:fadein 160ms cubic-bezier(.4,0,.2,1)"><span style="font-family:ui-monospace,Menlo,monospace;color:var(--muted)">{{ c.k }}</span>{{ c.v }}</span>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid var(--border);border-radius:8px;background:var(--surface);overflow:hidden">
+              <div style="height:30px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--border);background:var(--sunken)">
+                <span style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">The Questions demo mode can answer</span>
+                <span style="font-size:11px;color:var(--muted)">— the whole recorded repertoire, not a selection</span>
+              </div>
+              <sc-for list="{{ questions }}" as="q" hint-placeholder-count="6">
+                <div class="row30" onClick="{{ q.run }}" style="height:34px;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 120ms cubic-bezier(.4,0,.2,1)">
+                  <span style="width:16px;flex:none;font-size:11px;color:var(--muted)">{{ q.n }}</span>
+                  <span style="flex:1;font-size:13px">{{ q.text }}</span>
+                  <span style="font-size:11px;color:var(--muted);font-family:ui-monospace,Menlo,monospace">{{ q.chart }}</span>
+                  <span style="font-size:12px;color:var(--muted)">›</span>
+                </div>
+              </sc-for>
+              <div style="height:30px;display:flex;align-items:center;padding:0 12px;background:var(--raised);font-size:11px;color:var(--muted)">A refining Question needs something to refine, so it appears once there is an Analysis on screen · switch to Your API key to ask anything</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ hasAnalysis }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid var(--border);border-radius:8px;background:var(--surface);overflow:hidden">
+              <div style="padding:13px 14px 12px;border-bottom:1px solid var(--border)">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <h2 style="margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em">{{ title }}</h2>
+                  <div style="flex:1"></div>
+                  <div style="display:flex;align-items:center;height:24px;border:1px solid var(--border);border-radius:4px;overflow:hidden">
+                    <button onClick="{{ revBack }}" title="Cmd+Z" style="width:22px;height:22px;border:none;background:none;color:var(--muted);font-size:12px;cursor:pointer" style-hover="background:var(--sunken);color:var(--text)">‹</button>
+                    <span style="padding:0 6px;font-size:11px;color:var(--muted);border-left:1px solid var(--border);border-right:1px solid var(--border);line-height:22px">{{ revLabel }}</span>
+                    <button onClick="{{ revFwd }}" title="Shift+Cmd+Z" style="width:22px;height:22px;border:none;background:none;color:var(--muted);font-size:12px;cursor:pointer" style-hover="background:var(--sunken);color:var(--text)">›</button>
+                  </div>
+                  <button style="height:24px;padding:0 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:12px;cursor:pointer" style-hover="border-color:var(--border-strong)">Copy link</button>
+                </div>
+                <div style="font-size:12px;color:var(--muted);margin-top:5px">{{ narrationDone }}</div>
+              </div>
+
+              <div style="height:38px;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--border);background:var(--raised)">
+                <div style="display:flex;height:26px;padding:2px;gap:2px;border:1px solid var(--border);border-radius:5px;background:var(--sunken)">
+                  <sc-for list="{{ chartTypes }}" as="t" hint-placeholder-count="3">
+                    <button onClick="{{ t.pick }}" style="padding:0 9px;border:none;border-radius:3px;font-size:12px;cursor:pointer;background:{{ t.bg }};color:{{ t.fg }};box-shadow:{{ t.sh }}">{{ t.label }}</button>
+                  </sc-for>
+                </div>
+                <button onClick="{{ toggleAgg }}" style="height:26px;display:flex;align-items:center;gap:7px;padding:0 9px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--text);font-size:12px;cursor:pointer" style-hover="border-color:var(--border-strong)"><span style="color:var(--muted)">agg</span>{{ agg }}<span style="color:var(--muted);font-size:9px">▾</span></button>
+                <div style="flex:1"></div>
+                <button onClick="{{ toggleTable }}" style="height:26px;padding:0 9px;border:1px solid var(--border);border-radius:5px;background:{{ tableBtnBg }};color:var(--text);font-size:12px;cursor:pointer" style-hover="border-color:var(--border-strong)">{{ tableBtnLabel }}</button>
+              </div>
+
+              <sc-if value="{{ aggOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="position:relative"><div style="position:absolute;top:2px;left:118px;z-index:5;width:120px;border:1px solid var(--border-strong);border-radius:6px;background:var(--overlay);box-shadow:0 4px 12px rgba(0,0,0,.09);padding:3px">
+                  <sc-for list="{{ aggs }}" as="a" hint-placeholder-count="5">
+                    <div class="row30" onClick="{{ a.pick }}" style="height:26px;display:flex;align-items:center;gap:7px;padding:0 8px;border-radius:4px;font-size:12px;cursor:pointer"><span style="width:10px;color:var(--accent)">{{ a.tick }}</span>{{ a.label }}</div>
+                  </sc-for>
+                </div></div>
+              </sc-if>
+
+              <div style="padding:16px 16px 10px">
+                <sc-if value="{{ showChart }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;gap:10px;height:250px">
+                    <div style="width:44px;flex:none;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;padding-bottom:26px">
+                      <sc-for list="{{ yTicks }}" as="y" hint-placeholder-count="5"><span style="font-size:11px;color:var(--muted)">{{ y.label }}</span></sc-for>
+                    </div>
+                    <div style="flex:1;min-width:0;position:relative">
+                      <div style="position:absolute;left:0;right:0;top:0;bottom:26px;display:flex;flex-direction:column;justify-content:space-between">
+                        <sc-for list="{{ yTicks }}" as="y" hint-placeholder-count="5"><div style="height:1px;background:var(--border)"></div></sc-for>
+                      </div>
+                      <sc-if value="{{ isBar }}" hint-placeholder-val="{{ true }}">
+                        <div style="position:absolute;left:0;right:0;top:0;bottom:26px;display:flex;align-items:flex-end;gap:6px">
+                          <sc-for list="{{ series }}" as="d" hint-placeholder-count="12">
+                            <div style="flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center">
+                              <div style="position:relative;width:100%;height:{{ d.pct }}%;border-radius:3px 3px 0 0;background:var(--c1);transition:height 180ms cubic-bezier(.4,0,.2,1)"><span style="position:absolute;bottom:100%;left:0;right:0;margin-bottom:3px;text-align:center;font-size:11px;color:var(--muted)">{{ d.val }}</span></div>
+                            </div>
+                          </sc-for>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ isPath }}" hint-placeholder-val="{{ false }}">
+                        <div style="position:absolute;left:0;right:0;top:0;bottom:26px">
+                          <svg viewBox="0 0 1000 200" preserveAspectRatio="none" style="width:100%;height:100%;display:block">
+                            <sc-if value="{{ isArea }}" hint-placeholder-val="{{ false }}"><polygon points="{{ areaPts }}" fill="var(--c1)" opacity="0.16"></polygon></sc-if>
+                            <polyline points="{{ linePts }}" fill="none" stroke="var(--c1)" stroke-width="2.5" vector-effect="non-scaling-stroke"></polyline>
+                          </svg>
+                          <div style="position:absolute;right:0;top:{{ endLabelTop }}px;transform:translateY(-50%);padding-left:6px;font-size:11px;color:var(--c1)">{{ seriesName }}</div>
+                        </div>
+                      </sc-if>
+                      <div style="position:absolute;left:0;right:0;bottom:0;height:26px;display:flex;gap:6px;align-items:flex-start;padding-top:7px;border-top:1px solid var(--border-strong)">
+                        <sc-for list="{{ series }}" as="d" hint-placeholder-count="12">
+                          <span style="flex:1;min-width:0;text-align:center;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.label }}</span>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ showTable }}" hint-placeholder-val="{{ false }}">
+                  <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden">
+                    <div style="height:30px;display:flex;align-items:center;border-bottom:1px solid var(--border);background:var(--sunken);padding:0 10px">
+                      <span style="flex:1;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">{{ dimName }}</span>
+                      <span style="width:110px;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">{{ measureName }}</span>
+                    </div>
+                    <div style="max-height:214px;overflow-y:auto">
+                      <sc-for list="{{ series }}" as="d" hint-placeholder-count="12">
+                        <div style="height:30px;display:flex;align-items:center;padding:0 10px;border-bottom:1px solid var(--border)"><span style="flex:1;font-size:12px">{{ d.label }}</span><span style="width:110px;text-align:right;font-size:12px">{{ d.val }}</span></div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div style="border-top:1px solid var(--border)">
+                <div class="row30" onClick="{{ toggleQuery }}" style="height:30px;display:flex;align-items:center;gap:7px;padding:0 12px;cursor:pointer;font-size:12px;color:var(--muted)"><span style="font-size:9px;width:9px">{{ queryCaret }}</span>view the query the model wrote</div>
+                <sc-if value="{{ queryOpen }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:0 12px 12px"><div style="border:1px solid var(--border);border-radius:6px;background:var(--sunken);padding:10px 12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.8;color:var(--muted);white-space:pre">{{ queryText }}</div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:6px">Read-only. The specification is edited through the controls above, never as text.</div></div>
+                </sc-if>
+                <div class="row30" onClick="{{ toggleRows }}" style="height:30px;display:flex;align-items:center;gap:7px;padding:0 12px;border-top:1px solid var(--border);cursor:pointer;font-size:12px;color:var(--muted)"><span style="font-size:9px;width:9px">{{ rowsCaret }}</span>the rows behind the chart<span style="color:var(--border-strong)">·</span><span>{{ rowsCount }}</span></div>
+                <sc-if value="{{ rowsOpen }}" hint-placeholder-val="{{ false }}">
+                  <div style="border-top:1px solid var(--border)">
+                    <div style="height:38px;display:flex;align-items:center;gap:8px;padding:0 12px;background:var(--raised);border-bottom:1px solid var(--border)">
+                      <sc-if value="{{ filterOn }}" hint-placeholder-val="{{ true }}">
+                        <span style="height:22px;display:flex;align-items:center;gap:6px;padding:0 4px 0 8px;border:1px solid var(--border-strong);border-radius:11px;background:var(--surface);font-size:11px"><span style="font-family:ui-monospace,Menlo,monospace">city = Glasgow</span><button onClick="{{ clearFilter }}" style="width:14px;height:14px;border:none;border-radius:50%;background:none;color:var(--muted);font-size:11px;line-height:1;cursor:pointer;padding:0">×</button></span>
+                      </sc-if>
+                      <span style="font-size:11px;color:var(--muted);flex:1">{{ filterNote }}</span>
+                      <span style="font-size:11px;color:var(--muted)">sorting these rows never changes the chart</span>
+                    </div>
+                    <div style="max-height:180px;overflow-y:auto">
+                      <div style="height:30px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--border);background:var(--sunken);position:sticky;top:0">
+                        <sc-for list="{{ drillCols }}" as="c" hint-placeholder-count="6"><span style="width:{{ c.w }}px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">{{ c.name }}</span></sc-for>
+                      </div>
+                      <sc-for list="{{ drillRows }}" as="r" hint-placeholder-count="6">
+                        <div style="height:30px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--border)">
+                          <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="6"><span style="width:{{ c.w }}px;font-size:12px;color:{{ c.color }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px">{{ c.v }}</span></sc-for>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-if>
+          <div style="position:sticky;bottom:0;z-index:8;margin-top:auto;padding:14px 0 16px;background:linear-gradient(to top,var(--surface) 62%,transparent)">
+          <div style="border:1px solid var(--border-strong);border-radius:8px;background:var(--raised);padding:10px 10px 8px;box-shadow:0 2px 10px rgba(0,0,0,.05)">
+            <div style="display:flex;gap:8px;align-items:center">
+              <div style="flex:1;min-width:0;height:30px;display:flex;align-items:center;padding:0 10px;border:1px solid var(--border);border-radius:6px;background:{{ inputBg }}">
+                <span style="font-size:13px;color:{{ inputFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ inputText }}</span>
+                <sc-if value="{{ keyMode }}" hint-placeholder-val="{{ false }}"><span style="width:1px;height:15px;background:var(--text);margin-left:1px;animation:car 1s steps(1) infinite"></span></sc-if>
+              </div>
+              <div style="flex:none;display:flex;height:30px;padding:2px;gap:2px;border:1px solid var(--border);border-radius:6px;background:var(--sunken)">
+                <button onClick="{{ setSmart }}" title="Sonnet 5 · adaptive thinking" style="padding:0 9px;border:none;border-radius:4px;font-size:12px;cursor:pointer;background:{{ smartBg }};color:{{ smartFg }};box-shadow:{{ smartSh }}">Smart</button>
+                <button onClick="{{ setFast }}" title="Haiku 4.5 · about a third of the cost" style="padding:0 9px;border:none;border-radius:4px;font-size:12px;cursor:pointer;background:{{ fastBg }};color:{{ fastFg }};box-shadow:{{ fastSh }}">Fast</button>
+              </div>
+              <button onClick="{{ askOrCancel }}" style="flex:none;height:30px;padding:0 14px;border:1px solid transparent;border-radius:6px;background:{{ askBg }};color:{{ askFg }};font-size:12px;font-weight:500;cursor:pointer">{{ askLabel }}</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:7px;padding:0 2px">
+              <span style="font-size:11px;color:var(--muted);flex:1;line-height:1.5">{{ modeNote }}</span>
+              <span style="font-size:11px;color:var(--muted)">{{ modelNote }}</span>
+              <span style="width:1px;height:11px;background:var(--border);flex:none"></span>
+              <span style="font-size:11px;color:var(--muted);flex:none">{{ costLine }}</span>
+              <sc-if value="{{ recorded }}" hint-placeholder-val="{{ true }}"><span style="flex:none;height:16px;display:flex;align-items:center;padding:0 5px;border:1px solid var(--border);border-radius:3px;background:var(--surface);font-size:10px;color:var(--muted)" title="Replayed from a recording — nothing was charged">recorded</span></sc-if>
+            </div>
+          </div>
+          </div>
+
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isData }}" hint-placeholder-val="{{ false }}">
+        <div style="height:100%;display:flex;flex-direction:column">
+          <div style="flex:none;padding:16px 20px 12px;border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:10px">
+              <h2 style="margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em">International football matches</h2>
+              <span style="font-size:12px;color:var(--muted)">49,520 rows · 9 columns · types set in the headers</span>
+              <div style="flex:1"></div>
+              <button onClick="{{ goHome }}" style="height:26px;padding:0 10px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--text);font-size:12px;cursor:pointer" style-hover="border-color:var(--border-strong)">Back to analysis</button>
+            </div>
+          </div>
+          <div style="flex:1;min-height:0;overflow:auto">
+            <div style="min-width:1100px">
+              <div style="height:30px;display:flex;align-items:stretch;border-bottom:1px solid var(--border-strong);background:var(--sunken);position:sticky;top:0;z-index:3">
+                <sc-for list="{{ cols }}" as="c" hint-placeholder-count="9">
+                  <div style="width:{{ c.w }}px;flex:none;display:flex;align-items:center;gap:6px;padding:0 8px;border-right:1px solid var(--border);position:relative">
+                    <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.name }}</span>
+                    <div style="flex:1"></div>
+                    <button onClick="{{ c.openMenu }}" style="height:18px;flex:none;display:flex;align-items:center;gap:3px;padding:0 4px;border:1px solid var(--border);border-radius:3px;background:var(--surface);color:var(--muted);font-size:10px;cursor:pointer" style-hover="border-color:var(--border-strong);color:var(--text)">{{ c.type }}<span style="font-size:8px">▾</span></button>
+                    <sc-if value="{{ c.menuOpen }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:absolute;top:28px;right:4px;z-index:9;width:118px;border:1px solid var(--border-strong);border-radius:6px;background:var(--overlay);box-shadow:0 6px 16px rgba(0,0,0,.12);padding:3px">
+                        <sc-for list="{{ c.opts }}" as="o" hint-placeholder-count="4">
+                          <div class="row30" onClick="{{ o.pick }}" style="height:26px;display:flex;align-items:center;gap:6px;padding:0 7px;border-radius:4px;font-size:12px;cursor:pointer"><span style="width:9px;color:var(--accent)">{{ o.tick }}</span>{{ o.label }}</div>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+              <sc-for list="{{ dataRows }}" as="r" hint-placeholder-count="18">
+                <div class="row30" style="height:30px;display:flex;align-items:stretch;border-bottom:1px solid var(--border)">
+                  <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="9">
+                    <span style="width:{{ c.w }}px;flex:none;display:flex;align-items:center;padding:0 8px;border-right:1px solid var(--border);font-size:12px;color:{{ c.color }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.v }}</span>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex:none;height:30px;display:flex;align-items:center;gap:12px;padding:0 12px;border-top:1px solid var(--border);background:var(--raised);font-size:11px;color:var(--muted)">
+            <span>rows 1–18 of 49,520 · virtualised at 30px</span><span>·</span><span>changing a type re-runs inference on that column only</span>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:20;background:rgba(8,9,10,.34);display:flex;align-items:center;justify-content:center">
+      <div style="width:440px;border:1px solid var(--border-strong);border-radius:8px;background:var(--overlay);box-shadow:0 12px 40px rgba(0,0,0,.22);overflow:hidden">
+        <div style="padding:16px 18px 14px">
+          <div style="font-size:15px;font-weight:600;letter-spacing:-.01em">Use your own API key</div>
+          <p style="margin:8px 0 0;font-size:12px;line-height:1.65;color:var(--muted);text-wrap:pretty">The key is held in memory for this tab only. It is never written to storage and never put in the link. Requests go straight from this browser to the API — there is no server in between.</p>
+          <div style="margin-top:13px;height:30px;display:flex;align-items:center;padding:0 10px;border:1px solid {{ fieldBorder }};border-radius:6px;background:var(--surface)">
+            <span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:{{ fieldFg }}">{{ fieldText }}</span>
+            <sc-if value="{{ fieldCaret }}" hint-placeholder-val="{{ true }}"><span style="width:1px;height:14px;background:var(--text);animation:car 1s steps(1) infinite"></span></sc-if>
+          </div>
+          <sc-if value="{{ rejected }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:9px;border-left:2px solid var(--error);padding-left:9px;font-size:12px;line-height:1.5"><span style="font-weight:500">key rejected</span><span style="color:var(--muted)"> — verified with a one-token call before switching, so nothing was in flight. Check the key and try again.</span></div>
+          </sc-if>
+          <div style="display:flex;gap:5px;margin-top:12px">
+            <sc-for list="{{ keySamples }}" as="k" hint-placeholder-count="2">
+              <button onClick="{{ k.pick }}" style="height:24px;padding:0 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--muted);font-size:11px;cursor:pointer" style-hover="border-color:var(--border-strong);color:var(--text)">{{ k.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:11px 18px;border-top:1px solid var(--border);background:var(--raised)">
+          <div style="flex:1"></div>
+          <button onClick="{{ closeModal }}" style="height:30px;padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:12px;cursor:pointer" style-hover="border-color:var(--border-strong)">{{ secondaryLabel }}</button>
+          <button onClick="{{ verify }}" style="height:30px;padding:0 13px;border:1px solid transparent;border-radius:6px;background:var(--accent);color:var(--accent-on);font-size:12px;font-weight:500;cursor:pointer" style-hover="background:var(--accent-hover)">{{ verifyLabel }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ keyLostNote }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;left:0;right:0;bottom:0;z-index:15;display:flex;justify-content:center;padding:0 0 14px">
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px 8px 12px;border:1px solid var(--border-strong);border-radius:6px;background:var(--overlay);box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:12px">
+        <span>This session is in Demo mode — the key was only held in memory. Re-enter it from the header.</span>
+        <button onClick="{{ dismissKeyNote }}" style="width:18px;height:18px;border:none;background:none;color:var(--muted);font-size:12px;cursor:pointer;padding:0">×</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</div>
+<p class="dv-meta" style="margin-top:4px"><b>Motivation.</b> The question and the chart it produced are one object, so both live in one 1040px content column: the analysis scrolls, and the composer is docked to the bottom of that column — inside it, floating over the content, never bled across the window and never growing into the analysis. The rail is 44px of icons until asked for; the token readout is a single 11px line in the top bar.<br><b>Tradeoff.</b> A bottom-docked composer is the shape the brief warns about, so the bounded column is doing all the work of distinguishing it: it must stay column-width and fixed-height for that to read as a tool. <b>At 1280</b> the column drops to ~1000px and the header's dataset chip needs to lose its row count.</p>
+</div>
+
+</div>
+<p class="dv-next">Try next: "add a 1280 laptop artboard beside it" · "close the remaining gaps: 20 MB warning, uploaded-file link restore, live updated marker" · "add a dark-theme artboard for comparison"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1560,&quot;height&quot;:1200},&quot;railDefaultOpen&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Shell&quot;},&quot;startState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;nodata&quot;,&quot;parsing&quot;,&quot;quiet&quot;,&quot;loud&quot;,&quot;empty&quot;,&quot;analysis&quot;,&quot;open&quot;,&quot;data&quot;,&quot;modal&quot;,&quot;rejected&quot;,&quot;clarify&quot;,&quot;unsupported&quot;,&quot;failed&quot;],&quot;default&quot;:&quot;analysis&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Shell&quot;},&quot;showCostReadout&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Shell&quot;}}">
+const CITY = [["Glasgow",1140],["Kuala Lumpur",733],["Bangkok",700],["London",690],["Doha",610],["Dubai",585],["Budapest",560],["Cairo",540],["Nairobi",505],["Vienna",498],["Lima",470],["Manila",455]];
+const YEARS = [["1880s",118],["1900s",260],["1920s",470],["1930s",560],["1950s",810],["1960s",1010],["1970s",1180],["1980s",1290],["1990s",1460],["2000s",1720],["2010s",1880],["2020s",1240]];
+const AVG = [["1880s",3.4],["1900s",3.1],["1920s",2.8],["1930s",2.6],["1950s",2.4],["1960s",2.2],["1970s",2.0],["1980s",1.9],["1990s",1.8],["2000s",1.7],["2010s",1.6],["2020s",1.5]];
+
+const QS = [
+  {n:"01",text:"Which teams have hosted the most matches?",chart:"bar",id:"city"},
+  {n:"02",text:"Which cities have hosted the most matches?",chart:"bar",id:"city"},
+  {n:"03",text:"How many matches were played each year?",chart:"line",id:"year"},
+  {n:"04",text:"How has the average home score changed over time?",chart:"line",id:"avg"},
+  {n:"05",text:"What share of matches were played on neutral ground each year?",chart:"area",id:"year"},
+  {n:"06",text:"Which tournaments have the most matches?",chart:"bar",id:"city"},
+  {n:"07",text:"How many home goals per match does each tournament average?",chart:"bar",id:"city"},
+  {n:"08",text:"How many matches has England hosted each year?",chart:"line",id:"year"},
+  {n:"09",text:"Which countries host the most matches?",chart:"bar",id:"city"},
+  {n:"10",text:"How many matches were played each month of 2018?",chart:"line",id:"year"},
+  {n:"11",text:"Show that by year instead",chart:"refine",id:"year",refine:true},
+  {n:"12",text:"Who is the best team?",chart:"clarify",id:"clarify"},
+  {n:"13",text:"Why did scoring decline after 1990?",chart:"unsupported",id:"unsupported"}
+];
+
+const SPECS = {
+  city:{title:"Matches by city",narr:"Counting matches for each host city, most first.",chart:"bar",agg:"count",rev:[2,3],series:CITY,dim:"city",measure:"matches",name:"matches",
+    chips:[{k:"source",v:"matches"},{k:"group",v:"city"},{k:"agg",v:"count(*)"},{k:"sort",v:"count desc"},{k:"limit",v:"12"},{k:"chart",v:"bar"}],
+    query:"group_by   city\nmeasure    count(*) as matches\nsort       matches desc\nlimit      12\nchart      bar"},
+  year:{title:"Matches per year",narr:"Bucketing matches by year and counting them.",chart:"line",agg:"count",rev:[1,1],series:YEARS,dim:"period",measure:"matches",name:"matches",
+    chips:[{k:"source",v:"matches"},{k:"bucket",v:"date · decade"},{k:"agg",v:"count(*)"},{k:"chart",v:"line"}],
+    query:"bucket     date by decade\nmeasure    count(*) as matches\nsort       date asc\nchart      line"},
+  avg:{title:"Average home score over time",narr:"Averaging the home score for each year.",chart:"area",agg:"avg",rev:[1,1],series:AVG,dim:"period",measure:"avg home score",name:"avg home",
+    chips:[{k:"source",v:"matches"},{k:"bucket",v:"date · decade"},{k:"agg",v:"avg(home_score)"},{k:"chart",v:"area"}],
+    query:"bucket     date by decade\nmeasure    avg(home_score) as avg_home\nsort       date asc\nchart      area"}
+};
+
+const SAMPLES = [
+  {name:"International football matches",rows:"49,520 rows",note:"Every international result from 1872 to 2026."},
+  {name:"Team-match results",rows:"99,040 rows",note:"One row per team per match, derived from the same source by a committed script."},
+  {name:"Goals scored",rows:"47,914 rows",note:"The inference showcase: 254 goal minutes are written as the string NA rather than left blank, and 79 rows are exact duplicates."},
+  {name:"Deliberately messy export",rows:"2,021 rows",note:"Dirtied on purpose — a BOM, CRLF endings, dates mixed between two formats, attendances written with thousands separators, every null token, and 34 malformed rows."}
+];
+
+const COLS = [
+  {name:"date",type:"date",w:110},{name:"home_team",type:"categorical",w:130},{name:"away_team",type:"categorical",w:130},
+  {name:"home_score",type:"number",w:110},{name:"away_score",type:"number",w:110},{name:"tournament",type:"categorical",w:150},
+  {name:"city",type:"categorical",w:130},{name:"country",type:"categorical",w:130},{name:"neutral",type:"boolean",w:100}
+];
+const RAW = [
+  ["1872-11-30","Scotland","England","0","0","Friendly","Glasgow","Scotland","FALSE"],
+  ["1873-03-08","England","Scotland","4","2","Friendly","London","England","FALSE"],
+  ["1874-03-07","Scotland","England","2","1","Friendly","Glasgow","Scotland","FALSE"],
+  ["1875-03-06","England","Scotland","2","2","Friendly","London","England","FALSE"],
+  ["1876-03-04","Scotland","England","3","0","Friendly","Glasgow","Scotland","FALSE"],
+  ["1876-03-25","Scotland","Wales","4","0","Friendly","Glasgow","Scotland","FALSE"],
+  ["1877-03-03","England","Scotland","1","3","Friendly","London","England","FALSE"],
+  ["1877-03-05","Wales","Scotland","0","2","Friendly","Wrexham","Wales","FALSE"],
+  ["1878-03-02","Scotland","England","7","2","Friendly","Glasgow","Scotland","FALSE"],
+  ["1878-03-23","Scotland","Wales","9","0","Friendly","Glasgow","Scotland","FALSE"],
+  ["1879-01-18","England","Wales","2","1","Friendly","London","England","FALSE"],
+  ["1879-04-05","England","Scotland","5","4","Friendly","London","England","FALSE"],
+  ["1879-04-07","Wales","Scotland","0","3","Friendly","Wrexham","Wales","FALSE"],
+  ["1880-03-13","Scotland","England","5","4","Friendly","Glasgow","Scotland","FALSE"],
+  ["1880-03-15","Wales","England","2","3","Friendly","Wrexham","Wales","FALSE"],
+  ["1880-03-27","Scotland","Wales","5","1","Friendly","Glasgow","Scotland","FALSE"],
+  ["1881-02-26","England","Wales","0","1","Friendly","Blackburn","England","FALSE"],
+  ["1881-03-12","England","Scotland","1","6","Friendly","London","England","FALSE"]
+];
+const DRILL = [
+  ["1872-11-30","Scotland","England","0","0","Friendly"],
+  ["1874-03-07","Scotland","England","2","1","Friendly"],
+  ["1876-03-04","Scotland","England","3","0","Friendly"],
+  ["1876-03-25","Scotland","Wales","4","0","Friendly"],
+  ["1878-03-02","Scotland","England","7","2","Friendly"],
+  ["1878-03-23","Scotland","Wales","9","0","Friendly"],
+  ["1880-03-13","Scotland","England","5","4","Friendly"],
+  ["1880-03-27","Scotland","Wales","5","1","Friendly"]
+];
+const DCOLS = [{name:"date",w:100},{name:"home_team",w:110},{name:"away_team",w:110},{name:"home_score",w:90},{name:"away_score",w:90},{name:"tournament",w:110}];
+const TYPES = ["date","number","categorical","boolean"];
+const AGGS = ["count","sum","avg","min","max"];
+
+class Component extends DCLogic {
+  state = {
+    theme:"lt", route:"home", stage:"ready", infer:"quiet", confidentOpen:false,
+    mode:"demo", hasKey:false, modal:null, modalPhase:"idle", keyText:"", keyLostNote:false,
+    railOpen:false, noteDismissed:false, parsed:0, truncated:false,
+    spec:null, chart:"bar", agg:"count", rev:1, revs:1, activeIdx:0,
+    queryOpen:false, rowsOpen:false, filterOn:true, tableView:false, aggOpen:false, colMenu:-1,
+    inflight:null, narration:"", chips:[], notice:null, model:"Smart", palette:false, tab:0,
+    tokens:1284, cost:0.004, countdown:12, colTypes:COLS.map(c=>c.type),
+    analyses:[{title:"Matches by city",rev:"2/3",updated:false},{title:"Matches per year",rev:"1/1",updated:true},{title:"Average home score over time",rev:"1/1",updated:false}]
+  };
+  timers = [];
+  componentDidMount(){
+    this.setState({railOpen: this.props.railDefaultOpen ?? false});
+    const st = this.props.startState;
+    if(st && st!=="analysis") this.go(st);
+    else this.go("analysis");
+    this.onKey = e => {
+      if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="z"){ e.preventDefault(); e.shiftKey?this.revFwd():this.revBack(); }
+    };
+    window.addEventListener("keydown", this.onKey);
+  }
+  componentWillUnmount(){ this.clear(); window.removeEventListener("keydown", this.onKey); }
+  clear(){ this.timers.forEach(t=>{clearTimeout(t);clearInterval(t)}); this.timers=[]; }
+  later(fn,ms){ this.timers.push(setTimeout(fn,ms)); }
+
+  go(name){
+    this.clear();
+    const base = {notice:null, inflight:null, narration:"", chips:[], modal:null, aggOpen:false, colMenu:-1, keyLostNote:false, truncated:false};
+    const S = SPECS.city;
+    const withCity = {...base, stage:"ready", route:"home", spec:S, chart:S.chart, agg:S.agg, rev:S.rev[0], revs:S.rev[1]};
+    switch(name){
+      case "nodata": return this.setState({...base, stage:"nodataset", route:"home", spec:null});
+      case "parsing": return this.startParse();
+      case "quiet": return this.setState({...base, stage:"infer", infer:"quiet", route:"home"});
+      case "loud": return this.setState({...base, stage:"infer", infer:"loud", confidentOpen:false, route:"home"});
+      case "empty": return this.setState({...base, stage:"ready", route:"home", spec:null});
+      case "thinking": return this.setState({...base, stage:"ready", route:"home", spec:null, inflight:"thinking", narration:"Counting matches for e", chips:S.chips.slice(0,3)});
+      case "correcting": return this.setState({...base, stage:"ready", route:"home", spec:null, inflight:"correcting", narration:"Counting matches for each host city.", chips:S.chips.slice(0,4)});
+      case "waiting": this.setState({...base, stage:"ready", route:"home", spec:null, inflight:"waiting", narration:"Counting matches for each host city.", chips:S.chips.slice(0,4), countdown:12});
+        this.timers.push(setInterval(()=>this.setState(s=>({countdown: s.countdown>0 ? s.countdown-1 : 12})),1000)); return;
+      case "computing": return this.setState({...base, stage:"ready", route:"home", spec:null, inflight:"computing", narration:"Counting matches for each host city.", chips:S.chips});
+      case "analysis": return this.setState({...withCity, queryOpen:false, rowsOpen:false, tableView:false});
+      case "open": return this.setState({...withCity, queryOpen:true, rowsOpen:true, filterOn:true, tableView:false});
+      case "data": return this.setState({...base, stage:"ready", route:"data"});
+      case "modal": return this.setState({...withCity, modal:true, modalPhase:"idle", keyText:""});
+      case "rejected": return this.setState({...withCity, modal:true, modalPhase:"rejected", keyText:"sk-live-9f2b7c41d8"});
+      case "clarify": return this.setState({...base, stage:"ready", route:"home", spec:null, notice:"clarify"});
+      case "unsupported": return this.setState({...base, stage:"ready", route:"home", spec:null, notice:"unsupported"});
+      case "failed": return this.setState({...base, stage:"ready", route:"home", spec:null, notice:"failed"});
+      case "truncated": return this.setState({...withCity, truncated:true});
+    }
+  }
+  startParse(){
+    this.clear();
+    this.setState({stage:"parsing", route:"home", parsed:0, notice:null, inflight:null, modal:null});
+    this.timers.push(setInterval(()=>{
+      this.setState(s=>{
+        const n = Math.min(49520, s.parsed + 2400);
+        if(n>=49520){ this.clear(); this.later(()=>this.setState({stage:"infer", infer:"quiet"}),260); }
+        return {parsed:n};
+      });
+    },70));
+  }
+  run(id){
+    this.clear();
+    if(id==="clarify" || id==="unsupported"){
+      const narr = id==="clarify" ? "That could mean a few different things, so I am asking rather than guessing." : "That asks for a cause, which this grammar cannot express.";
+      this.setState({inflight:"thinking", narration:"", chips:[], notice:null, spec:null});
+      let j=0;
+      this.timers.push(setInterval(()=>{ j+=2; this.setState({narration:narr.slice(0,j)}); },28));
+      this.later(()=>{ this.clear(); this.setState({inflight:null, narration:"", chips:[], notice:id}); }, 1600);
+      return;
+    }
+    const S = SPECS[id];
+    this.setState({inflight:"thinking", narration:"", chips:[], notice:null, spec:null, tableView:false});
+    let i=0;
+    this.timers.push(setInterval(()=>{
+      i+=2; this.setState({narration:S.narr.slice(0,i)});
+      if(i>=S.narr.length){ this.clear2(); }
+    },28));
+    S.chips.forEach((c,k)=>this.later(()=>this.setState(s=>({chips:S.chips.slice(0,k+1)})), 300+k*180));
+    this.later(()=>this.setState({inflight:"computing"}), 1500);
+    this.later(()=>{
+      this.setState(s=>({
+        inflight:null, spec:S, chart:S.chart, agg:S.agg, rev:S.rev[0], revs:S.rev[1],
+        tokens:s.tokens+412, cost:+(s.cost+0.002).toFixed(3),
+        analyses: s.analyses.some(a=>a.title===S.title) ? s.analyses : [{title:S.title,rev:"1/1",updated:false},...s.analyses]
+      }));
+    }, 2150);
+  }
+  clear2(){}
+  revBack(){ this.setState(s=>({rev: Math.max(1, s.rev-1)})); }
+  revFwd(){ this.setState(s=>({rev: Math.min(s.revs, s.rev+1)})); }
+  bump(patch){ this.setState(s=>({...patch, revs: s.revs+1, rev: s.revs+1})); }
+
+  renderVals(){
+    const s = this.state, S = s.spec;
+    const on = (a,b) => a===b;
+    const seg = active => ({bg: active?"var(--surface)":"transparent", fg: active?"var(--text)":"var(--muted)", sh: active?"0 1px 2px rgba(0,0,0,.07)":"none"});
+    const series = S ? S.series : CITY;
+    const max = Math.max(...series.map(d=>d[1]));
+    const H = 190;
+    const fmt = n => Number.isInteger(n) ? n.toLocaleString("en-US") : n.toFixed(1);
+    const ticks = [];
+    for(let k=4;k>=0;k--){ const v = max*k/4; ticks.push({label: max>=100 ? Math.round(v).toLocaleString("en-US") : v.toFixed(1)}); }
+    const pts = series.map((d,i)=>{ const x = series.length===1?0:(i/(series.length-1))*1000; const y = 200 - (d[1]/max)*186; return [x,y]; });
+    const lineP = pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+    const nMode = s.mode==="demo";
+    const notices = {
+      clarify:{title:"Which did you mean?", stripe:"var(--warning)", body:"\u201cBest\u201d could be measured several ways in this Dataset, and they give different answers. Which did you mean?", chips:[{label:"Which teams have hosted the most matches?"},{label:"How has the average home score changed over time?"},{label:"Which tournaments have the most matches?"}]},
+      unsupported:{title:"Outside what this can express", stripe:"var(--serious)", body:"This can describe what the data shows, not why. The grammar has no causal analysis and no period-over-period comparison, because the model never sees your rows — it only writes the specification the application then executes.", chips:[{label:"How has the average home score changed over time?"},{label:"How many matches were played each year?"}]},
+      failed:{title:"That did not work", stripe:"var(--error)", body:"The reply named a column that does not exist in this table, and one repair was spent before giving up.", violations:[{path:"operation.timeBucket",msg:"Column month is categorical, so it cannot be bucketed by time. Date columns: date"},{path:"operation.sort[0].field",msg:"unknown field goals_total"}], chips:[{label:"treat month as a date and retry", primary:true},{label:"matches per year"}]}
+    };
+    const N = s.notice ? notices[s.notice] : null;
+    const phase = {
+      thinking:{label:"Thinking\u2026", note:"the model is streaming its specification", color:"var(--text)", spin:true},
+      correcting:{label:"Correcting\u2026", note:"the reply failed validation \u2014 one repair being spent", color:"var(--serious)", spin:true},
+      waiting:{label:"Rate limited. Retrying in "+s.countdown+"s", note:"nothing has been lost \u2014 the request resumes on its own", color:"var(--warning)", spin:false},
+      computing:{label:"Computing\u2026", note:"the model is done; this browser is executing over 49,520 rows", color:"var(--text)", spin:true}
+    }[s.inflight] || {label:"",note:"",color:"var(--text)",spin:true};
+
+    return {
+      themeClass: s.theme==="dk" ? "dk" : "",
+      toggleTheme: ()=>this.setState(x=>({theme:x.theme==="dk"?"lt":"dk"})),
+      toggleRail: ()=>this.setState(x=>({railOpen:!x.railOpen})),
+      railOpen: s.railOpen, railShut: !s.railOpen,
+      dismissNote: ()=>this.setState({noteDismissed:true}),
+      showSaveNote: !s.noteDismissed && s.analyses.length>1,
+      anyUpdated: s.analyses.some(a=>a.updated),
+      analyses: s.analyses.map((a,i)=>({...a, bg: i===0&&S ? "var(--sunken)" : "transparent", open: ()=>this.go("analysis")})),
+      costLine: (this.props.showCostReadout ?? true) ? s.tokens.toLocaleString("en-US")+" in · 312 out · $"+s.cost.toFixed(4) : "",
+      recorded: nMode,
+
+      goData: ()=>this.go("data"), goHome: ()=>this.go("analysis"),
+      dataBg: s.route==="data" ? "var(--sunken)" : "transparent",
+      isData: s.route==="data",
+      isNoData: s.route==="home" && s.stage==="nodataset",
+      isParsing: s.route==="home" && s.stage==="parsing",
+      isInfer: s.route==="home" && s.stage==="infer",
+      isHomeReady: s.route==="home" && s.stage==="ready",
+      inferQuiet: s.infer==="quiet", inferLoud: s.infer==="loud",
+      isEmpty: !S && !s.inflight && !s.notice,
+      hasAnalysis: !!S && !s.inflight,
+      truncated: s.truncated, clearTrunc: ()=>this.setState({truncated:false}),
+
+      samples: SAMPLES.map(x=>({...x, pick: ()=>this.startParse()})),
+      parsedRows: s.parsed.toLocaleString("en-US"),
+      parsePct: Math.round(s.parsed/49520*100),
+
+      uncertain: [
+        {col:"neutral", why:"mixed TRUE / 1 / blank", sample:"TRUE · 1 · \u2014", opts: TYPES.filter(t=>t!=="number").map(t=>({label:t, ...seg(t==="boolean"), pick:()=>{}}))},
+        {col:"home_score", why:"254 values written as NA", sample:"0 · 3 · NA", opts: TYPES.filter(t=>t!=="date").map(t=>({label:t, ...seg(t==="number"), pick:()=>{}}))}
+      ],
+      confidentOpen: s.confidentOpen,
+      confidentLabel: (s.confidentOpen?"Hide":"Show")+" the 7 confident columns",
+      toggleConfident: ()=>this.setState(x=>({confidentOpen:!x.confidentOpen})),
+      confident: COLS.filter(c=>c.name!=="neutral"&&c.name!=="home_score").map((c,i)=>({col:c.name, type:c.type, sample: RAW[0][COLS.findIndex(k=>k.name===c.name)]})),
+
+      inputBg: nMode ? "var(--sunken)" : "var(--surface)",
+      inputFg: nMode ? "var(--muted)" : "var(--text)",
+      inputText: nMode ? "Demo mode answers the Questions above — add a key to ask anything" : "Ask a question about this Dataset…",
+      keyMode: !nMode,
+      modeNote: nMode ? "Demo mode answers these 13 Questions, replaying recorded responses through the real validation and execution path. Switch to Your API key to ask anything." : "Your key is held in memory for this tab only. Requests go straight from this browser to the API.",
+      modelNote: s.model==="Smart" ? "Sonnet 5 · adaptive thinking" : "Haiku 4.5 · ~⅓ the cost",
+      setSmart: ()=>this.setState({model:"Smart"}), setFast: ()=>this.setState({model:"Fast"}),
+      ...(()=>{const a=seg(s.model==="Smart"),b=seg(s.model==="Fast");return {smartBg:a.bg,smartFg:a.fg,smartSh:a.sh,fastBg:b.bg,fastFg:b.fg,fastSh:b.sh}})(),
+      askLabel: s.inflight ? "Cancel" : "Ask",
+      askBg: s.inflight ? "var(--surface)" : (nMode ? "var(--sunken)" : "var(--accent)"),
+      askFg: s.inflight ? "var(--text)" : (nMode ? "var(--muted)" : "var(--accent-on)"),
+      askOrCancel: ()=>{ if(s.inflight){ this.clear(); this.setState({inflight:null, narration:"", chips:[]}); } else if(!nMode){ this.run("city"); } },
+
+      setDemo: ()=>this.setState({mode:"demo"}),
+      setKey: ()=>{ if(s.hasKey) this.setState({mode:"key"}); else this.setState({modal:true, modalPhase:"idle", keyText:""}); },
+      ...(()=>{const a=seg(s.mode==="demo"),b=seg(s.mode==="key");return {demoBg:a.bg,demoFg:a.fg,demoSh:a.sh,keyBg:b.bg,keyFg:b.fg,keySh:b.sh}})(),
+      modalOpen: !!s.modal,
+      rejected: s.modalPhase==="rejected",
+      fieldText: s.keyText || "sk-ant-…",
+      fieldFg: s.keyText ? "var(--text)" : "var(--muted)",
+      fieldBorder: s.modalPhase==="rejected" ? "var(--error)" : "var(--border)",
+      fieldCaret: !!s.keyText,
+      keySamples: [{label:"paste a valid key", pick:()=>this.setState({keyText:"sk-ant-api03-7Q2f…", modalPhase:"idle"})},{label:"paste a bad key", pick:()=>this.setState({keyText:"sk-live-9f2b7c41d8", modalPhase:"idle"})}],
+      verifyLabel: s.modalPhase==="checking" ? "Checking…" : "Verify and switch",
+      verify: ()=>{
+        if(!s.keyText) return;
+        this.setState({modalPhase:"checking"});
+        this.later(()=>{
+          if(s.keyText.indexOf("sk-ant-")===0) this.setState({modal:null, modalPhase:"idle", mode:"key", hasKey:true});
+          else this.setState({modalPhase:"rejected"});
+        }, 700);
+      },
+      closeModal: ()=>this.setState({modal:null, modalPhase:"idle"}),
+      secondaryLabel: s.hasKey ? "Cancel" : "Stay in Demo mode",
+      keyLostNote: s.keyLostNote, dismissKeyNote: ()=>this.setState({keyLostNote:false}),
+
+      questions: QS.filter(q=>!q.refine || !!S).map(q=>({...q, run: ()=>this.run(q.id)})),
+
+      inflight: !!s.inflight,
+      phaseLabel: phase.label, phaseNote: phase.note, phaseColor: phase.color,
+      phaseSpin: phase.spin && !!s.inflight, phaseWait: s.inflight==="waiting",
+      narration: s.narration, specChips: s.chips,
+      flightCost: s.model+" · streaming",
+
+      title: S ? S.title : "",
+      narrationDone: S ? S.narr : "",
+      revLabel: s.rev+"/"+s.revs, revBack: ()=>this.revBack(), revFwd: ()=>this.revFwd(),
+      chartTypes: ["bar","line","area"].map(t=>({label:t, ...seg(s.chart===t), pick: ()=>this.bump({chart:t})})),
+      agg: s.agg, aggOpen: s.aggOpen, toggleAgg: ()=>this.setState(x=>({aggOpen:!x.aggOpen})),
+      aggs: AGGS.map(a=>({label:a, tick: s.agg===a?"✓":"", pick: ()=>{ this.setState({aggOpen:false}); this.bump({agg:a}); }})),
+      toggleTable: ()=>this.setState(x=>({tableView:!x.tableView})),
+      tableBtnLabel: s.tableView ? "View as chart" : "View as table",
+      tableBtnBg: s.tableView ? "var(--sunken)" : "var(--surface)",
+      showChart: !s.tableView, showTable: s.tableView,
+      isBar: s.chart==="bar", isPath: s.chart!=="bar", isArea: s.chart==="area",
+      series: series.map(d=>({label:d[0], val: fmt(d[1]), h: Math.round(d[1]/max*H), pct: +(d[1]/max*100).toFixed(2)})),
+      yTicks: ticks, linePts: lineP, areaPts: "0,200 "+lineP+" 1000,200",
+      endLabelTop: Math.round(pts[pts.length-1][1]/200*(250-26)),
+      seriesName: S ? S.name : "matches",
+      dimName: S ? S.dim : "city", measureName: S ? S.measure : "matches",
+
+      queryOpen: s.queryOpen, queryCaret: s.queryOpen?"▾":"▸",
+      toggleQuery: ()=>this.setState(x=>({queryOpen:!x.queryOpen})),
+      queryText: S ? S.query : "",
+      rowsOpen: s.rowsOpen, rowsCaret: s.rowsOpen?"▾":"▸",
+      toggleRows: ()=>this.setState(x=>({rowsOpen:!x.rowsOpen})),
+      rowsCount: s.filterOn ? "1,140 of 49,520" : "49,520",
+      filterOn: s.filterOn, clearFilter: ()=>this.setState({filterOn:false}),
+      filterNote: s.filterOn ? "the chart filters these rows — removing the chip widens them and leaves the chart untouched" : "unfiltered — the chart is unchanged",
+      drillCols: DCOLS,
+      drillRows: (s.filterOn?DRILL:RAW).slice(0,8).map(r=>({cells: DCOLS.map((c,i)=>({v:r[i], w:c.w, color: i===0?"var(--muted)":"var(--text)"}))})),
+
+      cols: COLS.map((c,i)=>({name:c.name, w:c.w, type: s.colTypes[i], menuOpen: s.colMenu===i,
+        openMenu: ()=>this.setState(x=>({colMenu: x.colMenu===i ? -1 : i})),
+        opts: TYPES.map(t=>({label:t, tick: s.colTypes[i]===t?"✓":"", pick: ()=>this.setState(x=>{const ct=[...x.colTypes];ct[i]=t;return {colTypes:ct, colMenu:-1}})}))
+      })),
+      dataRows: RAW.map(r=>({cells: COLS.map((c,i)=>({v:r[i], w:c.w, color: i===0||i===8 ? "var(--muted)":"var(--text)"}))})),
+
+      notice: !!N, noticeTitle: N?N.title:"", noticeBody: N?N.body:"", noticeStripe: N?N.stripe:"var(--border)",
+      noticeViolations: !!(N&&N.violations), violations: N&&N.violations?N.violations:[],
+      noticeChips: N ? N.chips.map(c=>({label:c.label, bg: c.primary?"var(--accent)":"var(--surface)", fg: c.primary?"var(--accent-on)":"var(--text)", border: c.primary?"transparent":"var(--border)", pick: ()=>this.run("city")})) : [],
+      clearNotice: ()=>this.setState({notice:null}),
+
+      paletteOpen: s.palette || (s.stage==="ready" && s.route==="home" && !S && !s.inflight && !s.notice),
+      openPalette: ()=>this.setState({palette:true}),
+      closePalette: ()=>this.setState({palette:false}),
+      specFields: S ? S.chips : [],
+      hasSpec: !!S,
+      tabs: s.analyses.map((a,i)=>({title:a.title, updated:a.updated, rev:a.rev,
+        bg: i===s.tab ? "var(--surface)" : "transparent", fg: i===s.tab ? "var(--text)" : "var(--muted)",
+        bd: i===s.tab ? "var(--border)" : "transparent",
+        pick: ()=>{ this.setState({tab:i}); this.go("analysis"); }})),
+      jNoData: ()=>this.go("nodata"), jParsing: ()=>this.go("parsing"), jQuiet: ()=>this.go("quiet"), jLoud: ()=>this.go("loud"),
+      jEmpty: ()=>this.go("empty"), jThinking: ()=>this.go("thinking"), jCorrecting: ()=>this.go("correcting"),
+      jWaiting: ()=>this.go("waiting"), jComputing: ()=>this.go("computing"), jChart: ()=>this.go("analysis"),
+      jOpen: ()=>this.go("open"), jData: ()=>this.go("data"), jModal: ()=>this.go("modal"), jRejected: ()=>this.go("rejected"),
+      jClarify: ()=>this.go("clarify"), jUnsupported: ()=>this.go("unsupported"), jFailed: ()=>this.go("failed"), jTruncated: ()=>this.go("truncated")
+    };
+  }
+}
+</script>
+</body>
+</html>
