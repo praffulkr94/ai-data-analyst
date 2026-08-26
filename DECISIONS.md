@@ -360,11 +360,16 @@ job — `docs/ui-primitives.md` §5.2.
 **UI primitives — Radix first for new work, native where the platform won.** The library
 question was discussed early and never recorded, so it got answered ten times by accumulation,
 each component individually too small to justify a dependency. The standing decision: any *new*
-overlay, menu or toggle surface reaches for Radix first, installed on first use — it is not in
-`package.json` today. Existing controls are not retrofitted. `<dialog>`, `<details>` and
-`<select>` stay native regardless: the platform caught up after Radix was designed and the
-equivalents are more bytes for less. Measurements, the surface-by-surface gaps and the retrofit
-scope are in `docs/ui-primitives.md`.
+overlay, menu or toggle surface reaches for Radix first, installed on first use — which
+ADR-0027's dataset switcher did, so `@radix-ui/react-dropdown-menu` is now a dependency and
+nothing else of Radix is. Existing controls are not retrofitted.
+
+The exception is three **surfaces**, not three elements: a modal stays `<dialog>`, a plain
+disclosure stays `<details>`, a select stays `<select>` — the platform is equal or better at
+those jobs. It does not follow the element elsewhere. A `<details>` opening a *menu* is
+`docs/ui-primitives.md` row 6, which that document records as a gap and not as an exception, and
+the switcher was built that way once before being rebuilt on Radix. Measurements, the
+surface-by-surface gaps and the retrofit scope are in `docs/ui-primitives.md`.
 
 ## 16. Milestones
 
@@ -399,6 +404,10 @@ had nothing to do with the restructure that surfaced it.
     three keyless-only states are ordinary demo Questions; `#/data` carries schema editing next
     to the rows that show the problem; a load-time inference gate puts uncertain columns in
     front of a person once; and no surface scrolls horizontally at 1280, 1024, 900 or 760.
+    ADR-0027 is the correction a walkthrough of the shipped shell produced: the picker was
+    reachable exactly once per tab, and the gate stood in front of Datasets it had nothing to
+    ask about. `docs/design/gaps.md` is where gaps of that kind are recorded before they are
+    decided on.
     ADR-0025 came out of the same stretch and is unrelated to the shell: strict tool use
     compiles a grammar the API rejects outright, so `ModelReply.safeParse` is what enforces the
     reply shape. §15 carries the primitives decision the restructure forced into the open.

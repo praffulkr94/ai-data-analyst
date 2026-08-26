@@ -102,20 +102,29 @@ Radix is the default for any *new* overlay, menu, or toggle surface from here. E
 not retrofitted: the M10 patches deliberately kept the blast radius small, and a working control
 is not a reason to open a file.
 
-**Radix is not installed.** No package, no import, nothing in `package.json` — the M10
-light-dismiss fix was hand-rolled and this document is an assessment, not an adoption. So the
-decision is *adopt on first use*: whoever builds the next overlay surface installs it then, and a
-dependency nothing imports does not sit in the manifest in the meantime. Check before you assume
-it is there.
+**Radix is installed.** `@radix-ui/react-dropdown-menu`, added by the dataset switcher
+(ADR-0027 §1), which was the first new menu surface after this decision. Before that the decision
+was *adopt on first use* and the package was deliberately absent; that is now spent. Nothing else
+of Radix is installed — the next new surface adds its own package.
 
-The likely first caller is a filter combobox, which is the case where hand-rolling is genuinely
-hard — roving focus, typeahead, and an active-descendant relationship between an input and a
-listbox.
+**The exception is a list of surfaces, not a list of elements.** Rows 7–9 stay native: a modal is
+`<dialog>`, a plain disclosure is `<details>`, a select is `<select>`. Those three are recorded
+above with *gap: none*, and that is the whole basis for the exception — the platform is equal or
+better **at those jobs**.
 
-Standing exceptions, which are not close calls: `<dialog>`, `<details>` and `<select>` stay
-native. The platform caught up after Radix was designed, and the Radix equivalents are more bytes
-for less. "Radix first" means *first considered*, not *first regardless* — §1 rows 7–9 are the
-cases where considering it and declining is the right outcome.
+It does not extend to the element wherever else it turns up. A `<details>` doing the work of a
+dropdown is row **6**, and row 6 is recorded as a gap, not as an exception: no arrow keys, no
+typeahead, no `role="menu"`, no `aria-haspopup`. Reading the exception as "`<details>` is always
+fine" is how the dataset switcher was first built as a disclosure and then rebuilt; if you are
+reaching for a `<details>` because a *menu* needs to open, you are in row 6 and the answer is
+Radix.
+
+So: "Radix first" means *first considered*, and the only surfaces where considering it and
+declining is right are the three jobs named above. Everything else new is Radix. Existing code is
+not retrofitted, which is why the column type chips are still row 6 and still a disclosure.
+
+The other case where hand-rolling is genuinely hard is a filter combobox — roving focus,
+typeahead, and an active-descendant relationship between an input and a listbox.
 
 ### 5.2 · The `aria-pressed` toggles stay as they are, for now — **decided**
 

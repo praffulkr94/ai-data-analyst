@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; }
+    a { color:#5e6ad2; } a:hover { color:#4f5bd5; }
+    .art{--accent:#5e6ad2;--accent-hover:#4f5bd5;--accent-on:#ffffff;--surface:#ffffff;--raised:#fbfbfc;--sunken:#f6f7f8;--border:#e6e7eb;--border-strong:#d0d2d9;--text:#17181c;--muted:#6b6f76;--s3:#1baf7a;--good:#0a7f0a;--warning:#fab219;--serious:#ec835a;--critical:#d03b3b;font-family:Inter,ui-sans-serif,-apple-system,system-ui,sans-serif;font-size:13px;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;color:var(--text);background:var(--surface)}
+    .art *{box-sizing:border-box}
+    .art button{font:inherit;color:var(--text);border-radius:4px;border:1px solid var(--border);background:var(--surface);padding:4px 9px;cursor:pointer;transition:background 120ms cubic-bezier(.4,0,.2,1),border-color 120ms cubic-bezier(.4,0,.2,1)}
+    .art button:hover{border-color:var(--border-strong)}
+    .art button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:500}
+    .art button.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+    .art button.ghost{background:transparent;border-color:transparent}
+    .art button.ghost:hover{background:var(--sunken)}
+    .art .header{height:48px;flex:none;display:flex;align-items:center;gap:10px;padding:0 10px 0 8px;border-bottom:1px solid var(--border);background:var(--raised)}
+    .art .brand{font-weight:600;letter-spacing:-.01em}
+    .art .divider{width:1px;height:16px;flex:none;background:var(--border);margin:0 2px}
+    .art .dataset-chip{height:24px;display:flex;align-items:center;gap:7px;padding:0 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);font-size:12px;white-space:nowrap}
+    .art .dataset-chip .dot{width:5px;height:5px;flex:none;border-radius:50%;background:var(--s3)}
+    .art .header-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .art .icon-button{width:26px;height:26px;flex:none;display:flex;align-items:center;justify-content:center;position:relative;padding:0;border-color:transparent;background:none;color:var(--muted)}
+    .art .icon-button:hover{background:var(--sunken);color:var(--text)}
+    .art .icon-button.bordered{border-color:var(--border);background:var(--surface)}
+    .art .segmented{display:flex;height:26px;padding:2px;gap:2px;border:1px solid var(--border);border-radius:5px;background:var(--sunken)}
+    .art .segmented button{border:0;border-radius:3px;background:none;padding:0 9px;color:var(--muted);font-size:12px}
+    .art .segmented button[aria-pressed=true]{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgb(0 0 0/.06)}
+    .art .body{flex:1;min-height:0;display:flex}
+    .art .rail-strip{width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;border-right:1px solid var(--border);background:var(--raised)}
+    .art .rail-strip .icon-button{width:28px;height:28px}
+    .art .content{flex:1;min-width:0;overflow:hidden;background:var(--surface)}
+    .art .column{max-width:1040px;margin:0 auto;padding:20px 24px 0;display:flex;flex-direction:column;gap:14px}
+    .art .stage{max-width:760px;margin:0 auto;padding:56px 24px 40px}
+    .art h1{margin:0 0 8px;font-size:15px;font-weight:600;letter-spacing:-.01em}
+    .art h2{margin:0;font-size:13px;font-weight:600}
+    .art .muted{color:var(--muted)}
+    .art .card{border:1px solid var(--border);border-radius:8px;background:var(--surface);overflow:hidden}
+    .art .card-head{padding:13px 14px 12px;border-bottom:1px solid var(--border)}
+    .art .card-head .narration{margin:5px 0 0;font-size:12px;color:var(--muted)}
+    .art .card-foot{border-top:1px solid var(--border);font-size:11px;color:var(--muted);padding:7px 12px}
+    .art .strip{height:30px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--border);background:var(--sunken);font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+    .art .strip .plain{text-transform:none;letter-spacing:0}
+    .art .notice{border:1px solid var(--border);border-left:2px solid var(--border-strong);border-radius:6px;background:var(--surface);padding:12px 14px;font-size:12px}
+    .art .notice-good{border-left-color:var(--good)}
+    .art .notice-warning{border-left-color:var(--warning)}
+    .art .notice-serious{border-left-color:var(--serious)}
+    .art .notice-head{display:flex;align-items:baseline;gap:8px}
+    .art .notice-head .title{font-size:13px;font-weight:500}
+    .art .notice-head .aside{flex:1;font-size:11px;color:var(--muted)}
+    .art .notice-body{margin:5px 0 0;font-size:12px;color:var(--muted);line-height:1.6;max-width:640px}
+    .art .list-row{display:flex;align-items:center;gap:10px;width:100%;height:34px;padding:0 12px;border:0;border-bottom:1px solid var(--border);border-radius:0;background:none;text-align:left;font-size:13px;transition:background 120ms cubic-bezier(.4,0,.2,1)}
+    .art .list-row:hover{background:var(--sunken)}
+    .art .list-row .n{width:16px;flex:none;font-size:11px;color:var(--muted)}
+    .art .list-row .label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .art .list-row .kind{font-size:11px;color:var(--muted);font-family:ui-monospace,'SF Mono',Menlo,monospace}
+    .art .list-row .chevron{font-size:12px;color:var(--muted)}
+    .art .list-row.tall{height:auto;padding:9px 12px}
+    .art .list-row .sub{font-size:12px;color:var(--muted);margin-top:2px}
+    .art .picker-foot{padding:14px 12px;display:flex;align-items:center;gap:10px;background:var(--raised)}
+    .art .drop-hint{flex:1;height:52px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--border-strong);border-radius:6px;font-size:12px;color:var(--muted)}
+    .art .gate-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border)}
+    .art .gate-row .col{width:180px;flex:none}
+    .art .gate-row .name{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:12px}
+    .art .gate-row .why{font-size:11px;color:var(--muted);margin-top:2px}
+    .art .gate-row .sample{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .art .gate-foot{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--raised)}
+    .art .composer{padding:14px 0 16px;margin-top:auto}
+    .art .composer-box{border:1px solid var(--border-strong);border-radius:8px;background:var(--raised);padding:10px 10px 8px;box-shadow:0 2px 10px rgb(0 0 0/.05)}
+    .art .composer-row{display:flex;gap:8px;align-items:center}
+    .art .composer-row input{flex:1;font:inherit;font-size:13px;height:26px;padding:0 8px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--muted)}
+    .art .composer-foot{margin:7px 2px 0;display:flex;gap:8px;font-size:11px;color:var(--muted)}
+    .art .band{border-top:1px solid var(--border);background:var(--sunken);padding:18px 24px;display:flex;flex-direction:column;gap:10px}
+    .art .band-title{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+    .art .band-note{font-size:12px;color:var(--muted);line-height:1.6;max-width:1100px;text-wrap:pretty}
+    .art .menu{position:absolute;border:1px solid var(--border);border-radius:8px;background:var(--surface);box-shadow:0 8px 28px rgb(0 0 0/.12),0 1px 2px rgb(0 0 0/.06);overflow:hidden}
+    .art .pill{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:3px;padding:0 5px;line-height:16px;flex:none}
+    .art .rail{width:240px;flex:none;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--raised)}
+    .art .rail-head{height:30px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 12px;border-bottom:1px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+    .art .rail-row{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:12px;border-bottom:1px solid var(--border)}
+    .art .rail-foot{flex:none;border-top:1px solid var(--border);padding:8px 12px}
+  </style>
+</helmet>
+<div class="art" style="width:1440px;height:1120px;display:flex;flex-direction:column;position:relative;overflow:hidden">
+  <header class="header">
+    <button class="icon-button" aria-label="Analyses"><svg width="12" height="10" viewBox="0 0 12 10" fill="currentColor"><rect y="0" width="12" height="1.5" rx=".75"/><rect y="4.25" width="12" height="1.5" rx=".75"/><rect y="8.5" width="12" height="1.5" rx=".75"/></svg></button>
+    <span class="brand">Analyst</span>
+    <span class="divider"></span>
+    <button class="dataset-chip"><span class="dot" style="background:var(--s3)"></span>International football matches<span class="muted">49,520 rows</span></button>
+    <div class="header-right">
+      <button class="ghost" style="background:var(--sunken);">Data</button>
+      <div class="segmented" role="group" aria-label="Mode"><button aria-pressed="true">Demo</button><button>Your API key</button></div>
+      <button class="icon-button bordered" aria-label="Theme"><svg width="11" height="11" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 .75A5.25 5.25 0 0 0 6 11.25Z" fill="currentColor"/></svg></button>
+    </div>
+  </header>
+  <div class="body">
+      <nav class="rail-strip" aria-label="Analyses">
+        <button class="icon-button" aria-label="Analyses"><svg width="13" height="12" viewBox="0 0 13 12" fill="currentColor"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="0" width="3" height="12" rx="1"/><rect x="10" y="4" width="3" height="8" rx="1"/></svg></button>
+        <button class="icon-button" aria-label="New analysis" style="font-size:15px">+</button>
+      </nav>
+      <div class="content">
+        <div style="display:flex;flex-direction:column;height:836px">
+          <div style="flex:none;display:flex;align-items:center;gap:10px;padding:16px 20px 12px;border-bottom:1px solid var(--border)">
+            <h2>International football matches</h2>
+            <span class="muted" style="font-size:12px">49,520 rows · 9 columns · types set in the headers</span>
+            <span style="flex:1"></span>
+            <button>Back to analysis</button>
+          </div>
+          <div style="padding:14px 20px 0"><section class="card" style="margin:0 0 14px">
+            <div class="strip"><span>How this file read</span></div>
+            <div style="display:flex;flex-direction:column">
+              <div class="gate-row"><div class="col"><div class="name">rows</div></div><span style="flex:1">49,520 parsed · none skipped · not capped</span></div>
+              <div class="gate-row" style="border-bottom:0"><div class="col"><div class="name">columns</div></div><span style="flex:1">9 typed · 2 numbers · 1 date · 5 categorical · 1 boolean — each one is set in its header below</span></div>
+            </div>
+          </section></div>
+          <div style="flex:1;min-height:0;padding:0 20px 20px">
+            <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+              <div style="height:30px;display:flex;background:var(--sunken);border-bottom:1px solid var(--border);color:var(--muted)"><div style="flex:1;padding:0 10px;display:flex;align-items:center;gap:6px;border-right:1px solid var(--border);font-size:12px"><span>date</span><span class="pill">date</span></div><div style="flex:1;padding:0 10px;display:flex;align-items:center;gap:6px;border-right:1px solid var(--border);font-size:12px"><span>home_team</span><span class="pill">categorical</span></div><div style="flex:1;padding:0 10px;display:flex;align-items:center;gap:6px;border-right:1px solid var(--border);font-size:12px"><span>away_team</span><span class="pill">categorical</span></div><div style="flex:1;padding:0 10px;display:flex;align-items:center;gap:6px;border-right:1px solid var(--border);font-size:12px"><span>home_score</span><span class="pill">number</span></div><div style="flex:1;padding:0 10px;display:flex;align-items:center;gap:6px;border-right:1px solid var(--border);font-size:12px"><span>away_score</span><span class="pill">number</span></div><div style="flex:1;padding:0 10px;display:flex;align-items:center;gap:6px;border-right:1px solid var(--border);font-size:12px"><span>neutral</span><span class="pill">boolean</span></div></div>
+              <div style="height:30px;display:flex;border-bottom:1px solid var(--border);font-size:12px;color:var(--text)"><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">1872-11-30</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">Scotland</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">England</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">0</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">0</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">false</div></div><div style="height:30px;display:flex;border-bottom:1px solid var(--border);font-size:12px;color:var(--text)"><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">1873-03-08</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">England</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">Scotland</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">4</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">2</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">false</div></div><div style="height:30px;display:flex;border-bottom:1px solid var(--border);font-size:12px;color:var(--text)"><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">1874-03-07</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">Scotland</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">England</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">2</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">1</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">false</div></div><div style="height:30px;display:flex;border-bottom:1px solid var(--border);font-size:12px;color:var(--text)"><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">1875-03-06</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">England</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">Scotland</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">2</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">2</div><div style="flex:1;padding:0 10px;display:flex;align-items:center;border-right:1px solid var(--border);font-family:ui-monospace,Menlo,monospace;font-size:11px">false</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+  </div>
+  <div class="band">
+    <span class="band-title">Where the bad news would go</span>
+    <div style="display:flex;flex-direction:column;gap:8px;max-width:1100px"><div class="notice notice-serious"><div class="notice-head"><span class="title">Parsed 47,914 of 48,000 rows.</span><span class="aside">86 malformed rows skipped &nbsp;·&nbsp; <span style="color:var(--accent)">See which</span></span><button class="icon-button" aria-label="Dismiss" style="width:18px;height:18px"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M2 2l6 6M8 2l-6 6"/></svg></button></div></div><div class="notice notice-warning"><div class="notice-head"><span class="title">Capped at 500,000 rows.</span><span class="aside">The rest of the file was not read &nbsp;·&nbsp; <span style="color:var(--accent)">What this means</span></span><button class="icon-button" aria-label="Dismiss" style="width:18px;height:18px"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M2 2l6 6M8 2l-6 6"/></svg></button></div></div></div>
+    <p class="band-note" style="margin:0">The quietest option: the load never speaks on the way in, and everything it knows lives on the surface that already carries the parse report. The cost is that a truncated file — real news a person has to act on — is entirely passive; nothing on the workspace says go and look.</p>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

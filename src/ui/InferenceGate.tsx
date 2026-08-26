@@ -2,45 +2,39 @@
 
     Inference is where a live demo breaks: one column typed categorical because 254 of its values
     say `NA` makes "average goal minute" impossible, and a visitor who never saw the guess has no
-    way to know why. So the guesses are put in front of a person exactly once, and the shape of
-    the screen is the shape of the news — one row when everything was confident, one row per
-    doubtful column when it was not (DECISIONS §21.1).
+    way to know why. So the doubtful guesses are put in front of a person exactly once
+    (DECISIONS §21.1).
+
+    Only the doubtful ones. This screen used to open for every Dataset, and with every column
+    confident it was a one-line receipt with a Continue button on an otherwise empty stage — a
+    screen asking permission to do what had just been asked for. That case never reaches here
+    now: the store leaves `load` ready and the census goes to the workspace as `LoadNews`. What
+    is left is the branch that earns a screen, because it has a decision in it (ADR-0027).
 
     A type changed here goes through `loader.retype`, the same path the `#/data` headers use: the
     worker re-encodes that column and rebuilds the RowIndex. There is no second inference path. */
 import { useState } from 'react';
 import type { Loader } from '../data/loader';
-import { isCategoryStats, isNumberStats, type ColumnMeta, type ColumnType } from '../engine/types';
+import {
+  isCategoryStats,
+  isNumberStats,
+  isUncertain,
+  type ColumnMeta,
+  type ColumnType,
+} from '../engine/types';
 import { useApp } from '../store';
+import type { Workspace } from '../workspace/workspace';
+import { DatasetMenu } from './DatasetMenu';
 
 const TYPES: ColumnType[] = ['number', 'date', 'categorical', 'boolean'];
 
-/** Below this, the winning type did not fit enough of the sampled values to be taken on trust. */
-const CONFIDENT = 0.99;
-
-export function InferenceGate({ loader }: { loader: Loader }) {
+export function InferenceGate({ loader, workspace }: { loader: Loader; workspace: Workspace }) {
   const columns = useApp((s) => s.columns);
   const confirm = useApp((s) => s.confirmInference);
   const [showConfident, setShowConfident] = useState(false);
 
-  const uncertain = columns.filter((c) => !c.overridden && c.confidence < CONFIDENT);
+  const uncertain = columns.filter(isUncertain);
   const confident = columns.filter((c) => !uncertain.includes(c));
-
-  if (uncertain.length === 0) {
-    return (
-      <div className="stage">
-        <div className="notice notice-good" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span>All {columns.length} columns typed.</span>
-          <span className="muted" style={{ flex: 1 }}>
-            {census(columns)}
-          </span>
-          <button type="button" className="primary" onClick={confirm}>
-            Continue
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="stage">
@@ -82,6 +76,11 @@ export function InferenceGate({ loader }: { loader: Loader }) {
             {showConfident ? 'Hide' : 'Show'} the {confident.length} confident columns
           </button>
           <span className="spacer" style={{ flex: 1 }} />
+          {/* The way out, for a Dataset picked by mistake. Nothing has been asked of it yet, so
+              this is the cheapest moment to leave — and before this it cost a tab reload. */}
+          <DatasetMenu workspace={workspace} className="plain-trigger" align="end">
+            Choose a different dataset
+          </DatasetMenu>
           <button type="button" className="primary" onClick={confirm}>
             Continue
           </button>
@@ -98,20 +97,6 @@ export function InferenceGate({ loader }: { loader: Loader }) {
       </section>
     </div>
   );
-}
-
-/** "1 date · 2 numbers · 5 categorical · 1 boolean" — the tally, in the design's own words. */
-function census(columns: ColumnMeta[]): string {
-  const plural: Record<ColumnType, [string, string]> = {
-    date: ['date', 'dates'],
-    number: ['number', 'numbers'],
-    categorical: ['categorical', 'categorical'],
-    boolean: ['boolean', 'booleans'],
-  };
-  return TYPES.map((t) => [t, columns.filter((c) => c.type === t).length] as const)
-    .filter(([, n]) => n > 0)
-    .map(([t, n]) => `${n} ${plural[t][n === 1 ? 0 : 1]}`)
-    .join(' · ');
 }
 
 /** Why this column is being asked about, in the terms the inference actually used. */

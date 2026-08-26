@@ -7,6 +7,7 @@
 
     Everything else in the application is wiring around this and the `DataEngine`. There is no
     third seam. */
+import { navigate } from '../route';
 import { validateSpec } from '../spec/validate';
 import { mark } from '../perf';
 import { specFromReply, type AnalysisSpec } from '../spec/grammar';
@@ -330,12 +331,19 @@ export function createWorkspace({
   return {
     /** A Dataset the Analyses were not asked against makes every one of them meaningless, so the
         store drops them — and any Request still in flight is abandoned here rather than allowed
-        to land against columns that no longer exist. */
+        to land against columns that no longer exist.
+
+        The route goes home for the same reason: a switch is not a view change. `#/data` is a
+        table of columns that are about to stop existing, and the arrival of a Dataset is legible
+        on home and nowhere else — the inference gate stands there when there is something to
+        ask, and `LoadNews` says what the load found when there is not. Landing on `#/data`
+        skipped both. */
     async loadDataset(source: Sample | File): Promise<void> {
       requestId++;
       inFlight?.abort();
       exchanges.clear();
       store.getState().dismissNotice();
+      navigate('home');
       await (source instanceof File ? loader.loadFile(source) : loader.loadSample(source));
     },
 

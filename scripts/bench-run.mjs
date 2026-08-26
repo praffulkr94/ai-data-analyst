@@ -63,8 +63,9 @@ async function bench(index) {
 async function pan() {
   await page.goto(base);
   await page.getByRole('button', { name: /Team-match results/ }).click();
-  // The inference gate stands between parsing and the workspace (ADR-0026).
-  await page.getByRole('button', { name: 'Continue' }).click({ timeout: 120_000 });
+  // No Continue click: the inference gate opens only for a Dataset with a column in doubt, and
+  // every column of this one types confidently (ADR-0027). The question click below waits for
+  // the workspace, so it fails loudly if a gate ever returns to this path.
   await page.getByRole('button', { name: /goals scored compare with goals conceded/ }).click();
   await page.waitForSelector('canvas', { timeout: 120_000 });
   await page.waitForTimeout(2_000);

@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; }
+    a { color:#5e6ad2; } a:hover { color:#4f5bd5; }
+    .art{--accent:#5e6ad2;--accent-hover:#4f5bd5;--accent-on:#ffffff;--surface:#ffffff;--raised:#fbfbfc;--sunken:#f6f7f8;--border:#e6e7eb;--border-strong:#d0d2d9;--text:#17181c;--muted:#6b6f76;--s3:#1baf7a;--good:#0a7f0a;--warning:#fab219;--serious:#ec835a;--critical:#d03b3b;font-family:Inter,ui-sans-serif,-apple-system,system-ui,sans-serif;font-size:13px;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;color:var(--text);background:var(--surface)}
+    .art *{box-sizing:border-box}
+    .art button{font:inherit;color:var(--text);border-radius:4px;border:1px solid var(--border);background:var(--surface);padding:4px 9px;cursor:pointer;transition:background 120ms cubic-bezier(.4,0,.2,1),border-color 120ms cubic-bezier(.4,0,.2,1)}
+    .art button:hover{border-color:var(--border-strong)}
+    .art button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:500}
+    .art button.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+    .art button.ghost{background:transparent;border-color:transparent}
+    .art button.ghost:hover{background:var(--sunken)}
+    .art .header{height:48px;flex:none;display:flex;align-items:center;gap:10px;padding:0 10px 0 8px;border-bottom:1px solid var(--border);background:var(--raised)}
+    .art .brand{font-weight:600;letter-spacing:-.01em}
+    .art .divider{width:1px;height:16px;flex:none;background:var(--border);margin:0 2px}
+    .art .dataset-chip{height:24px;display:flex;align-items:center;gap:7px;padding:0 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);font-size:12px;white-space:nowrap}
+    .art .dataset-chip .dot{width:5px;height:5px;flex:none;border-radius:50%;background:var(--s3)}
+    .art .header-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .art .icon-button{width:26px;height:26px;flex:none;display:flex;align-items:center;justify-content:center;position:relative;padding:0;border-color:transparent;background:none;color:var(--muted)}
+    .art .icon-button:hover{background:var(--sunken);color:var(--text)}
+    .art .icon-button.bordered{border-color:var(--border);background:var(--surface)}
+    .art .segmented{display:flex;height:26px;padding:2px;gap:2px;border:1px solid var(--border);border-radius:5px;background:var(--sunken)}
+    .art .segmented button{border:0;border-radius:3px;background:none;padding:0 9px;color:var(--muted);font-size:12px}
+    .art .segmented button[aria-pressed=true]{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgb(0 0 0/.06)}
+    .art .body{flex:1;min-height:0;display:flex}
+    .art .rail-strip{width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;border-right:1px solid var(--border);background:var(--raised)}
+    .art .rail-strip .icon-button{width:28px;height:28px}
+    .art .content{flex:1;min-width:0;overflow:hidden;background:var(--surface)}
+    .art .column{max-width:1040px;margin:0 auto;padding:20px 24px 0;display:flex;flex-direction:column;gap:14px}
+    .art .stage{max-width:760px;margin:0 auto;padding:56px 24px 40px}
+    .art h1{margin:0 0 8px;font-size:15px;font-weight:600;letter-spacing:-.01em}
+    .art h2{margin:0;font-size:13px;font-weight:600}
+    .art .muted{color:var(--muted)}
+    .art .card{border:1px solid var(--border);border-radius:8px;background:var(--surface);overflow:hidden}
+    .art .card-head{padding:13px 14px 12px;border-bottom:1px solid var(--border)}
+    .art .card-head .narration{margin:5px 0 0;font-size:12px;color:var(--muted)}
+    .art .card-foot{border-top:1px solid var(--border);font-size:11px;color:var(--muted);padding:7px 12px}
+    .art .strip{height:30px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--border);background:var(--sunken);font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+    .art .strip .plain{text-transform:none;letter-spacing:0}
+    .art .notice{border:1px solid var(--border);border-left:2px solid var(--border-strong);border-radius:6px;background:var(--surface);padding:12px 14px;font-size:12px}
+    .art .notice-good{border-left-color:var(--good)}
+    .art .notice-warning{border-left-color:var(--warning)}
+    .art .notice-serious{border-left-color:var(--serious)}
+    .art .notice-head{display:flex;align-items:baseline;gap:8px}
+    .art .notice-head .title{font-size:13px;font-weight:500}
+    .art .notice-head .aside{flex:1;font-size:11px;color:var(--muted)}
+    .art .notice-body{margin:5px 0 0;font-size:12px;color:var(--muted);line-height:1.6;max-width:640px}
+    .art .list-row{display:flex;align-items:center;gap:10px;width:100%;height:34px;padding:0 12px;border:0;border-bottom:1px solid var(--border);border-radius:0;background:none;text-align:left;font-size:13px;transition:background 120ms cubic-bezier(.4,0,.2,1)}
+    .art .list-row:hover{background:var(--sunken)}
+    .art .list-row .n{width:16px;flex:none;font-size:11px;color:var(--muted)}
+    .art .list-row .label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .art .list-row .kind{font-size:11px;color:var(--muted);font-family:ui-monospace,'SF Mono',Menlo,monospace}
+    .art .list-row .chevron{font-size:12px;color:var(--muted)}
+    .art .list-row.tall{height:auto;padding:9px 12px}
+    .art .list-row .sub{font-size:12px;color:var(--muted);margin-top:2px}
+    .art .picker-foot{padding:14px 12px;display:flex;align-items:center;gap:10px;background:var(--raised)}
+    .art .drop-hint{flex:1;height:52px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--border-strong);border-radius:6px;font-size:12px;color:var(--muted)}
+    .art .gate-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border)}
+    .art .gate-row .col{width:180px;flex:none}
+    .art .gate-row .name{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:12px}
+    .art .gate-row .why{font-size:11px;color:var(--muted);margin-top:2px}
+    .art .gate-row .sample{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .art .gate-foot{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--raised)}
+    .art .composer{padding:14px 0 16px;margin-top:auto}
+    .art .composer-box{border:1px solid var(--border-strong);border-radius:8px;background:var(--raised);padding:10px 10px 8px;box-shadow:0 2px 10px rgb(0 0 0/.05)}
+    .art .composer-row{display:flex;gap:8px;align-items:center}
+    .art .composer-row input{flex:1;font:inherit;font-size:13px;height:26px;padding:0 8px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--muted)}
+    .art .composer-foot{margin:7px 2px 0;display:flex;gap:8px;font-size:11px;color:var(--muted)}
+    .art .band{border-top:1px solid var(--border);background:var(--sunken);padding:18px 24px;display:flex;flex-direction:column;gap:10px}
+    .art .band-title{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+    .art .band-note{font-size:12px;color:var(--muted);line-height:1.6;max-width:1100px;text-wrap:pretty}
+    .art .menu{position:absolute;border:1px solid var(--border);border-radius:8px;background:var(--surface);box-shadow:0 8px 28px rgb(0 0 0/.12),0 1px 2px rgb(0 0 0/.06);overflow:hidden}
+    .art .pill{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:3px;padding:0 5px;line-height:16px;flex:none}
+    .art .rail{width:240px;flex:none;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--raised)}
+    .art .rail-head{height:30px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 12px;border-bottom:1px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+    .art .rail-row{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:12px;border-bottom:1px solid var(--border)}
+    .art .rail-foot{flex:none;border-top:1px solid var(--border);padding:8px 12px}
+  </style>
+</helmet>
+<div class="art" style="width:1440px;height:1120px;display:flex;flex-direction:column;position:relative;overflow:hidden">
+  <header class="header">
+    <button class="icon-button" aria-label="Analyses"><svg width="12" height="10" viewBox="0 0 12 10" fill="currentColor"><rect y="0" width="12" height="1.5" rx=".75"/><rect y="4.25" width="12" height="1.5" rx=".75"/><rect y="8.5" width="12" height="1.5" rx=".75"/></svg></button>
+    <span class="brand">Analyst</span>
+    <span class="divider"></span>
+    <button class="dataset-chip"><span class="dot" style="background:var(--s3)"></span>International football matches<span class="muted">49,520 rows</span><span style="color:var(--muted);display:flex"><svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4 5 6.5 7.5 4"/></svg></span></button>
+    <div class="header-right">
+      <button class="ghost" style="">Data</button>
+      <div class="segmented" role="group" aria-label="Mode"><button aria-pressed="true">Demo</button><button>Your API key</button></div>
+      <button class="icon-button bordered" aria-label="Theme"><svg width="11" height="11" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 .75A5.25 5.25 0 0 0 6 11.25Z" fill="currentColor"/></svg></button>
+    </div>
+  </header>
+  <div class="body">
+      <nav class="rail-strip" aria-label="Analyses">
+        <button class="icon-button" aria-label="Analyses"><svg width="13" height="12" viewBox="0 0 13 12" fill="currentColor"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="0" width="3" height="12" rx="1"/><rect x="10" y="4" width="3" height="8" rx="1"/></svg></button>
+        <button class="icon-button" aria-label="New analysis" style="font-size:15px">+</button>
+      </nav>
+      <div class="content"><div class="column" style="height:836px"><section class="card">
+          <div class="strip"><span>The Questions demo mode can answer</span><span class="plain">— the whole recorded repertoire, not a selection</span></div>
+          <ul style="margin:0;padding:0;list-style:none"><li><button class="list-row"><span class="n">1</span><span class="label">Which teams have hosted the most matches?</span><span class="kind">bar</span><span class="chevron">&rsaquo;</span></button></li><li><button class="list-row"><span class="n">2</span><span class="label">How many matches were played each year?</span><span class="kind">line</span><span class="chevron">&rsaquo;</span></button></li><li><button class="list-row"><span class="n">3</span><span class="label">How has the average home score changed over time?</span><span class="kind">line</span><span class="chevron">&rsaquo;</span></button></li><li><button class="list-row"><span class="n">4</span><span class="label">What share of matches were played on neutral ground each year?</span><span class="kind">area</span><span class="chevron">&rsaquo;</span></button></li><li><button class="list-row"><span class="n">5</span><span class="label">Which tournaments have the most matches?</span><span class="kind">bar</span><span class="chevron">&rsaquo;</span></button></li><li><button class="list-row"><span class="n">6</span><span class="label">How many matches has Atlantis hosted?</span><span class="kind">clarification</span><span class="chevron">&rsaquo;</span></button></li><li><button class="list-row"><span class="n">7</span><span class="label">Who is the best team?</span><span class="kind">unsupported</span><span class="chevron">&rsaquo;</span></button></li></ul>
+          <p class="card-foot" style="margin:0">A refining Question needs something to refine, so it appears once there is an Analysis on screen · switch to Your API key to ask anything</p>
+        </section><div class="composer">
+          <div class="composer-box">
+            <div class="composer-row">
+              <input value="" placeholder="Demo mode answers the Questions above — add a key to ask anything" disabled>
+              <div class="segmented" role="group" aria-label="Model"><button aria-pressed="true">Smart</button><button>Fast</button></div>
+              <button class="primary" disabled style="opacity:.55">Ask</button>
+            </div>
+            <p class="composer-foot" style="margin:7px 2px 0"><span>Demo mode · recorded replies, no key spent</span></p>
+          </div>
+        </div></div></div>
+  </div>
+    <div class="menu" style="left:130px;top:44px;width:392px">
+      <div class="strip"><span>International football matches</span></div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;gap:10px;font-size:12px"><span class="muted" style="width:118px">Rows</span><span>49,520 · none skipped</span></div>
+        <div style="display:flex;gap:10px;font-size:12px"><span class="muted" style="width:118px">Columns</span><span>9 · all typed confidently</span></div>
+        <div style="display:flex;gap:10px;font-size:12px"><span class="muted" style="width:118px">Types</span><span>2 numbers · 1 date · 5 categorical · 1 boolean</span></div>
+      </div>
+      <div style="display:flex;gap:8px;padding:10px 12px;background:var(--raised);border-top:1px solid var(--border)">
+        <button style="flex:1">Open the data</button><button style="flex:1">Change dataset…</button>
+      </div>
+    </div>
+  <div class="band">
+    <span class="band-title">The chip in its three states</span>
+    <div style="display:flex;flex-direction:column;gap:9px"><div style="display:flex;align-items:center;gap:10px"><button class="dataset-chip"><span class="dot" style="background:var(--s3)"></span>International football matches<span class="muted">49,520 rows</span></button><span class="muted" style="font-size:12px">&larr; the dot is the only difference</span></div><div style="display:flex;align-items:center;gap:10px"><button class="dataset-chip"><span class="dot" style="background:var(--serious)"></span>Deliberately messy export<span class="muted">2,021 rows · 86 skipped</span></button><span class="muted" style="font-size:12px">&larr; the dot is the only difference</span></div><div style="display:flex;align-items:center;gap:10px"><button class="dataset-chip"><span class="dot" style="background:var(--warning)"></span>Big export<span class="muted">500,000 rows · capped</span></button><span class="muted" style="font-size:12px">&larr; the dot is the only difference</span></div></div>
+    <p class="band-note" style="margin:0">Nothing interrupts the landing. The chip is the permanent home for everything the load knows, so the news is still there an hour later — but a skipped-row report behind a click is one a visitor may never open.</p>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

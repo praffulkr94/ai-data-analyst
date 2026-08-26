@@ -27,7 +27,7 @@ has happened.
   "store". RowSlice — never "window". ModelReply — never `SpecResponse`. Translator — never
   `SpecGenerator`. A concept you need that is missing from the glossary is a signal, not a
   licence to invent one.
-- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are twenty-six.
+- `docs/adr/` — read the ADRs that touch the area you are about to work in. There are twenty-seven.
 - Issue #1 — the whole spec, and the only place the work is decomposed.
 
 ## The constraint that has to travel with you
@@ -118,8 +118,12 @@ else is wiring around them.
   line breaking at a gap — count subpaths, never coordinates.
 - **The `Workspace` seam tests share `tests/workspace/harness.ts`** — the scripted Translator, the
   `attempt`/`analysis` builders, the gated port, and a `setup` that parses a four-row CSV through
-  the real kernel. Three files use it now (`workspace`, `analysis`, `analysisCard`); use it rather
-  than forking a fourth copy.
+  the real kernel. Most of `tests/workspace/` uses it; use it rather than forking another copy.
+- **This repo is not Prettier-formatted and has no Prettier config.** Running `npx prettier
+  --write` on a file rewrites it to Prettier's defaults — double quotes, 80 columns — against a
+  house style of single quotes and ~100. It buries a real change in hundreds of lines of noise.
+  Do not run it. If it has already happened, replay the edit onto `git show HEAD:<file>` rather
+  than trying to unpick the reformat.
 - **Every edit to an Analysis goes through the `Workspace`**, spoken or manual. `workspace.revise`
   is the manual path and it is deliberately `ask` without the Translator — same validation, same
   worker execution, same captured target, same Revision (ADR-0021). A control that writes a
@@ -195,6 +199,14 @@ else is wiring around them.
   raw date column labelled every tick "no value".
 - A drag tracked in a local variable is reset by the re-render the drag itself causes: it moves
   one pixel and stops. It has to be a ref.
+- **Class names are a flat namespace and `app.css` is 1,600 lines.** A new `.caret` for a menu
+  chevron silently inherited `.caret`, the composer's blinking text cursor: `width: 1px`, a
+  background fill and a blink animation. It rendered as a 1px sliver and looked like a layout bug.
+  Grep the stylesheet for a name before you use it.
+- **Chrome throttles `setTimeout` in a hidden tab**, and the Fixture Translator paces its
+  narration with `sleep`. A browser-automation session whose tab is not foregrounded will watch a
+  demo-mode Question sit at *Thinking* indefinitely — it is throttling, not a hang. Drive that
+  path from a test, or check `document.hidden` before concluding anything.
 - `setPointerCapture` throws on a pointer id that is not down — which every synthetic event is —
   and jsdom does not implement it. The call is wrapped; the drag works without it, it just ends
   at the edge of the plot.

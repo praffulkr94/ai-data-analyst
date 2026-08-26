@@ -8,3 +8,7 @@ coverage/
 playwright-report/
 test-results/
 bench-results/*.json
+
+# The seeded design canvas. Regenerated from `docs/design/gaps/` by the design skill's
+# helper, and 2 MB of editor payload that does not belong in the history.
+analyst-gap-directions.html

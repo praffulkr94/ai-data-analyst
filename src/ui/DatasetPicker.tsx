@@ -5,7 +5,11 @@ import { SAMPLES } from '../data/samples';
 import { useApp } from '../store';
 
 /** The first-run surface: a sample is offered before anything is asked of the visitor, so the
-    app can be seen working before they invest a file or a key. */
+    app can be seen working before they invest a file or a key.
+
+    First run only. Once a Dataset is loaded the switcher in the header is what changes it
+    (ADR-0027), and a load in progress is `LoadStage` — which is why the progress card that used
+    to live here does not any more. */
 export function DatasetPicker({ loader }: { loader: Loader }) {
   const load = useApp((s) => s.load);
   const restore = useApp((s) => s.restore);
@@ -24,37 +28,6 @@ export function DatasetPicker({ loader }: { loader: Loader }) {
         ? `This link was built on ${wanted.filename}, and you picked ${file.name}.`
         : undefined,
     );
-
-  if (load.status === 'loading') {
-    return (
-      <div className="stage narrow">
-        <section className="card" style={{ padding: '18px 18px 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
-            <span className="spinner" aria-hidden="true" />
-            <strong>Loading {load.label}</strong>
-            <span style={{ flex: 1 }} />
-            <button type="button" onClick={() => loader.cancel()}>
-              Cancel
-            </button>
-          </div>
-          {/* The total is unknown until the file ends, so the bar paces itself against the row
-              count rather than claiming a percentage it cannot know. */}
-          <div className="progress">
-            <div style={{ width: `${Math.min(97, Math.log10(load.rows + 1) * 20)}%` }} />
-          </div>
-          <p className="composer-foot" aria-live="polite">
-            <span className="mode-note">{load.rows.toLocaleString()} rows parsed</span>
-            <span>the interface stays responsive — this is not a blocking spinner</span>
-          </p>
-          {load.warning && (
-            <p className="notice notice-warning" role="status">
-              {load.warning}
-            </p>
-          )}
-        </section>
-      </div>
-    );
-  }
 
   return (
     <div

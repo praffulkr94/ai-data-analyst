@@ -12,8 +12,11 @@ import { Header } from './ui/Header';
 import { InferenceGate } from './ui/InferenceGate';
 import { InFlight } from './ui/InFlight';
 import { KeyDialog } from './ui/KeyDialog';
+import { LoadNews } from './ui/LoadNews';
+import { LoadStage } from './ui/LoadStage';
 import { Notice } from './ui/Notice';
 import { Rail } from './ui/Rail';
+import { useLightDismiss } from './ui/lightDismiss';
 import { useApp } from './store';
 
 export function App({
@@ -35,9 +38,11 @@ export function App({
   const theme = useApp((s) => s.theme);
   const status = useApp((s) => s.load.status);
   const hasDataset = useApp((s) => s.datasetHandle !== null);
+  /** The strip's dismissal belongs to the Dataset it is about, so a switch brings back a strip
+      the last one's × had closed. */
+  const datasetLabel = useApp((s) => s.datasetHandle?.label);
   const hasAnalysis = useApp((s) => s.activeAnalysisId !== null);
   const inFlight = useApp((s) => s.request !== null);
-  const report = useApp((s) => s.parseReport);
   /** Shut by default. A quarter of the width is worth spending on a list of Analyses only once
       there is a list, and the 44px strip still carries the marker that says one changed. */
   const [railOpen, setRailOpen] = useState(false);
@@ -46,7 +51,10 @@ export function App({
       header and closed has changed nothing, and saying so would be noise. */
   const [restoring, setRestoring] = useState(wantsKey);
   const [announcement, setAnnouncement] = useState<string | null>(null);
-  const [truncationRead, setTruncationRead] = useState(false);
+
+  /** One listener for every `<details name>` menu on the page. That is the column type chips
+      and nothing else now — the dataset switcher is Radix, which brings its own. */
+  useLightDismiss();
 
   function closeKeyDialog(): void {
     setKeyDialog(false);
@@ -73,16 +81,24 @@ export function App({
       <Header
         route={route}
         railOpen={railOpen}
+        workspace={workspace}
         onToggleRail={() => setRailOpen((v) => !v)}
         onWantKey={() => setKeyDialog(true)}
       />
       <div className="body">
         <Rail open={railOpen} onToggle={() => setRailOpen((v) => !v)} workspace={workspace} />
         <main className="content">
-          {!hasDataset ? (
+          {/* Before every other branch. A load in progress, and a failure the Dataset did not
+              survive, both make the surface underneath untrue — a switch used to leave the
+              outgoing Dataset's analyses on screen until the new one landed and then blank
+              them. A first-run failure is not here: it belongs on the picker, next to the
+              samples the visitor has to choose from again. */}
+          {status === 'loading' || (status === 'failed' && hasDataset) ? (
+            <LoadStage loader={loader} workspace={workspace} />
+          ) : !hasDataset ? (
             <DatasetPicker loader={loader} />
           ) : status === 'inferring' ? (
-            <InferenceGate loader={loader} />
+            <InferenceGate loader={loader} workspace={workspace} />
           ) : route === 'data' ? (
             <DataSurface cache={cache} loader={loader} />
           ) : (
@@ -104,28 +120,10 @@ export function App({
                   </span>
                 </p>
               )}
-              {/* What the file cost to read, once, dismissibly — the detail is on `#/data`.
-                  A malformed row never fails the file, so this is news rather than an error. */}
-              {report && (report.skipped > 0 || report.truncated) && !truncationRead && (
-                <p className="notice notice-serious" role="status">
-                  <span className="notice-head">
-                    <span className="aside">
-                      {report.truncated && 'Capped at 500,000 rows — the rest of the file was not read. '}
-                      {report.skipped > 0 &&
-                        `Parsed ${(report.totalRows - report.skipped).toLocaleString()} of ` +
-                          `${report.totalRows.toLocaleString()} · ${report.skipped.toLocaleString()} skipped`}
-                    </span>
-                    <button
-                      type="button"
-                      className="close"
-                      aria-label="Dismiss"
-                      onClick={() => setTruncationRead(true)}
-                    >
-                      &times;
-                    </button>
-                  </span>
-                </p>
-              )}
+              {/* Everything the load has to say, in one strip: the types when the gate did not
+                  need to open, the rows the parser could not use, the cap. The detail is on
+                  `#/data`, which the strip links to. */}
+              <LoadNews key={datasetLabel} />
               <Notice workspace={workspace} loader={loader} />
               {inFlight && <InFlight />}
               {hasAnalysis ? (

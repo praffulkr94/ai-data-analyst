@@ -1,0 +1,139 @@
+{
+  "artboards": [
+    {
+      "file": "G1A.dc.html",
+      "title": "GAP-1 \u00b7 A \u2014 the chip is a switcher",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "gap-1"
+    },
+    {
+      "file": "G1B.dc.html",
+      "title": "GAP-1 \u00b7 B \u2014 the picker is a place you go back to",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "gap-1"
+    },
+    {
+      "file": "G1C.dc.html",
+      "title": "GAP-1 \u00b7 C \u2014 the rail owns the dataset",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "gap-1"
+    },
+    {
+      "file": "Main.dc.html",
+      "title": "GAP-2 \u00b7 A \u2014 one load strip, three flavours",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1120,
+      "page": "gap-2"
+    },
+    {
+      "file": "G2B.dc.html",
+      "title": "GAP-2 \u00b7 B \u2014 the chip is the receipt",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 1120,
+      "page": "gap-2"
+    },
+    {
+      "file": "G2C.dc.html",
+      "title": "GAP-2 \u00b7 C \u2014 it all lives on the data surface",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 1120,
+      "page": "gap-2"
+    },
+    {
+      "file": "GateLoud.dc.html",
+      "title": "GAP-2 \u00b7 the loud gate, kept \u2014 and its dead controls fixed",
+      "x": 4680,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "gap-2"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "g1a",
+      "x": 0,
+      "y": 960,
+      "w": 1440,
+      "page": "gap-1",
+      "text": "A \u2014 the chip is a switcher\n\nThe thing that names the dataset is the thing that changes it. One click, no screen change, and the current one is ticked.\n\nCosts: the chip today navigates to the data surface \u2014 that job moves to the Data button. A menu row cannot carry the sample descriptions the root screen shows, so a first-time visitor still meets those on the root screen and never again."
+    },
+    {
+      "id": "g1b",
+      "x": 1560,
+      "y": 960,
+      "w": 1440,
+      "page": "gap-1",
+      "text": "B \u2014 the picker is a place you go back to\n\nThe root screen is a route, reachable from the chip or the data surface, and it keeps everything it had: descriptions, the full-width drop target, the size rules. Reached with a dataset loaded it marks the current one and offers a way out that changes nothing.\n\nCosts: a whole screen for what is often one click. The warning about clearing analyses has to be believed before it is acted on."
+    },
+    {
+      "id": "g1c",
+      "x": 3120,
+      "y": 960,
+      "w": 1440,
+      "page": "gap-1",
+      "text": "C \u2014 the rail owns the dataset\n\nThe rail already lists what you can return to. Putting the dataset above the analyses makes visible the thing that is otherwise only written down: these three analyses belong to this dataset and die with it.\n\nCosts: the rail is documented as being for Analyses (ADR-0014) and starts shut, so the entry point is behind a toggle. Widening what the rail means is the real decision here, not the pixels."
+    },
+    {
+      "id": "g2a",
+      "x": 0,
+      "y": 1180,
+      "w": 1440,
+      "page": "gap-2",
+      "text": "A \u2014 one load strip, three flavours\n\nLand on the workspace. Everything the load has to say arrives as one dismissible strip at the top of the column \u2014 the shape the bad-parse news already uses today, so the convention is not new, it is just extended to the good case.\n\nCosts: a strip that always appears is a strip that is always dismissed unread, including the time it mattered. Once dismissed the census is gone until the data surface."
+    },
+    {
+      "id": "g2b",
+      "x": 1560,
+      "y": 1180,
+      "w": 1440,
+      "page": "gap-2",
+      "text": "B \u2014 the chip is the receipt\n\nNothing interrupts the landing at all. The chip is the permanent home for what the load knows, and its dot carries the only signal: green read clean, amber has something to say.\n\nCosts: news behind a click is news that may never be read, and a truncated file is news a person has to act on. The dot is doing a lot of work for how small it is."
+    },
+    {
+      "id": "g2c",
+      "x": 3120,
+      "y": 1180,
+      "w": 1440,
+      "page": "gap-2",
+      "text": "C \u2014 it all lives on the data surface\n\nThe quietest end of the axis. The load never speaks on the way in; the census joins the parse report on the surface that already carries it, next to the type controls a reader would act on.\n\nCosts: entirely passive. Nothing on the workspace says go and look, so this is only defensible if the answer to \"what should a truncated file do?\" is genuinely \"nothing\"."
+    },
+    {
+      "id": "gate",
+      "x": 4680,
+      "y": 1180,
+      "w": 1440,
+      "page": "gap-2",
+      "text": "The loud branch, kept\n\nUnchanged where it earns the screen: one row per doubtful column, the type control, and the values that show why it is doubtful.\n\nTwo fixes to the dead controls. The Data button is gone while the gate is up \u2014 the gate IS the data surface at that moment, so there is nothing for it to go to. The chip stays, and it is live: it is the way back out, which is the same affordance GAP-1 needs. A secondary way out sits next to Continue for anyone who reads the card rather than the header."
+    }
+  ],
+  "pages": [
+    {
+      "id": "gap-1",
+      "name": "GAP-1 \u00b7 Getting back to the picker"
+    },
+    {
+      "id": "gap-2",
+      "name": "GAP-2 \u00b7 Where the load's news goes"
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "gap-1"
+  }
+}

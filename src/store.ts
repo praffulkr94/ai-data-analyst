@@ -7,7 +7,7 @@ import type { Usage } from './ai/translator';
 import type { DatasetHandle, DatasetRef, ParseReport } from './engine/handle';
 import type { AnalysisResult } from './engine/result';
 import type { ViewState } from './engine/rowIndex';
-import type { ColumnMeta, ColumnType } from './engine/types';
+import { isUncertain, type ColumnMeta, type ColumnType } from './engine/types';
 import type { AnalysisSpec, Filter } from './spec/grammar';
 import type { SpecViolation } from './spec/validate';
 
@@ -111,6 +111,10 @@ export type AppState = {
   columns: ColumnMeta[];
   parseReport: ParseReport | null;
   load: LoadState;
+  /** A load that was refused without disturbing the Dataset on screen — a file that is not a CSV,
+      or one over the cap. Nothing changed, so it is news rather than a state: the strip says so
+      and the workspace carries on. */
+  loadFailure: string | null;
   /** How the visitor has arranged the table. Inspection only — it never drives a chart. */
   viewState: ViewState;
 
@@ -126,6 +130,9 @@ export type AppState = {
   restore: { ref: DatasetRef; spec: AnalysisSpec | null } | null;
   /** Set once the visitor has read the note saying Analyses are not saved. */
   saveNoteRead: boolean;
+  /** True when the inference gate stood in front of this Dataset. The load's news is told once:
+      the gate is the loud telling, so the census strip on the workspace stays quiet after it. */
+  typesReviewed: boolean;
 
   setMode: (mode: Mode) => void;
   setModel: (model: ModelChoice) => void;
@@ -157,7 +164,11 @@ export type AppState = {
   toggleTheme: () => void;
   beginLoad: (label: string, warning?: string) => void;
   reportProgress: (rows: number) => void;
-  failLoad: (message: string) => void;
+  /** `fatal` is for a failure the Dataset cannot survive — the worker died and took the
+      ColumnStore with it. Anything else leaves what was loaded exactly as it was. */
+  failLoad: (message: string, fatal?: boolean) => void;
+  /** The visitor stopped a load. Whatever was loaded before it is still loaded. */
+  cancelLoad: () => void;
   setDataset: (handle: DatasetHandle, report: ParseReport | null) => void;
   setColumnType: (name: string, type: ColumnType) => void;
   sortBy: (column: string) => void;
@@ -175,6 +186,7 @@ export const useApp = create<AppState>((set) => ({
   columns: [],
   parseReport: null,
   load: { status: 'idle' },
+  loadFailure: null,
   viewState: { sort: null, filters: [], hidden: [] },
 
   model: 'smart',
@@ -185,6 +197,7 @@ export const useApp = create<AppState>((set) => ({
   usage: { last: null, total: NO_TOTAL, cost: 0, requests: 0 },
   restore: null,
   saveNoteRead: false,
+  typesReviewed: false,
 
   setMode: (mode) => set({ mode }),
   setModel: (model) => set({ model }),
@@ -337,29 +350,42 @@ export const useApp = create<AppState>((set) => ({
   confirmInference: () => set({ load: { status: 'ready' } }),
   toggleTheme: () => set((s) => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),
   beginLoad: (label, warning = undefined) =>
-    set({ load: { status: 'loading', label, rows: 0, warning: warning ?? null } }),
+    set({ load: { status: 'loading', label, rows: 0, warning: warning ?? null }, loadFailure: null }),
   reportProgress: (rows) =>
     set((s) => (s.load.status === 'loading' ? { load: { ...s.load, rows } } : {})),
-  failLoad: (message) => set({ load: { status: 'failed', message } }),
+  failLoad: (message, fatal = false) =>
+    set((s) =>
+      s.datasetHandle && !fatal
+        ? { load: { status: 'ready' }, loadFailure: message }
+        : { load: { status: 'failed', message }, loadFailure: null },
+    ),
+  cancelLoad: () =>
+    set((s) => ({ load: s.datasetHandle ? { status: 'ready' } : { status: 'idle' } })),
   setDataset: (handle, report) =>
-    set((s) => ({
-      datasetHandle: handle,
-      columns: handle.schema.columns,
-      parseReport: report,
+    set((s) => {
+      const same = s.datasetHandle?.label === handle.label;
       // The gate opens for a Dataset that was not already here — never for a retype, which
-      // arrives through this same action, and never for a link that carries an Analysis.
-      load:
-        s.datasetHandle?.label === handle.label || s.restore?.spec
-          ? { status: 'ready' }
-          : { status: 'inferring' },
-      // A different Dataset has different columns, so a sort or a hidden column carried over
-      // from the last one would name something that no longer exists.
-      viewState: s.datasetHandle?.label === handle.label ? s.viewState : { sort: null, filters: [], hidden: [] },
-      // Analyses name columns of the Dataset they were asked against, so a different one leaves
-      // them meaningless rather than merely stale.
-      analyses: s.datasetHandle?.label === handle.label ? s.analyses : [],
-      activeAnalysisId: s.datasetHandle?.label === handle.label ? s.activeAnalysisId : null,
-    })),
+      // arrives through this same action, and never for a link that carries an Analysis — and
+      // only when some column is genuinely in doubt. With every type confident there is no
+      // decision to take, and a screen that asks permission to do what was just asked for is
+      // friction rather than care: the census goes to the workspace as news instead.
+      const gate = !same && !s.restore?.spec && handle.schema.columns.some(isUncertain);
+      return {
+        datasetHandle: handle,
+        columns: handle.schema.columns,
+        parseReport: report,
+        load: gate ? { status: 'inferring' } : { status: 'ready' },
+        loadFailure: null,
+        typesReviewed: same ? s.typesReviewed : gate,
+        // A different Dataset has different columns, so a sort or a hidden column carried over
+        // from the last one would name something that no longer exists.
+        viewState: same ? s.viewState : { sort: null, filters: [], hidden: [] },
+        // Analyses name columns of the Dataset they were asked against, so a different one
+        // leaves them meaningless rather than merely stale.
+        analyses: same ? s.analyses : [],
+        activeAnalysisId: same ? s.activeAnalysisId : null,
+      };
+    }),
   setColumnType: (name, type) =>
     set((s) => ({
       columns: s.columns.map((c) => (c.name === name ? { ...c, type, overridden: true } : c)),

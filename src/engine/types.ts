@@ -17,6 +17,15 @@ export type ColumnMeta = {
   stats: NumberStats | CategoryStats | null;
 };
 
+/** Below this, the winning type did not fit enough of the sampled values to be taken on trust.
+    A Dataset with no such column has nothing to ask a person about, and the inference gate does
+    not open for it (ADR-0026). */
+export const CONFIDENT = 0.99;
+
+/** A column the inference is not sure enough about to use without asking. An override is a
+    visitor's own decision and is never second-guessed. */
+export const isUncertain = (c: ColumnMeta): boolean => !c.overridden && c.confidence < CONFIDENT;
+
 export type DatasetSchema = { columns: ColumnMeta[] };
 
 export const isNumberStats = (s: ColumnMeta['stats']): s is NumberStats =>

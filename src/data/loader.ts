@@ -20,9 +20,11 @@ export function createLoader(port: DataPort) {
   const app = useApp;
   let current: JobId | null = null;
 
+  // Fatal: the worker died and the ColumnStore went with it, so the Dataset on screen is gone
+  // whatever the interface still says. Every other failure leaves it exactly as it was.
   port.onCrash((message) => {
     current = null;
-    app.getState().failLoad(`${message} Re-select the Dataset to carry on.`);
+    app.getState().failLoad(`${message} Re-select the Dataset to carry on.`, true);
   });
 
   async function run(
@@ -111,6 +113,9 @@ export function createLoader(port: DataPort) {
     cancel(): void {
       if (current !== null) port.cancel(current);
       current = null;
+      // Nothing else puts the status back: `run` returns early on a job it no longer owns, so
+      // without this the interface stays on the progress stage for a load that has stopped.
+      app.getState().cancelLoad();
     },
   };
 }

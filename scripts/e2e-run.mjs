@@ -148,8 +148,9 @@ async function ready() {
   await route(page);
   await page.goto(base);
   await page.getByRole('button', { name: /International football matches/ }).click();
-  // The inference gate stands between parsing and the workspace (ADR-0026).
-  await page.getByRole('button', { name: 'Continue' }).click({ timeout: 120_000 });
+  // No Continue click: the inference gate opens only for a Dataset with a column in doubt, and
+  // every column of this one types confidently (ADR-0027). The waits below are what stand in for
+  // it — they fail loudly if a re-inference ever puts a gate back in this path.
   await page.getByRole('button', { name: 'Your API key' }).click();
   await page.getByLabel('API key').fill(KEY);
   await page.getByRole('button', { name: 'Verify and switch' }).click();

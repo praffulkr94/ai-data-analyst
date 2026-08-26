@@ -1216,6 +1216,100 @@ h2 {
   color: var(--accent);
 }
 
+/* ---- the dataset switcher ---------------------------------------------------------------
+   Radix's Dropdown Menu (`docs/ui-primitives.md` §5.1). The trigger is the caller's — the header
+   wears `.dataset-chip`, the gate and the failure stage wear `.plain-trigger` — and only the
+   panel below is this component's. The panel is portalled to the body, so it is styled from the
+   document root rather than under the trigger, and nothing it opens inside can clip it. */
+
+/* A tertiary trigger: a button that is not competing with the primary beside it. */
+.plain-trigger {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.plain-trigger:hover {
+  background: var(--surface-sunken);
+  color: var(--text);
+  border-color: transparent;
+}
+
+.dataset-chip .menu-caret {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.menu-panel {
+  z-index: 9;
+  width: 392px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-overlay);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.12);
+  overflow: hidden;
+}
+
+/* Radix items are `div`s, so the row and the button both need their box drawn here rather than
+   inherited from `button`. */
+.menu-panel .list-row {
+  cursor: pointer;
+  outline: none;
+}
+
+.menu-panel .list-row[data-highlighted] {
+  background: var(--surface-sunken);
+}
+
+.menu-panel .tick {
+  width: 12px;
+  flex: none;
+  color: var(--accent);
+}
+
+.menu-panel .menu-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface-raised);
+}
+
+.menu-panel .menu-foot .muted {
+  flex: 1;
+  font-size: var(--text-sm);
+}
+
+.menu-panel .as-button {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  outline: none;
+}
+
+.menu-panel .as-button[data-highlighted] {
+  border-color: var(--border-strong);
+}
+
+.menu-panel .card-foot {
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+
 /* An 18px chip that opens the four types. `<details>` is the whole popover: no focus trap to
    hand-roll, and Escape already closes it. */
 .type-menu {
@@ -1604,4 +1698,3 @@ h2 {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-

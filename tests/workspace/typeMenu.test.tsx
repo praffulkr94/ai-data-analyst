@@ -2,18 +2,25 @@
 
     `<details>` gives an exclusive group and closes on pick; it gives nothing else. Escape, a
     click on the page background and a tab out all left the menu standing open, which reads as
-    broken because the chip is drawn as a dropdown. `Grid` adds the two listeners, and this is
-    what fails if either goes.
+    broken because the chip is drawn as a dropdown. `useLightDismiss` adds the two listeners once
+    for every named menu on the page, and this is what fails if either goes. The hook is mounted
+    here because `App` mounts it in the application; the surface under test is only a fragment of
+    that page.
+
+    These chips are row 6 of `docs/ui-primitives.md` — drawn as a dropdown, built as a disclosure.
+    They are not retrofitted, which is the standing decision for existing code; the dataset
+    switcher, which is new, is Radix (ADR-0027 §1).
 
     The menus are opened by setting `open` rather than by clicking the summary: jsdom does not
     implement the summary's default toggle, and the toggle is the browser's job anyway. What is
     under test is the dismissal. */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createLoader } from '../../src/data/loader';
+import { createLoader, type Loader } from '../../src/data/loader';
 import { createLocalPort } from '../../src/worker/localPort';
-import { createSliceCache } from '../../src/table/sliceCache';
+import { createSliceCache, type SliceCache } from '../../src/table/sliceCache';
 import { DataSurface } from '../../src/ui/DataTable';
+import { useLightDismiss } from '../../src/ui/lightDismiss';
 import { useApp } from '../../src/store';
 import { CSV, flush, ref, reset } from './harness';
 
@@ -32,13 +39,19 @@ beforeAll(() => {
   };
 });
 
+/** `App` in miniature: the surface plus the one listener the application mounts around it. */
+function Page({ cache, loader }: { cache: SliceCache; loader: Loader }) {
+  useLightDismiss();
+  return <DataSurface cache={cache} loader={loader} />;
+}
+
 async function surface() {
   reset();
   const port = createLocalPort();
   const res = await port.send({ type: 'parse', source: { text: CSV }, ref, label: 'm.csv' }).done;
   if (res.type !== 'parse:done') throw new Error('fixture failed to parse');
   useApp.getState().setDataset(res.handle, null);
-  render(<DataSurface cache={createSliceCache(port)} loader={createLoader(port)} />);
+  render(<Page cache={createSliceCache(port)} loader={createLoader(port)} />);
   await flush();
   return document.querySelectorAll<HTMLDetailsElement>('details.type-menu');
 }

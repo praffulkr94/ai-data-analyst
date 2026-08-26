@@ -271,8 +271,12 @@ the answer is only legible next to the thing that was open.
   on home?** A first-run state on home: `InferenceGate`, gated on `load.status === 'inferring'`,
   which the store opens only for a Dataset that was not already loaded. Not the picker, because
   the same gate has to stand in front of a dropped file, and not a modal, because the visitor is
-  reading a table of columns and needs the width. It is quiet — a one-line summary and Continue —
-  when every column typed confidently, and loud only when some did not. ADR-0026, `gate.test.ts`.
+  reading a table of columns and needs the width. ADR-0026, `gate.test.ts`.
+
+  M10 shipped it with two volumes — loud when some column was in doubt, quiet when none was — and
+  the quiet one was wrong. A one-line census and a Continue button on an empty stage is a screen
+  asking permission to do what has just been asked for. It does not open at all now: the census
+  is news, and news goes to the workspace as `LoadNews`. ADR-0027.
 
 - **Does `#/data` need the full schema statistics (confidence, nulls, distributions), or only the
   type control plus the grid?** The type control plus the grid, plus the parse report. Confidence

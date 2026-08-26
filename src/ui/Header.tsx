@@ -1,8 +1,14 @@
 import { hasApiKey } from '../ai/anthropic';
 import { navigate, type Route } from '../route';
 import { useApp } from '../store';
+import type { Workspace } from '../workspace/workspace';
+import { DatasetMenu } from './DatasetMenu';
 
 /** The top bar: what is loaded, where you are, and which mode you are in.
+
+    The chip that names the Dataset is the control that switches it — see `DatasetMenu`. The
+    Data button beside it is now the only route to `#/data`, and it is not rendered while the
+    inference gate stands in front of the workspace.
 
     The Demo / Your API key toggle is persistent and works in both directions — not a one-way
     door (DECISIONS §A1). Switching to the key side opens the dialog unless a key is already in
@@ -14,11 +20,13 @@ import { useApp } from '../store';
 export function Header({
   route,
   railOpen,
+  workspace,
   onToggleRail,
   onWantKey,
 }: {
   route: Route;
   railOpen: boolean;
+  workspace: Workspace;
   onToggleRail: () => void;
   onWantKey: () => void;
 }) {
@@ -27,6 +35,7 @@ export function Header({
   const theme = useApp((s) => s.theme);
   const toggleTheme = useApp((s) => s.toggleTheme);
   const datasetHandle = useApp((s) => s.datasetHandle);
+  const inferring = useApp((s) => s.load.status === 'inferring');
 
   return (
     <header className="header">
@@ -42,14 +51,20 @@ export function Header({
       <span className="brand">Analyst</span>
       <span className="divider" aria-hidden="true" />
       {datasetHandle && (
-        <button type="button" className="dataset-chip" onClick={() => navigate('data')}>
+        <DatasetMenu workspace={workspace} className="dataset-chip">
           <span className="dot" aria-hidden="true" />
           {datasetHandle.label}
           <span className="muted">{datasetHandle.rowCount.toLocaleString()} rows</span>
-        </button>
+          <span className="menu-caret" aria-hidden="true">
+            ▾
+          </span>
+        </DatasetMenu>
       )}
       <div className="header-right">
-        {datasetHandle && (
+        {/* Not while the gate is up: the gate *is* the data surface at that moment, so there
+            is nothing for this to go to, and a live-looking control that does nothing is worse
+            than no control. The chip beside it stays, because it still works. */}
+        {datasetHandle && !inferring && (
           <button
             type="button"
             className="ghost"
