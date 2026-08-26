@@ -4,13 +4,20 @@ This document is deliberately thin and carries **no project state**. It is autho
 nothing. Where things stand comes from three places and only those three:
 
 1. **The progress ledger at the bottom of GitHub issue #1** — `gh issue view 1`. The ticked boxes
-   are the state of record. Tick them as you go and commit; a handoff can land at any moment.
+   are the state of record **for the spec, which the ledger decomposes into M1–M9 and no
+   further**. It is complete as that record: 108 of 113 ticked, and the five that are not each
+   need a key, a person or credentials. Work after M9 is remediation the audits produced rather
+   than scope the spec named, so it is not in the ledger and should not be retrofitted into it —
+   read `git log` and the section below for it. If you start a new *planned* body of work, that
+   is when the ledger gains a section.
 2. **`git log`** — one commit per completed ledger item or small group, each naming what was
    verified and with which numbers.
 3. **A passing test suite** — `npm test`. If it is green, what it covers works.
 
 If this document ever disagrees with `DECISIONS.md`, `docs/adr/`, `CONTEXT.md` or issue #1,
-they win. Precedence is `DECISIONS.md` → `docs/adr/*` → `CONTEXT.md` → issue #1 → commits.
+they win. Precedence is `DECISIONS.md` → `docs/adr/*` → `CONTEXT.md` → issue #1 → commits — with
+the one scope note above: the issue is authoritative about the spec, not about everything that
+has happened.
 
 ## Read before touching anything
 
@@ -240,10 +247,10 @@ else is wiring around them.
 The UI restructure. Four commits on top of M9, `npm test` green at 439 across 30 files,
 `npm run test:e2e` on both flows, `npm run audit:contrast` unchanged.
 
-**M10 has no ledger items in issue #1.** The whole restructure was done outside the progress
-ledger, so the state of record — which this document says wins over it — does not know M10
-happened. Whoever picks this up should add the items and tick them, or decide the ledger closed
-at M9 and say so there. Do not read the unticked M9 list as the whole of what is outstanding.
+**M10 is deliberately absent from issue #1.** The ledger decomposes the spec, and this milestone
+is what the M9 audit passes turned up — remediation rather than planned scope. It is recorded in
+`git log`, in ADR-0025 and ADR-0026, and here. Do not read the ledger's five unticked boxes as
+the whole of what is outstanding, and do not add M10 rows to it after the fact.
 
 What landed:
 
