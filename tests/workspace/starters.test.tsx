@@ -6,7 +6,7 @@
 
     Rendered through `TipProvider` because Radix's tooltip Root requires a provider ancestor —
     the real one is in `App`, and a test that renders the composer on its own supplies it. */
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { act } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEMO_REPERTOIRE } from '../../src/ai/fixtures';
@@ -25,7 +25,7 @@ const screenful = (workspace: Workspace) =>
     </TipProvider>,
   );
 
-const composer = () => screen.getByLabelText('Question') as HTMLInputElement;
+const composer = () => screen.getByLabelText('Question') as HTMLTextAreaElement;
 
 afterEach(cleanup);
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -76,6 +76,32 @@ describe('a starter Question fills the composer', () => {
       await flush();
     });
     expect(useApp.getState().model).toBe('smart');
+  });
+});
+
+/** The Question is a textarea now, so Enter is no longer the browser's to handle — a form only
+    submits on Enter from an `<input>`. The send had to be re-established by hand, which makes it
+    the one thing here worth a test: lose it and the composer silently stops sending. */
+describe('Enter sends the Question', () => {
+  it('sends on Enter and takes a newline on Shift+Enter', async () => {
+    const { workspace, script } = await setup();
+    const question = DEMO_REPERTOIRE[0]!.question;
+    screenful(workspace);
+    act(() => useApp.getState().setDraft(question));
+
+    await act(async () => {
+      fireEvent.keyDown(composer(), { key: 'Enter', shiftKey: true });
+      await flush();
+    });
+    expect(script.calls).toHaveLength(0);
+    expect(composer().value).toBe(question);
+
+    await act(async () => {
+      fireEvent.keyDown(composer(), { key: 'Enter' });
+      await flush();
+    });
+    expect(script.calls).toHaveLength(1);
+    expect(composer().value).toBe('');
   });
 });
 

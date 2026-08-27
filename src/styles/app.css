@@ -832,8 +832,9 @@ h2 {
 
 /* ---- the composer ----------------------------------------------------------------------
    Sticky to the bottom of the 1040px column and not to the window, with a gradient behind it so
-   content scrolls *under* rather than being clipped by a hard edge. Fixed height: the readout
-   is one line, and nothing here expands in place. */
+   content scrolls *under* rather than being clipped by a hard edge. Two rows in one box: the
+   Question, which grows a line at a time to a cap and then scrolls, and the controls under it.
+   Bounded rather than fixed — nothing here expands without limit. */
 
 .composer {
   position: sticky;
@@ -845,6 +846,9 @@ h2 {
 }
 
 .composer-box {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   background: var(--surface-raised);
@@ -852,15 +856,46 @@ h2 {
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.05);
 }
 
+/* The Question. No border and no background of its own — the box around it is the input as far
+   as a visitor is concerned, so the focus ring belongs to the box (below) and not to this.
+   `height` is set inline by the component on every draft change; what is here is the floor.
+   `overflow-y: auto` rather than a toggled `hidden`: the height matches the content exactly
+   until the cap, so a scrollbar can only appear at the cap, which is when it should. */
+.composer-text {
+  font: inherit;
+  font-size: var(--text-md);
+  color: var(--text);
+  background: none;
+  border: 0;
+  padding: 5px 4px 4px;
+  margin: 0;
+  min-height: 30px;
+  overflow-y: auto;
+  resize: none;
+}
+
+.composer-text::placeholder {
+  color: var(--text-muted);
+}
+
+/* The ring goes on the box, not on the textarea: the box is what a visitor reads as the input,
+   and an outline drawn around the text inside it would sit inside another border. It is the same
+   outline the global `:focus-visible` rule draws, moved out one element — not a box-shadow, which
+   disappears in forced-colours mode. */
+.composer-text:focus-visible {
+  outline: none;
+}
+
+.composer-box:focus-within {
+  outline: 2px solid var(--accent-focus-tint);
+  outline-offset: 1px;
+}
+
+/* The controls, under the Question: picker on the left, readout and Ask on the right. */
 .composer-row {
   display: flex;
   gap: 8px;
   align-items: center;
-}
-
-.composer-row input {
-  flex: 1;
-  min-width: 0;
 }
 
 .composer-row .segmented,
@@ -878,8 +913,33 @@ h2 {
   font-size: var(--text-sm);
 }
 
-/* One 11px line. The `<details>` readout and the request inspector that used to live here
-   inflated the bar to 45vh, which is the whole reason the composer had to be bounded. */
+/* Eleven pixels of text between the picker and Ask. The `<details>` readout and the request
+   inspector that used to live here inflated the bar to 45vh, which is the whole reason the
+   composer had to be bounded — and until now it had a line of its own below the input, whose
+   23px is most of what the taller Question is spending. It shares its row, so it truncates
+   rather than wrapping: a wrapped readout would move Ask. */
+.composer-usage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  min-width: 0;
+  padding-right: 2px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.composer-usage > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-usage .usage-cache {
+  color: var(--status-good);
+}
+
+/* Still the parse progress line's own shape — it is a line under a stage, not a control row. */
 .composer-foot {
   display: flex;
   align-items: center;
@@ -889,10 +949,6 @@ h2 {
   padding: 0 2px;
   font-size: var(--text-xs);
   color: var(--text-muted);
-}
-
-.composer-foot .usage-cache {
-  color: var(--status-good);
 }
 
 .tag {
