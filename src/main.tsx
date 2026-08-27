@@ -1,7 +1,7 @@
 import { lazy, StrictMode, Suspense, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
-import { createAnthropicTranslator } from './ai/anthropic';
+import { createAnthropicTranslator, proposeQuestions } from './ai/anthropic';
 import { createFixtureTranslator } from './ai/fixtureTranslator';
 import { switching } from './ai/translator';
 import { createLoader } from './data/loader';
@@ -42,6 +42,9 @@ const workspace = createWorkspace({
   translator: switching(() => (useApp.getState().mode === 'byok' ? anthropic : fixtures)),
   port,
   loader,
+  // The other thing that reaches the API: the three sample Questions a keyed workspace opens on.
+  // Injected here for the same reason the Translator is — a test that omits it gets no network.
+  propose: proposeQuestions,
 });
 
 /** The hash is read once, before anything renders, and then kept in step for the rest of the

@@ -119,6 +119,15 @@ export type AppState = {
   viewState: ViewState;
 
   model: ModelChoice;
+  /** What is in the composer's input. It lives here rather than in `Composer`'s own state
+      because the starter Questions are a different component: clicking one fills the composer
+      rather than submitting on the visitor's behalf, so the two need one value between them. */
+  draft: string;
+  /** The three sample Questions proposed for a Dataset, and which Dataset they are about. An
+      empty array means the call was made and came back with nothing usable — a state worth
+      remembering, because the empty state unmounts the moment an Analysis lands and every
+      remount would otherwise pay for the call again. */
+  suggestions: { for: string; questions: string[] } | null;
   analyses: Analysis[];
   activeAnalysisId: string | null;
   pendingNotice: Notice | null;
@@ -136,6 +145,8 @@ export type AppState = {
 
   setMode: (mode: Mode) => void;
   setModel: (model: ModelChoice) => void;
+  setDraft: (draft: string) => void;
+  setSuggestions: (dataset: string, questions: string[]) => void;
   selectAnalysis: (id: string | null) => void;
   /** Remove the active Analysis's filter chip from the table. The Analysis is untouched — the
       table is inspection only, and it never sends anything back the other way. */
@@ -190,6 +201,8 @@ export const useApp = create<AppState>((set) => ({
   viewState: { sort: null, filters: [], hidden: [] },
 
   model: 'smart',
+  draft: '',
+  suggestions: null,
   analyses: [],
   activeAnalysisId: null,
   pendingNotice: null,
@@ -201,6 +214,8 @@ export const useApp = create<AppState>((set) => ({
 
   setMode: (mode) => set({ mode }),
   setModel: (model) => set({ model }),
+  setDraft: (draft) => set({ draft }),
+  setSuggestions: (dataset, questions) => set({ suggestions: { for: dataset, questions } }),
 
   /** A pure view change. It cancels nothing — discarding work the visitor asked for to service a
       navigation is hostile — and it clears the Analysis's updated marker, which has been read.

@@ -104,8 +104,15 @@ is not a reason to open a file.
 
 **Radix is installed.** `@radix-ui/react-dropdown-menu`, added by the dataset switcher
 (ADR-0027 §1), which was the first new menu surface after this decision. Before that the decision
-was *adopt on first use* and the package was deliberately absent; that is now spent. Nothing else
-of Radix is installed — the next new surface adds its own package.
+was *adopt on first use* and the package was deliberately absent; that is now spent.
+
+`@radix-ui/react-tooltip` followed, on the same rule: the model picker had to explain the model it
+picks and why it is inert in Demo mode, which is a new overlay surface and so brings its own
+package. `src/ui/Tip.tsx` is the wrapper; the provider is in `App`. What it buys over the `title`
+attribute the picker used before: the interface's own styling, opening on keyboard focus,
+`aria-describedby`, and a portal out of the composer's stacking context. Note the constraint it
+imposes — a natively `disabled` trigger receives no pointer events, so a control whose tooltip
+explains its unavailability must use `aria-disabled` and refuse the click itself.
 
 **The exception is a list of surfaces, not a list of elements.** Rows 7–9 stay native: a modal is
 `<dialog>`, a plain disclosure is `<details>`, a select is `<select>`. Those three are recorded

@@ -3,6 +3,7 @@ import { navigate, type Route } from '../route';
 import { useApp } from '../store';
 import type { Workspace } from '../workspace/workspace';
 import { DatasetMenu } from './DatasetMenu';
+import { Tip } from './Tip';
 
 /** The top bar: what is loaded, where you are, and which mode you are in.
 
@@ -13,6 +14,11 @@ import { DatasetMenu } from './DatasetMenu';
     The Demo / Your API key toggle is persistent and works in both directions — not a one-way
     door (DECISIONS §A1). Switching to the key side opens the dialog unless a key is already in
     memory from earlier in the session; switching back keeps that key.
+
+    Each half of that toggle says on hover what the mode actually does with a key. That sentence
+    used to sit permanently under the composer's input, which is the wrong place twice over: it
+    describes the mode rather than the Question, and it was on screen in the one mode where it is
+    not true.
 
     Every value here is read through a selector rather than by destructuring the whole store: a
     Request in flight writes narration into the store on every frame, and a component that
@@ -75,16 +81,20 @@ export function Header({
           </button>
         )}
         <div className="segmented" role="group" aria-label="Mode">
-          <button type="button" aria-pressed={mode === 'demo'} onClick={() => setMode('demo')}>
-            Demo
-          </button>
-          <button
-            type="button"
-            aria-pressed={mode === 'byok'}
-            onClick={() => (hasApiKey() ? setMode('byok') : onWantKey())}
-          >
-            Your API key
-          </button>
+          <Tip label={DEMO_MODE_TIP} side="bottom">
+            <button type="button" aria-pressed={mode === 'demo'} onClick={() => setMode('demo')}>
+              Demo
+            </button>
+          </Tip>
+          <Tip label={KEY_MODE_TIP} side="bottom">
+            <button
+              type="button"
+              aria-pressed={mode === 'byok'}
+              onClick={() => (hasApiKey() ? setMode('byok') : onWantKey())}
+            >
+              Your API key
+            </button>
+          </Tip>
         </div>
         <button
           type="button"
@@ -98,6 +108,18 @@ export function Header({
     </header>
   );
 }
+
+/** What each mode is, and the one fact about a key worth stating before it is pasted: it is held
+    in memory and it goes nowhere but the API. There is no backend to send it to. */
+const KEY_MODE_TIP = [
+  'Ask anything this Dataset can answer.',
+  'Your key, held in memory for this tab. Requests go straight from this browser to the API.',
+];
+
+const DEMO_MODE_TIP = [
+  'Answers a fixed set of Questions, with no key.',
+  'Recorded replies, replayed through the real validation and execution path.',
+];
 
 const BarsIcon = () => (
   <svg width="12" height="10" viewBox="0 0 12 10" aria-hidden="true" fill="currentColor">

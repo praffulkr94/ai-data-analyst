@@ -16,6 +16,7 @@ import { LoadNews } from './ui/LoadNews';
 import { LoadStage } from './ui/LoadStage';
 import { Notice } from './ui/Notice';
 import { Rail } from './ui/Rail';
+import { TipProvider } from './ui/Tip';
 import { useLightDismiss } from './ui/lightDismiss';
 import { useApp } from './store';
 
@@ -77,66 +78,68 @@ export function App({
   }, [theme]);
 
   return (
-    <div className="app">
-      <Header
-        route={route}
-        railOpen={railOpen}
-        workspace={workspace}
-        onToggleRail={() => setRailOpen((v) => !v)}
-        onWantKey={() => setKeyDialog(true)}
-      />
-      <div className="body">
-        <Rail open={railOpen} onToggle={() => setRailOpen((v) => !v)} workspace={workspace} />
-        <main className="content">
-          {/* Before every other branch. A load in progress, and a failure the Dataset did not
-              survive, both make the surface underneath untrue — a switch used to leave the
-              outgoing Dataset's analyses on screen until the new one landed and then blank
-              them. A first-run failure is not here: it belongs on the picker, next to the
-              samples the visitor has to choose from again. */}
-          {status === 'loading' || (status === 'failed' && hasDataset) ? (
-            <LoadStage loader={loader} workspace={workspace} />
-          ) : !hasDataset ? (
-            <DatasetPicker loader={loader} />
-          ) : status === 'inferring' ? (
-            <InferenceGate loader={loader} workspace={workspace} />
-          ) : route === 'data' ? (
-            <DataSurface cache={cache} loader={loader} />
-          ) : (
-            /* One bounded column for the analysis and the composer both — that bound is the
-               whole distinction from a chat shell, so it stays column-width. */
-            <div className="column">
-              {announcement && (
-                <p className="notice notice-warning" role="status">
-                  <span className="notice-head">
-                    <span className="aside">{announcement}</span>
-                    <button
-                      type="button"
-                      className="close"
-                      aria-label="Dismiss"
-                      onClick={() => setAnnouncement(null)}
-                    >
-                      &times;
-                    </button>
-                  </span>
-                </p>
-              )}
-              {/* Everything the load has to say, in one strip: the types when the gate did not
-                  need to open, the rows the parser could not use, the cap. The detail is on
-                  `#/data`, which the strip links to. */}
-              <LoadNews key={datasetLabel} />
-              <Notice workspace={workspace} loader={loader} />
-              {inFlight && <InFlight />}
-              {hasAnalysis ? (
-                <AnalysisCard workspace={workspace} cache={cache} />
-              ) : (
-                !inFlight && <EmptyState workspace={workspace} />
-              )}
-              <Composer workspace={workspace} />
-            </div>
-          )}
-        </main>
+    <TipProvider>
+      <div className="app">
+        <Header
+          route={route}
+          railOpen={railOpen}
+          workspace={workspace}
+          onToggleRail={() => setRailOpen((v) => !v)}
+          onWantKey={() => setKeyDialog(true)}
+        />
+        <div className="body">
+          <Rail open={railOpen} onToggle={() => setRailOpen((v) => !v)} workspace={workspace} />
+          <main className="content">
+            {/* Before every other branch. A load in progress, and a failure the Dataset did not
+                survive, both make the surface underneath untrue — a switch used to leave the
+                outgoing Dataset's analyses on screen until the new one landed and then blank
+                them. A first-run failure is not here: it belongs on the picker, next to the
+                samples the visitor has to choose from again. */}
+            {status === 'loading' || (status === 'failed' && hasDataset) ? (
+              <LoadStage loader={loader} workspace={workspace} />
+            ) : !hasDataset ? (
+              <DatasetPicker loader={loader} />
+            ) : status === 'inferring' ? (
+              <InferenceGate loader={loader} workspace={workspace} />
+            ) : route === 'data' ? (
+              <DataSurface cache={cache} loader={loader} />
+            ) : (
+              /* One bounded column for the analysis and the composer both — that bound is the
+                 whole distinction from a chat shell, so it stays column-width. */
+              <div className="column">
+                {announcement && (
+                  <p className="notice notice-warning" role="status">
+                    <span className="notice-head">
+                      <span className="aside">{announcement}</span>
+                      <button
+                        type="button"
+                        className="close"
+                        aria-label="Dismiss"
+                        onClick={() => setAnnouncement(null)}
+                      >
+                        &times;
+                      </button>
+                    </span>
+                  </p>
+                )}
+                {/* Everything the load has to say, in one strip: the types when the gate did not
+                    need to open, the rows the parser could not use, the cap. The detail is on
+                    `#/data`, which the strip links to. */}
+                <LoadNews key={datasetLabel} />
+                <Notice workspace={workspace} loader={loader} />
+                {inFlight && <InFlight />}
+                {hasAnalysis ? (
+                  <AnalysisCard workspace={workspace} cache={cache} />
+                ) : (
+                  !inFlight && <EmptyState workspace={workspace} />
+                )}
+                <Composer workspace={workspace} />
+              </div>
+            )}
+          </main>
+        </div>
+        <KeyDialog open={keyDialog} onClose={closeKeyDialog} />
       </div>
-      <KeyDialog open={keyDialog} onClose={closeKeyDialog} />
-    </div>
+    </TipProvider>
   );
 }

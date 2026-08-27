@@ -25,6 +25,8 @@ import {
 } from '../ai/translator';
 import type { AnalysisResult } from '../engine/result';
 import type { Exchange } from '../ai/prompt';
+import type { ModelChoice } from '../ai/models';
+import type { DatasetSchema } from '../engine/types';
 
 /** One retry, and only one. A structural failure and a semantic one consume the same attempt.
 
@@ -45,11 +47,17 @@ export function createWorkspace({
   translator,
   port,
   loader,
+  propose,
   store = useApp,
 }: {
   translator: Translator;
   port: DataPort;
   loader: Loader;
+  /** Proposes the three sample Questions for a Dataset. Injected for the same reason the
+      Translator is: it is the only other thing here that reaches the network, and a test that
+      constructs a `Workspace` without it gets a `suggest` that does nothing rather than an
+      HTTP call. */
+  propose?: (schema: DatasetSchema, model: ModelChoice) => Promise<string[]>;
   store?: typeof useApp;
 }) {
   /** One app-global monotonic counter, spanning both async boundaries. Only a new submission
@@ -144,6 +152,12 @@ export function createWorkspace({
       AnalysisResult and the model, and nothing else (CONTEXT.md). A Question is dispatch context
       — the same category as `intent` — so it lives with the dispatcher. */
   const exchanges = new Map<string, Exchange[]>();
+
+  /** The Datasets already asked about, by label. Set before the call rather than after, so
+      React's development double-effect — and a remount that races the first reply — cannot pay
+      for the same three Questions twice. A failure is remembered too: these are a convenience,
+      and retrying them on every remount is how a convenience becomes a bill. */
+  const suggested = new Set<string>();
 
   async function ask(question: string): Promise<void> {
     const id = ++requestId;
@@ -358,6 +372,18 @@ export function createWorkspace({
     deleteCard(id: string): void {
       exchanges.delete(id);
       store.getState().deleteAnalysis(id);
+    },
+
+    /** The three sample Questions, fetched once per Dataset. Demo mode has its whole repertoire
+        on screen already and needs none; without a key there is nothing to ask with. */
+    async suggest(): Promise<void> {
+      const state = store.getState();
+      const label = state.datasetHandle?.label;
+      if (!propose || !label || state.mode !== 'byok' || state.load.status !== 'ready') return;
+      if (suggested.has(label)) return;
+      suggested.add(label);
+      const questions = await propose({ columns: state.columns }, state.model);
+      store.getState().setSuggestions(label, questions);
     },
 
     /** A pure view change. It cancels nothing. */

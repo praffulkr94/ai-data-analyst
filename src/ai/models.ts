@@ -71,6 +71,19 @@ export function costOf(choice: ModelChoice, tokens: TokenCounts, on = new Date()
   );
 }
 
+/** The prices, as the tooltip states them — including the introductory pair while it still
+    applies. Here rather than in the composer because `costOf` already owns the rule for when
+    intro pricing expires, and a second copy of that date comparison in the interface is a drift
+    bug that shows up as a quoted price nobody is charged. */
+export function priceNote(choice: ModelChoice, on = new Date()): string {
+  const model = MODELS[choice];
+  const intro = model.intro && on.toISOString().slice(0, 10) <= model.intro.until;
+  const { input, output } = intro ? model.intro! : model;
+  return intro
+    ? `$${input} / $${output} per M tokens — introductory, through ${model.intro!.until}`
+    : `$${input} / $${output} per M tokens`;
+}
+
 /** Translating a Question into a narrow grammar does not benefit from deep reasoning, so Smart
     thinks adaptively at low effort — which bounds the output cost and keeps the narration short.
     Disabling thinking outright was considered and rejected: disabled thinking is where the
