@@ -1,3 +1,4 @@
+import { ChartColumn, ChevronDown, Contrast, PanelLeft } from 'lucide-react';
 import { hasApiKey } from '../ai/anthropic';
 import { navigate, type Route } from '../route';
 import { useApp } from '../store';
@@ -11,9 +12,15 @@ import { Tip } from './Tip';
     Data button beside it is now the only route to `#/data`, and it is not rendered while the
     inference gate stands in front of the workspace.
 
+    The brand starts the session again — no Dataset, no thread, back on the picker with a clean
+    address. It is a reset and not a route: the picker is by definition the screen with nothing
+    loaded behind it, so "go to the picker" without dropping the Dataset would be a panel you
+    back out of rather than a home screen. `workspace.reset` says the rest.
+
     The Demo / Your API key toggle is persistent and works in both directions — not a one-way
     door (DECISIONS §A1). Switching to the key side opens the dialog unless a key is already in
-    memory from earlier in the session; switching back keeps that key.
+    memory from earlier in the session; switching back keeps that key. Either direction clears
+    the thread and lands on the picker — `workspace.setMode` says why.
 
     Each half of that toggle says on hover what the mode actually does with a key. That sentence
     used to sit permanently under the composer's input, which is the wrong place twice over: it
@@ -37,7 +44,6 @@ export function Header({
   onWantKey: () => void;
 }) {
   const mode = useApp((s) => s.mode);
-  const setMode = useApp((s) => s.setMode);
   const theme = useApp((s) => s.theme);
   const toggleTheme = useApp((s) => s.toggleTheme);
   const datasetHandle = useApp((s) => s.datasetHandle);
@@ -52,18 +58,24 @@ export function Header({
         aria-expanded={railOpen}
         onClick={onToggleRail}
       >
-        <BarsIcon />
+        <PanelLeft />
       </button>
-      <span className="brand">Analyst</span>
+      <button
+        type="button"
+        className="brand"
+        title="Start again"
+        onClick={() => workspace.reset()}
+      >
+        <ChartColumn />
+        Analyst
+      </button>
       <span className="divider" aria-hidden="true" />
       {datasetHandle && (
         <DatasetMenu workspace={workspace} className="dataset-chip">
           <span className="dot" aria-hidden="true" />
           {datasetHandle.label}
           <span className="muted">{datasetHandle.rowCount.toLocaleString()} rows</span>
-          <span className="menu-caret" aria-hidden="true">
-            ▾
-          </span>
+          <ChevronDown className="menu-caret" />
         </DatasetMenu>
       )}
       <div className="header-right">
@@ -82,7 +94,11 @@ export function Header({
         )}
         <div className="segmented" role="group" aria-label="Mode">
           <Tip label={DEMO_MODE_TIP} side="bottom">
-            <button type="button" aria-pressed={mode === 'demo'} onClick={() => setMode('demo')}>
+            <button
+              type="button"
+              aria-pressed={mode === 'demo'}
+              onClick={() => workspace.setMode('demo')}
+            >
               Demo
             </button>
           </Tip>
@@ -90,7 +106,7 @@ export function Header({
             <button
               type="button"
               aria-pressed={mode === 'byok'}
-              onClick={() => (hasApiKey() ? setMode('byok') : onWantKey())}
+              onClick={() => (hasApiKey() ? workspace.setMode('byok') : onWantKey())}
             >
               Your API key
             </button>
@@ -102,7 +118,7 @@ export function Header({
           aria-label={theme === 'light' ? 'Switch to the dark theme' : 'Switch to the light theme'}
           onClick={toggleTheme}
         >
-          <HalfDiscIcon />
+          <Contrast />
         </button>
       </div>
     </header>
@@ -121,19 +137,6 @@ const DEMO_MODE_TIP = [
   'Recorded replies, replayed through the real validation and execution path.',
 ];
 
-const BarsIcon = () => (
-  <svg width="12" height="10" viewBox="0 0 12 10" aria-hidden="true" fill="currentColor">
-    <rect y="0" width="12" height="1.5" rx="0.75" />
-    <rect y="4.25" width="12" height="1.5" rx="0.75" />
-    <rect y="8.5" width="12" height="1.5" rx="0.75" />
-  </svg>
-);
-
-/** Half filled, half outlined — the same disc in either theme, so the control does not itself
-    change appearance with the thing it toggles. */
-const HalfDiscIcon = () => (
-  <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
-    <circle cx="6" cy="6" r="5.25" fill="none" stroke="currentColor" strokeWidth="1.5" />
-    <path d="M6 0.75 A5.25 5.25 0 0 0 6 11.25 Z" fill="currentColor" />
-  </svg>
-);
+/* The theme control is lucide's `Contrast` — half filled, half outlined. It is the same disc in
+   either theme on purpose, so the control does not itself change appearance with the thing it
+   toggles, which is the one property the hand-rolled icon it replaces was drawn for. */

@@ -4,6 +4,7 @@ import {
   type ColumnDef,
   type VisibilityState,
 } from '@tanstack/react-table';
+import { Check, ChevronDown, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Loader } from '../data/loader';
 import type { ColumnType } from '../engine/types';
@@ -96,7 +97,7 @@ export function DrillDown({ cache }: { cache: SliceCache }) {
               onClick={clearTableFilter}
               aria-label={`Show all rows, removing the filter ${describe(filters)}`}
             >
-              &times;
+              <X />
             </button>
           </span>
         )}
@@ -295,7 +296,7 @@ function TypeMenu({
     <details className="type-menu" name="column-type">
       <summary aria-label={`Type of ${name}: ${type}`}>
         {type}
-        <span aria-hidden="true">▾</span>
+        <ChevronDown />
       </summary>
       <ul>
         {TYPES.map((t) => (
@@ -308,7 +309,7 @@ function TypeMenu({
               }}
             >
               <span className="tick" aria-hidden="true">
-                {t === type ? '✓' : ''}
+                {t === type && <Check />}
               </span>
               {t}
             </button>

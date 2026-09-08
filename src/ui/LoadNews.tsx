@@ -8,6 +8,7 @@
 
     It says nothing about types when the inference gate has just been through them. The gate is
     the loud telling of the same news, and telling it twice is noise. */
+import { CircleAlert, CircleCheck, TriangleAlert, X } from 'lucide-react';
 import { useState } from 'react';
 import { navigate } from '../route';
 import { useApp } from '../store';
@@ -35,6 +36,7 @@ export function LoadNews() {
   const news = failure
     ? {
         kind: 'notice-critical',
+        mark: CircleAlert,
         title: 'That file was not loaded.',
         aside: `${failure} The Dataset below is the one that was already open`,
         link: 'Check the types',
@@ -42,6 +44,7 @@ export function LoadNews() {
     : truncated
     ? {
         kind: 'notice-warning',
+        mark: TriangleAlert,
         title: 'Capped at 500,000 rows.',
         aside:
           skipped > 0
@@ -52,6 +55,7 @@ export function LoadNews() {
     : skipped > 0
       ? {
           kind: 'notice-serious',
+          mark: TriangleAlert,
           title: `Parsed ${parsed.toLocaleString()} of ${report!.totalRows.toLocaleString()} rows.`,
           aside: `${skipped.toLocaleString()} malformed rows skipped — a malformed row never fails the file`,
           link: 'See which',
@@ -59,6 +63,7 @@ export function LoadNews() {
       : !reviewed && columns.length > 0
         ? {
             kind: 'notice-good',
+            mark: CircleCheck,
             title: `All ${columns.length} columns typed.`,
             aside: census(columns),
             link: 'Check the types',
@@ -67,9 +72,13 @@ export function LoadNews() {
 
   if (news === null || news.title === read) return null;
 
+  // Beside the words and the stripe, never instead of either — see `Notice`.
+  const Mark = news.mark;
+
   return (
     <p className={`notice ${news.kind}`} role="status">
       <span className="notice-head">
+        <Mark className="notice-mark" />
         <span className="title">{news.title}</span>
         <span className="aside">
           {news.aside}{' '}
@@ -77,8 +86,13 @@ export function LoadNews() {
             {news.link}
           </button>
         </span>
-        <button type="button" className="close" aria-label="Dismiss" onClick={() => setRead(news.title)}>
-          &times;
+        <button
+          type="button"
+          className="close"
+          aria-label="Dismiss"
+          onClick={() => setRead(news.title)}
+        >
+          <X />
         </button>
       </span>
     </p>

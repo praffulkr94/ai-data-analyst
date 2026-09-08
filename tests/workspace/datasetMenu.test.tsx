@@ -56,8 +56,10 @@ describe('the dataset switcher', () => {
     });
     fireEvent.keyDown(menu(), { key: 'Enter' });
 
+    // The tick is an icon rather than a glyph, so the assertion is on the mark being drawn in
+    // that row's slot and nowhere else.
     const items = screen.getAllByRole('menuitem');
-    expect(items[0]!.textContent).toContain('✓');
-    expect(items[1]!.textContent).not.toContain('✓');
+    expect(items[0]!.querySelector('.tick svg')).toBeTruthy();
+    expect(items[1]!.querySelector('.tick svg')).toBeNull();
   });
 });

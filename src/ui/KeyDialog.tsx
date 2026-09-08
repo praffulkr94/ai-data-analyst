@@ -7,10 +7,19 @@
     re-pasting. */
 import { useEffect, useRef, useState } from 'react';
 import { hasApiKey, setApiKey, verifyKey } from '../ai/anthropic';
-import { useApp } from '../store';
 
-export function KeyDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const setMode = useApp((s) => s.setMode);
+export function KeyDialog({
+  open,
+  onVerified,
+  onClose,
+}: {
+  open: boolean;
+  /** Called once the key is verified and stored. Flipping the mode is the caller's business,
+      not the dialog's: the same verified key completes a restored session in one place and is a
+      deliberate switch in another, and only the second clears the workspace. */
+  onVerified: () => void;
+  onClose: () => void;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   const [key, setKey] = useState('');
   const [state, setState] = useState<{ busy: boolean; error: string | null }>({
@@ -36,7 +45,7 @@ export function KeyDialog({ open, onClose }: { open: boolean; onClose: () => voi
     setApiKey(key.trim());
     setKey('');
     setState({ busy: false, error: null });
-    setMode('byok');
+    onVerified();
     onClose();
   }
 

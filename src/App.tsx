@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useLayoutEffect, useState } from 'react';
 import type { Loader } from './data/loader';
 import type { Route } from './route';
@@ -20,6 +21,9 @@ import { TipProvider } from './ui/Tip';
 import { useLightDismiss } from './ui/lightDismiss';
 import { useApp } from './store';
 
+/** Long enough for the colour crossing in `app.css` to finish before the marker is removed. */
+const SWAP_MS = 200;
+
 export function App({
   route,
   loader,
@@ -27,7 +31,8 @@ export function App({
   workspace,
   wantsKey = false,
 }: {
-  /** Which surface is on screen. `#/data` is the rows and their types; `#/` is the analysis. */
+  /** Which surface is on screen. `#/data` is the rows and their types; `#/` is the analysis, or
+      the picker when nothing is loaded. */
   route: Route;
   loader: Loader;
   cache: SliceCache;
@@ -57,6 +62,15 @@ export function App({
       and nothing else now — the dataset switcher is Radix, which brings its own. */
   useLightDismiss();
 
+  /** Who flips the mode once a key verifies. The dialog the header opened is a switch and goes
+      through the Workspace, which clears the thread and returns to the picker. The dialog a
+      reload opened is not: that session is being restored around an Analysis the hash already
+      carries, and wiping it would destroy the link the visitor just followed. */
+  function applyKey(): void {
+    if (restoring) useApp.getState().setMode('byok');
+    else workspace.setMode('byok');
+  }
+
   function closeKeyDialog(): void {
     setKeyDialog(false);
     if (restoring && useApp.getState().mode !== 'byok') {
@@ -74,7 +88,18 @@ export function App({
       — and a passive effect here runs *after* that one, which left the canvas drawn in the
       palette of the theme just left. */
   useLayoutEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    const root = document.documentElement;
+    const previous = root.dataset.theme;
+    root.dataset.theme = theme;
+    /** Nothing to cross from on the first paint, and nothing to cross at all when the attribute
+        already says what it is being set to (StrictMode runs this twice on mount). Every other
+        time the swap gets a marker for the length of one transition — see `app.css`, which hangs
+        a colour transition off it and nothing else, so the crossing is paid for once rather than
+        on every hover for the life of the page. */
+    if (!previous || previous === theme) return;
+    root.dataset.themeSwitching = '';
+    const done = setTimeout(() => delete root.dataset.themeSwitching, SWAP_MS);
+    return () => clearTimeout(done);
   }, [theme]);
 
   return (
@@ -98,7 +123,11 @@ export function App({
             {status === 'loading' || (status === 'failed' && hasDataset) ? (
               <LoadStage loader={loader} workspace={workspace} />
             ) : !hasDataset ? (
-              <DatasetPicker loader={loader} />
+              /* No Dataset is the whole of the picker's condition, and the only way to get back
+                 to it once there is one is `workspace.reset` — the brand, or a mode switch. A
+                 picker rendered over a loaded Dataset would need a way back to that Dataset,
+                 which is a modal, not a home screen. */
+              <DatasetPicker workspace={workspace} />
             ) : status === 'inferring' ? (
               <InferenceGate loader={loader} workspace={workspace} />
             ) : route === 'data' ? (
@@ -117,7 +146,7 @@ export function App({
                         aria-label="Dismiss"
                         onClick={() => setAnnouncement(null)}
                       >
-                        &times;
+                        <X />
                       </button>
                     </span>
                   </p>
@@ -138,7 +167,7 @@ export function App({
             )}
           </main>
         </div>
-        <KeyDialog open={keyDialog} onClose={closeKeyDialog} />
+        <KeyDialog open={keyDialog} onVerified={applyKey} onClose={closeKeyDialog} />
       </div>
     </TipProvider>
   );

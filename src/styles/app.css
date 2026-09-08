@@ -33,6 +33,36 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* The theme swap, and nothing else. `App` sets `data-theme-switching` for the length of one
+   transition when the theme actually changes, so every surface, hairline and label crosses
+   together in 160ms instead of the page inverting in a single frame — and the cost is paid once
+   per toggle rather than sitting on every element for the life of the page. Under
+   `prefers-reduced-motion` `--motion` is 0ms and this is a no-op.
+
+   The canvas-drawn scatter cannot join in; it repaints in its own effect. One mark snapping
+   while the chrome crosses is the accepted edge of doing this in CSS. */
+:root[data-theme-switching] *,
+:root[data-theme-switching] *::before,
+:root[data-theme-switching] *::after {
+  transition:
+    background-color var(--motion) var(--ease),
+    border-color var(--motion) var(--ease),
+    color var(--motion) var(--ease),
+    fill var(--motion) var(--ease),
+    stroke var(--motion) var(--ease);
+}
+
+/* One rule for the whole icon set. lucide draws on a 24 unit grid and ships at 24px; this
+   interface is dense, so it paints at 14 and the stroke scales with the box. Sized here rather
+   than at every call site, and rather than through lucide's context provider — a menu rendered
+   into a portal and a component rendered in a test both sit outside a provider, and an icon set
+   whose size depends on where it is mounted is the problem this replaced. */
+svg.lucide {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
 /* ---- the shell ------------------------------------------------------------------------ */
 
 .app {
@@ -52,10 +82,31 @@ body {
   background: var(--surface-raised);
 }
 
+/* The brand is the link to `#/datasets`. It is styled as text and not as a button because it is
+   the application's name first and a control second — the pointer and the hover are what say it
+   is clickable. */
 .brand {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
+
+.brand:hover {
+  background: var(--surface-sunken);
+  border-color: transparent;
+}
+
+.brand svg.lucide {
+  color: var(--accent);
+}
+
 
 .divider {
   width: 1px;
@@ -394,6 +445,7 @@ button.link {
   text-decoration: underline;
 }
 
+
 button:disabled {
   cursor: default;
   opacity: 0.55;
@@ -622,6 +674,34 @@ h2 {
   gap: 8px;
 }
 
+/* Baseline alignment is right for the words in this row and wrong for a square icon in it, so
+   the mark opts out and centres on the heading instead. Its colour is the stripe's — the two are
+   the same signal, said twice. */
+.notice-mark {
+  align-self: center;
+  color: var(--border-strong);
+}
+
+.notice-good .notice-mark {
+  color: var(--status-good);
+}
+
+.notice-warning .notice-mark {
+  color: var(--status-warning);
+}
+
+.notice-serious .notice-mark {
+  color: var(--status-serious);
+}
+
+.notice-error .notice-mark {
+  color: var(--status-error);
+}
+
+.notice-critical .notice-mark {
+  color: var(--status-critical);
+}
+
 .notice-head .title {
   font-size: var(--text-md);
   font-weight: 500;
@@ -680,12 +760,20 @@ h2 {
   width: 18px;
   height: 18px;
   flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
   border: 0;
   background: none;
   color: var(--text-muted);
   font-size: var(--text-sm);
   line-height: 1;
+}
+
+.close svg.lucide {
+  width: 13px;
+  height: 13px;
 }
 
 .close:hover {
@@ -990,6 +1078,7 @@ h2 {
   background: var(--surface-sunken);
   border-color: var(--border);
 }
+
 
 .list-row .n {
   width: 16px;
@@ -1312,9 +1401,9 @@ h2 {
 }
 
 .dataset-chip .menu-caret {
-  flex: none;
   color: var(--text-muted);
-  font-size: 9px;
+  width: 12px;
+  height: 12px;
 }
 
 .menu-panel {
@@ -1339,7 +1428,8 @@ h2 {
 }
 
 .menu-panel .tick {
-  width: 12px;
+  width: 14px;
+  height: 14px;
   flex: none;
   color: var(--accent);
 }
@@ -1443,8 +1533,15 @@ h2 {
 }
 
 .type-menu .tick {
-  width: 9px;
+  width: 14px;
+  height: 14px;
+  flex: none;
   color: var(--accent);
+}
+
+.type-menu .tick svg.lucide {
+  width: 12px;
+  height: 12px;
 }
 
 .grid tbody tr {

@@ -4,6 +4,7 @@
     The controls are the milestone's argument. A spec only the model can write is
     indistinguishable from blindly rendered model output; a spec two editors can write is
     demonstrably an object the application owns. Both editors produce the same Revision. */
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AnalysisChart } from '../chart/AnalysisChart';
 import {
@@ -72,7 +73,7 @@ export function AnalysisCard({
                 aria-label="Previous revision"
                 title="Cmd+Z"
               >
-                &lsaquo;
+                <ChevronLeft />
               </button>
               <span aria-live="polite">
                 {analysis.at + 1}/{count}
@@ -84,7 +85,7 @@ export function AnalysisCard({
                 aria-label="Next revision"
                 title="Shift+Cmd+Z"
               >
-                &rsaquo;
+                <ChevronRight />
               </button>
             </div>
           )}

@@ -32,6 +32,26 @@ describe('what the hash carries', () => {
     });
   });
 
+  /** A reset leaves nothing to carry, so the payload has to go. The bug this covers is not the
+      screen — that was right — it is the address, which went on describing a Dataset that had
+      been thrown away, so copying the link handed someone a session the sender no longer had. */
+  it('clears the payload when the workspace is reset', async () => {
+    const { workspace, script } = await setup();
+    void workspace.ask('how many matches per team?');
+    await flush();
+    await script.resolve(0, attempt(analysis('Matches by team')));
+
+    const stop = trackSession();
+    useApp.getState().setMode('byok');
+    expect(readSession(location.hash)).not.toBeNull();
+
+    workspace.reset();
+    stop();
+
+    expect(readSession(location.hash)).toBeNull();
+    expect(location.hash).toBe('#/');
+  });
+
   /** One Analysis, not all of them. The use case is sharing a chart; encoding a session grows
       the URL without bound and buys back only what a reload was never promised. */
   it('carries one Analysis however many there are, and no rows', async () => {
@@ -81,6 +101,9 @@ describe('what the hash carries', () => {
   /** A first-run visitor has nothing to share, and an address bar that grows a hash the moment
       the page opens looks like the application did something. */
   it('leaves the address bar alone until there is something to carry', () => {
+    // A first run, which jsdom does not hand back on its own — the previous test left a payload
+    // in `location`, and clearing a stale one is now a write like any other.
+    history.replaceState(null, '', '#');
     const replace = vi.spyOn(history, 'replaceState');
     const stop = trackSession();
     useApp.getState().setMode('byok');

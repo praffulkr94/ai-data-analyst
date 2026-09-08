@@ -1,16 +1,24 @@
+import { ChevronRight } from 'lucide-react';
 import { useRef, useState } from 'react';
-import type { Loader } from '../data/loader';
 import { MAX_BYTES, WARN_BYTES } from '../data/loader';
 import { SAMPLES } from '../data/samples';
 import { useApp } from '../store';
+import type { Workspace } from '../workspace/workspace';
 
 /** The first-run surface: a sample is offered before anything is asked of the visitor, so the
     app can be seen working before they invest a file or a key.
 
-    First run only. Once a Dataset is loaded the switcher in the header is what changes it
-    (ADR-0027), and a load in progress is `LoadStage` — which is why the progress card that used
-    to live here does not any more. */
-export function DatasetPicker({ loader }: { loader: Loader }) {
+    It is the screen with no Dataset behind it, and that is the whole of its condition — which is
+    also why it needs no way back and marks nothing as current. It is reached on a first run, and
+    again whenever `workspace.reset` is called: the brand in the header, or a mode switch. The
+    switcher in the header chip is the other way to change Dataset (ADR-0027) and the one that
+    keeps you where you are; this one starts over. A load in progress is `LoadStage`, which is
+    why the progress card that used to live here does not any more.
+
+    Every route in goes through `workspace.loadDataset` rather than the loader, for the reason
+    ADR-0027 gives: it is where the in-flight Request is abandoned. After a reset there is
+    nothing to abandon and it costs nothing. */
+export function DatasetPicker({ workspace }: { workspace: Workspace }) {
   const load = useApp((s) => s.load);
   const restore = useApp((s) => s.restore);
   const input = useRef<HTMLInputElement>(null);
@@ -22,7 +30,7 @@ export function DatasetPicker({ loader }: { loader: Loader }) {
       decides whether the analysis still holds. */
   const wanted = restore?.ref.kind === 'upload' ? restore.ref : null;
   const take = (file: File) =>
-    void loader.loadFile(
+    void workspace.loadDataset(
       file,
       wanted && file.name !== wanted.filename
         ? `This link was built on ${wanted.filename}, and you picked ${file.name}.`
@@ -78,7 +86,7 @@ export function DatasetPicker({ loader }: { loader: Loader }) {
               <button
                 type="button"
                 className="list-row tall"
-                onClick={() => void loader.loadSample(s)}
+                onClick={() => void workspace.loadDataset(s)}
               >
                 <span className="label">
                   <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
@@ -87,9 +95,7 @@ export function DatasetPicker({ loader }: { loader: Loader }) {
                   </span>
                   <span className="sub">{s.note}</span>
                 </span>
-                <span className="chevron" aria-hidden="true">
-                  &rsaquo;
-                </span>
+                <ChevronRight className="chevron" />
               </button>
             </li>
           ))}

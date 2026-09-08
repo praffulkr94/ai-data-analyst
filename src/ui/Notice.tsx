@@ -9,6 +9,7 @@
     the flow rather than a dead end in the history. And where the validator already knows the
     fix, the chip **is** the fix: a spec refused because `month` is categorical offers to retype
     that column and ask again, rather than describing what the visitor should go and do. */
+import { CircleAlert, Info, TriangleAlert, X } from 'lucide-react';
 import type { Loader } from '../data/loader';
 import { useApp } from '../store';
 import type { Workspace } from '../workspace/workspace';
@@ -23,6 +24,15 @@ const STRIPE = {
   clarification: 'notice',
   unsupported: 'notice notice-warning',
   failed: 'notice notice-critical',
+} as const;
+
+/** Beside the heading, never instead of it. The left stripe is a colour and DECISIONS §A5 forbids
+    colour carrying meaning alone, so the icon is a third redundant signal next to the words and
+    the stripe — worth having because it is the one of the three that reads at a glance. */
+const MARK = {
+  clarification: Info,
+  unsupported: TriangleAlert,
+  failed: CircleAlert,
 } as const;
 
 export function Notice({ workspace, loader }: { workspace: Workspace; loader?: Loader }) {
@@ -40,6 +50,7 @@ export function Notice({ workspace, loader }: { workspace: Workspace; loader?: L
   /** Violations whose fix is a column type. `validate.ts` names the column; retyping it and
       re-asking the same Question is the whole repair. */
   const failed = notice.kind === 'failed' ? notice : null;
+  const Mark = MARK[notice.kind];
   const retypable =
     failed && loader ? failed.violations.filter((v) => v.code === 'not-temporal' && v.column) : [];
 
@@ -49,10 +60,11 @@ export function Notice({ workspace, loader }: { workspace: Workspace; loader?: L
       role={notice.kind === 'failed' ? 'alert' : 'status'}
     >
       <div className="notice-head">
+        <Mark className="notice-mark" />
         <span className="title">{HEADING[notice.kind]}</span>
         <span className="aside">not saved as an analysis</span>
         <button type="button" className="close" aria-label="Dismiss" onClick={dismiss}>
-          &times;
+          <X />
         </button>
       </div>
       <p className="notice-body">

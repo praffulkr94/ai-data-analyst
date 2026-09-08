@@ -500,9 +500,23 @@ time in either direction, not a one-way door at first load.
   mid-analysis failure.
 - Switching back to `Demo` **keeps the key in memory** for the rest of the session, so a
   visitor can toggle freely without re-pasting.
-- The dataset, analysis cards and revision history survive the switch untouched — mode
+- ~~The dataset, analysis cards and revision history survive the switch untouched — mode
   affects only which `Translator` implementation is injected. This falls out of the seam
-  design for free.
+  design for free.~~ **Reversed, 2026-08-27.** The seam does make it free, and it is still
+  free — the reset is deliberate. What changes with the mode is not only who answers but what
+  an answer *is*: Demo replays recorded replies to a fixed repertoire and refuses free text,
+  BYOK is model-authored and open. A card carries no mark saying which produced it, and Demo
+  cannot refine a BYOK Analysis it has no Fixture for — so a thread spanning the switch
+  misrepresents half of itself and half of it is a dead end. Switching is now a **full reset**:
+  Dataset, Analyses, Revisions, the pending notice, the draft, the proposed Questions, and the
+  session payload in the hash, back to the first screen. The same reset the brand in the header
+  performs, deliberately — a picker standing over a Dataset whose thread has just been thrown
+  away needs a way back to that Dataset, which makes it a panel you dismiss rather than a home
+  screen. The accepted cost is re-picking the Dataset, and re-dropping an upload, whose rows
+  cannot be recovered. What survives is what belongs to the visitor rather than to the work: the
+  mode, the theme, the model, the key in memory, and the session's token and cost totals.
+  `workspace.setMode` is the one path; the raw store setter still switches nothing else, which
+  is what a restored link uses.
 - In `Demo`, suggested-question chips are live and free-text is disabled with an inline
   hint naming the 12 available questions. In `Your API key`, free-text is enabled and a
   per-request token/cost readout appears.

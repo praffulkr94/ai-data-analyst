@@ -2,6 +2,12 @@
    Both themes exist from milestone 1; dark mode is not a later pass. */
 
 :root {
+  /* The UA paints scrollbars, form controls, the canvas behind the page and the focus ring from
+     this and not from `--surface`. Without it a dark theme kept a light scrollbar down the side
+     of the window and a light frame around the page, and the toggle read as a flash rather than
+     a change of theme. */
+  color-scheme: light;
+
   /* Accent — Linear's brand accent. Indigo-violet does no data duty, so it can never be
      mistaken for a Series. It appears only on chrome, never inside a plot area. */
   --accent: #5e6ad2;
@@ -73,6 +79,8 @@
 }
 
 :root[data-theme='dark'] {
+  color-scheme: dark;
+
   --accent: #5e6ad2;
   --accent-hover: #828fff; /* dark mode hovers LIGHTER. #828fff on a light surface is 2.87:1
                               with white text and fails AA — which is why this token splits. */

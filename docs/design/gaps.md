@@ -178,3 +178,102 @@ revisit.
 Design impact: **yes** — where a per-card busy state lives is a canvas question. The card has a
 control bar, a title row with the stepper, and no drawn state for "this card is recomputing".
 `InFlight` is the Request card and is the wrong size for a 300ms manual edit.
+
+---
+
+## GAP-5 · A mode switch leaves a thread that half of it cannot answer · `done`
+
+Switching Demo ↔ BYOK changed the Translator and nothing else, which DECISIONS §A1 recorded as a
+feature. It is not one. A Demo session that inherits a BYOK Analysis can neither explain it — no
+card says which mode produced it — nor refine it, because Demo answers only Questions it has a
+Fixture for and a refining Question against an arbitrary Analysis is not one of them.
+
+- `src/store.ts` — `setMode: (mode) => set({ mode })`, the whole of it.
+- `src/ui/KeyDialog.tsx` — the second caller, so any reset added to one path missed the other.
+- `tests/workspace/mode.test.ts` — asserted the survival as a property to protect.
+
+Design impact: **no** — the switch has a drawn control already; what it lands on is the picker,
+which is also drawn.
+
+**Shipped.** `workspace.setMode` is the one path, and all it does beyond flipping the flag is
+call `workspace.reset` — the same full reset the brand performs (GAP-6). The first attempt kept
+the Dataset and navigated to a picker route, which produced the half-state GAP-6 records; a mode
+switch and a "start again" are the same gesture and now run the same code. The raw store setter
+is unchanged and is what a restored link uses, which is the distinction `App.applyKey` draws.
+DECISIONS §A1 amended rather than quietly broken.
+
+---
+
+## GAP-6 · There was no way to start again · `done`
+
+GAP-1 gave the picker a way in — the header chip's menu — and stopped there. A menu is a state,
+not a place, and there is no affordance anywhere that reads as *go back to the start*. Clicking
+the application's own name did nothing.
+
+- `src/App.tsx` — the picker rendered on `!hasDataset` and on no other condition, and nothing
+  anywhere set `datasetHandle` back to `null`.
+- `src/ui/Header.tsx` — `<span className="brand">Analyst</span>`, inert.
+
+Design impact: **no** — the picker is drawn, and this is that screen unchanged.
+
+**Shipped**, and the first attempt at it is the interesting part. It was built as a fourth route,
+`#/datasets`, rendering the picker *over* a Dataset that stayed loaded — so the screen carried a
+*Back to \<label\>* link and marked the current sample `· loaded`. That is a panel you dismiss,
+not a home screen, and the address said `#/datasets?s=<the old session>` while claiming to be the
+start.
+
+The route is gone. `#/` with nothing loaded **is** the first screen — that is the whole of the
+picker's condition — so getting there means dropping the Dataset, not navigating. `workspace.reset`
+is the one thing that does it: abandon the in-flight Request, clear the exchanges and the proposed
+Questions, `store.reset()`, `navigate('home')`. The brand calls it and so does a mode switch
+(GAP-5). Nothing is kept that belongs to the work; the mode, theme, model and session totals are
+the visitor's and stay.
+
+One bug fell out of it that was never about the picker: `trackSession` returned early when there
+was nothing to carry, so the payload of the Dataset just discarded stayed in the URL. It now
+clears it — and still leaves a first-run address bar alone, which is what the early return was
+there for.
+
+---
+
+## GAP-7 · The theme toggle read as a flash · `done`
+
+Two independent causes, one symptom.
+
+- No `color-scheme` anywhere in the stylesheet, so the UA kept painting light scrollbars, light
+  form controls and a light canvas behind a dark page. That strip down the side of the window is
+  the part that actually flashed.
+- Every colour in the interface is a token, and the token swap is instantaneous, so the whole
+  page inverted inside one frame with nothing carrying the eye across.
+
+Design impact: **no**.
+
+**Shipped.** `color-scheme: light | dark` on the two `:root` blocks in `tokens.css`. And a
+transition that exists only during the swap: `App` sets `data-theme-switching` on the root when
+the theme actually changes and removes it 200ms later, and one rule in `app.css` hangs a 160ms
+`background-color`/`border-color`/`color`/`fill`/`stroke` transition off that attribute. The cost
+is paid once per toggle rather than sitting on every element for the life of the page, and under
+`prefers-reduced-motion` `--motion` is already 0ms so it is a no-op. The canvas-drawn scatter
+cannot join in — it repaints in its own effect — which is the accepted edge of doing this in CSS.
+
+---
+
+## GAP-8 · The icons were typography · `done`
+
+Chevrons read small and sat off-centre because they were not icons: `&rsaquo;`, `&lsaquo;`, `▾`,
+`&times;` and `✓` are glyphs, sized and optically centred by Inter rather than by anything in this
+design. Three hand-drawn `<svg>`s sat beside them on a fourth and fifth grid.
+
+- `src/ui/DatasetPicker.tsx`, `src/ui/EmptyState.tsx`, `src/ui/AnalysisCard.tsx` — `&rsaquo;`
+  and `&lsaquo;` as chevrons.
+- `src/ui/Header.tsx`, `src/ui/DataTable.tsx` — `▾` as a menu caret, at `font-size: 9px`.
+- Six `&times;` dismiss buttons; two `✓` ticks at two different widths.
+- `src/ui/Header.tsx`, `src/ui/Rail.tsx` — three hand-rolled `<svg>` icons.
+
+Design impact: **no** — the canvas draws icons at these positions already.
+
+**Shipped.** `lucide-react`, sized by one CSS rule. `docs/ui-primitives.md` §5.4 records why, and
+why the library's own context provider was declined. The status notices gained a severity mark
+beside the heading at the same time — a third signal next to the words and the stripe, never
+instead of either.
+

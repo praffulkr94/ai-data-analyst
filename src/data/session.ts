@@ -80,14 +80,19 @@ export function trackSession(store = useApp): () => void {
     if (key.length === previous.length && key.every((v, i) => v === previous[i])) return;
     previous = key;
     const session = sessionOf(s);
-    // Nothing to carry yet. A first-run visitor's address bar stays clean rather than picking
-    // up a hash that encodes an empty workspace.
-    if (!session.dataset && !session.spec) return;
-    const { route } = parseHash();
+    const { route, payload: written } = parseHash();
+    const payload = session.dataset || session.spec ? encode(session) : '';
+    // Nothing to carry and nothing stale to clear: a first-run visitor's address bar stays as it
+    // is rather than growing a hash that says the application did something.
+    //
+    // The second half of that condition is the whole point. A reset also has nothing to carry,
+    // and returning early on that basis alone is how the address went on describing a Dataset
+    // that had been thrown away — the screen was right and the link was a lie.
+    if (!payload && !written) return;
     history.replaceState(
       null,
       '',
-      `${location.pathname}${location.search}${formatHash(route, encode(session))}`,
+      `${location.pathname}${location.search}${formatHash(route, payload)}`,
     );
   });
 }

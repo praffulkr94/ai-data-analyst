@@ -1,12 +1,20 @@
 /** Switching between Demo and BYOK.
 
-    Mode picks a Translator and does nothing else, so the Dataset, the Analyses and the Revisions
-    survive a switch untouched. That is a property of the seam rather than of any code written to
-    preserve them — which is exactly why it is worth a test: the day someone adds a reset to the
-    mode setter, this is what says so. */
+    Two different things share the word "switch" and this file holds both apart.
+
+    `useApp.setMode` is the raw setter. It picks a Translator and does nothing else, so the
+    Dataset, the Analyses and the Revisions survive it untouched — a property of the seam rather
+    than of any code written to preserve them. That is the path a restored link takes: the hash
+    already describes an Analysis, and the key arriving late completes it.
+
+    `workspace.setMode` is a visitor at the header toggle. That one is a full reset — Dataset and
+    thread both — because what changes with the mode is not only who answers but what an answer
+    is (DECISIONS §A1), and a picker standing over a Dataset whose thread has just been thrown
+    away is a panel you back out of rather than a home screen. */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createFixtureTranslator } from '../../src/ai/fixtureTranslator';
 import type { Fixture } from '../../src/ai/fixtures';
+import { parseHash } from '../../src/route';
 import { switching, type Translator } from '../../src/ai/translator';
 import { useApp } from '../../src/store';
 import { analyses, analysis, attempt, reset, scripted, setup, titles } from './harness';
@@ -20,7 +28,11 @@ const RECORDED: Fixture = {
 };
 
 describe('the mode toggle', () => {
-  beforeEach(reset);
+  beforeEach(() => {
+    reset();
+    // jsdom carries `location` between tests, and `workspace.setMode` navigates.
+    history.replaceState(null, '', '#/');
+  });
 
   /** Both implementations behind one seam, chosen per Request exactly as `main.tsx` chooses. */
   async function bothModes(): Promise<{
@@ -36,7 +48,7 @@ describe('the mode toggle', () => {
     return { workspace, live };
   }
 
-  it('carries the Dataset, the Analyses and their Revisions across a switch in both directions', async () => {
+  it('carries the Dataset, the Analyses and their Revisions across the raw setter, both directions', async () => {
     const { workspace, live } = await bothModes();
     await workspace.ask(RECORDED.question);
     const handle = useApp.getState().datasetHandle;
@@ -79,5 +91,41 @@ describe('the mode toggle', () => {
     void workspace.ask('anything at all');
     await Promise.resolve();
     expect(live.calls).toHaveLength(1);
+  });
+
+  /** The visitor's switch, which is the raw setter's opposite in every respect. */
+  it('resets to the picker — Dataset and thread both — and keeps the session totals', async () => {
+    const { workspace } = await bothModes();
+    await workspace.ask(RECORDED.question);
+    useApp.setState({ draft: 'half a question', suggestions: { for: 'x', questions: ['q'] } });
+    const spent = useApp.getState().usage.requests;
+    expect(spent).toBeGreaterThan(0);
+
+    workspace.setMode('byok');
+
+    const state = useApp.getState();
+    expect(state.mode).toBe('byok');
+    expect(state.datasetHandle).toBeNull();
+    expect(state.columns).toEqual([]);
+    expect(state.load).toEqual({ status: 'idle' });
+    expect(analyses()).toEqual([]);
+    expect(state.activeAnalysisId).toBeNull();
+    expect(state.draft).toBe('');
+    expect(state.suggestions).toBeNull();
+    // Charged for whatever is on screen now.
+    expect(state.usage.requests).toBe(spent);
+    expect(parseHash().route).toBe('home');
+  });
+
+  /** Re-pressing the half that is already pressed is not a switch, and must not cost the thread
+      the visitor is looking at. */
+  it('does nothing when the mode is already the one asked for', async () => {
+    const { workspace } = await bothModes();
+    await workspace.ask(RECORDED.question);
+
+    workspace.setMode('demo');
+
+    expect(titles()).toEqual(['Matches hosted by team']);
+    expect(parseHash().route).toBe('home');
   });
 });

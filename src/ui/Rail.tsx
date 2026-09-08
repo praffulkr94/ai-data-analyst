@@ -1,3 +1,4 @@
+import { ChartColumn, ChevronLeft, Plus, X } from 'lucide-react';
 import { navigate } from '../route';
 import { useApp } from '../store';
 import type { Workspace } from '../workspace/workspace';
@@ -43,7 +44,7 @@ export function Rail({
           aria-expanded={false}
           onClick={onToggle}
         >
-          <ChartIcon />
+          <ChartColumn />
           {analyses.some((a) => a.updated) && <span className="updated-dot" aria-hidden="true" />}
         </button>
         <button
@@ -52,7 +53,7 @@ export function Rail({
           aria-label="New analysis"
           onClick={startNew}
         >
-          +
+          <Plus />
         </button>
       </nav>
     );
@@ -63,7 +64,7 @@ export function Rail({
       <div className="rail-head">
         <span>Analyses</span>
         <button type="button" className="close" aria-label="Collapse the rail" onClick={onToggle}>
-          &lsaquo;
+          <ChevronLeft />
         </button>
       </div>
 
@@ -98,7 +99,7 @@ export function Rail({
                   aria-label={`Delete ${analysis.title}`}
                   onClick={() => workspace.deleteCard(analysis.id)}
                 >
-                  &times;
+                  <X />
                 </button>
               </li>
             ))}
@@ -113,7 +114,7 @@ export function Rail({
           <p className="rail-note" role="status">
             Analyses aren't saved — copy the link to keep the one you're looking at.
             <button type="button" className="close" aria-label="Got it" onClick={readSaveNote}>
-              &times;
+              <X />
             </button>
           </p>
         )}
@@ -121,17 +122,10 @@ export function Rail({
 
       <div className="rail-foot">
         <button type="button" onClick={startNew}>
-          <span className="muted">+</span>New analysis
+          <Plus />
+          New analysis
         </button>
       </div>
     </nav>
   );
 }
-
-const ChartIcon = () => (
-  <svg width="13" height="12" viewBox="0 0 13 12" aria-hidden="true" fill="currentColor">
-    <rect x="0" y="7" width="3" height="5" rx="1" />
-    <rect x="5" y="0" width="3" height="12" rx="1" />
-    <rect x="10" y="4" width="3" height="8" rx="1" />
-  </svg>
-);

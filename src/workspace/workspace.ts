@@ -14,7 +14,7 @@ import { specFromReply, type AnalysisSpec } from '../spec/grammar';
 import type { Sample } from '../data/samples';
 import type { Loader } from '../data/loader';
 import type { DataPort } from '../worker/port';
-import { useApp, type Notice, type Revision } from '../store';
+import { useApp, type Mode, type Notice, type Revision } from '../store';
 import {
   Cancelled,
   sleep,
@@ -324,6 +324,15 @@ export function createWorkspace({
       inferred rather than the one it was written against. Those two can disagree — a re-selected
       file whose columns have moved on — and when they do the SpecViolations are rendered, which
       is the state a bad reply already produces, rather than a throw. */
+  function reset(): void {
+    requestId++;
+    inFlight?.abort();
+    exchanges.clear();
+    suggested.clear();
+    store.getState().reset();
+    navigate('home');
+  }
+
   async function restore(spec: AnalysisSpec): Promise<void> {
     const id = ++requestId;
     const violations = validateSpec(spec, { columns: store.getState().columns });
@@ -352,13 +361,48 @@ export function createWorkspace({
         on home and nowhere else — the inference gate stands there when there is something to
         ask, and `LoadNews` says what the load found when there is not. Landing on `#/data`
         skipped both. */
-    async loadDataset(source: Sample | File): Promise<void> {
+    async loadDataset(source: Sample | File, warning?: string): Promise<void> {
       requestId++;
       inFlight?.abort();
       exchanges.clear();
       store.getState().dismissNotice();
       navigate('home');
-      await (source instanceof File ? loader.loadFile(source) : loader.loadSample(source));
+      await (source instanceof File ? loader.loadFile(source, warning) : loader.loadSample(source));
+    },
+
+    /** Start again: no Dataset, no thread, back on the picker with a clean address. The brand
+        in the header is what calls it.
+
+        A *reset* and not a route to the picker, which is what this was first built as and what
+        it is not. The picker is the screen with no Dataset behind it — that is the whole of its
+        definition — so a picker rendered over a Dataset that is still loaded needs a way back to
+        that Dataset, and a home screen you can back out of is a modal wearing a screen's
+        clothes. There is no `#/datasets`: `#/` with nothing loaded *is* the first screen, and
+        this is the one thing that puts you there.
+
+        ponytail: the worker still holds the outgoing ColumnStore until the next parse replaces
+        it — the protocol has no "drop it" message, only `dispose`, which kills the worker. Add
+        one if a reset with nothing picked afterwards ever shows up in a memory profile. */
+    reset,
+
+    /** A deliberate mode switch, which is not the pure Translator swap DECISIONS §A1 first
+        described it as. What changes with the mode is not only who answers but what an answer
+        *is*: Demo replays recorded replies to a fixed repertoire and refuses free text, BYOK is
+        model-authored and open. A card carries no mark saying which produced it, and a Demo
+        session cannot refine a BYOK Analysis it has no Fixture for — so a thread that spans the
+        switch misrepresents half of itself and half of it is a dead end.
+
+        So it is the same reset the brand does, and for the same reason it is a reset rather than
+        a navigation: the alternative is a picker standing over a Dataset whose thread has just
+        been thrown away, offering to go back to it. The cost is a re-pick, and for an upload a
+        re-drop, because those rows cannot be recovered.
+
+        Restoring a shared link is not this. That path flips the mode to complete a session the
+        hash already describes, and it calls the store's setter directly (see `App`). */
+    setMode(mode: Mode): void {
+      if (store.getState().mode === mode) return;
+      store.getState().setMode(mode);
+      reset();
     },
 
     ask,

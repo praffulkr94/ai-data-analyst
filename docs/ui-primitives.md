@@ -167,3 +167,33 @@ and it deletes tests that currently pass.
 That asymmetry is the useful finding: the four toggles could be swapped in an afternoon by
 whoever installs Radix first, and the menu is the piece that deserves its own change and its own
 review.
+
+### 5.4 · Icons come from lucide-react — **decided**
+
+Every icon in the interface was either a typographic glyph (`&rsaquo;`, `▾`, `&times;`, `✓`,
+`&lsaquo;`) or a hand-drawn `<svg>` (the rail toggle, the chart mark, the theme disc). The glyphs
+are the problem: they are *text*, so their size, weight, optical centre and vertical alignment are
+whatever Inter decided for that codepoint, and none of them agree with each other. That is why the
+chevrons read small and sat off-centre — they were never drawn on the same grid as anything
+around them.
+
+`lucide-react`, on the same rule as Radix in §5.1: a component vocabulary is a platform decision,
+and evaluating an icon set one arrow at a time is how you end up with five arrows that do not
+match. It is the React ecosystem's default (the maintained fork of Feather), ISC-licensed, one
+tree-shaken ES module per icon, `currentColor` throughout, and drawn on one 24-unit grid — which
+is the whole point.
+
+Two consequences worth recording:
+
+- **Size lives in CSS, not at the call site and not in a provider.** One rule, `svg.lucide
+  { width: 14px; height: 14px; flex: none }`. lucide ships a `LucideProvider`, and it was
+  declined: a menu rendered through a Radix portal and a component rendered in a test both sit
+  outside whatever provider `App` mounts, and an icon set whose size depends on where it is
+  mounted is the problem this replaced. No wrapper module either — there is nothing to wrap.
+- **The status notices gained a mark.** `Notice` and `LoadNews` now carry an icon beside the
+  heading, coloured to match the left stripe. It is a *third* redundant signal next to the words
+  and the stripe, never a replacement for either: DECISIONS §A5 forbids colour carrying meaning
+  alone, and an icon carrying it alone is the same defect.
+
+Not retrofitted anywhere it was not already a glyph: `ChartFrame`'s plot SVG is a drawing, not an
+icon, and the composer's blinking `.caret` is a text cursor.

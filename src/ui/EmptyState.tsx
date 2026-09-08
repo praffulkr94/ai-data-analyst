@@ -15,6 +15,7 @@
     With a key the list is three, from one cheap call at load. Three is a starter, not a
     repertoire: free text is open, so their whole job is to be something to click instead of an
     empty canvas. */
+import { ChevronRight } from 'lucide-react';
 import { useEffect } from 'react';
 import { repertoireFor } from '../ai/fixtures';
 import { useApp } from '../store';
@@ -137,9 +138,7 @@ function Row({ n, question, kind }: { n: number; question: string; kind?: string
       <span className="n">{n}</span>
       <span className="label">{question}</span>
       {kind && <span className="kind">{kind}</span>}
-      <span className="chevron" aria-hidden="true">
-        &rsaquo;
-      </span>
+      <ChevronRight className="chevron" />
     </button>
   );
 }

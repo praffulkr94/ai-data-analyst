@@ -144,6 +144,10 @@ export type AppState = {
   typesReviewed: boolean;
 
   setMode: (mode: Mode) => void;
+  /** Back to a first run: no Dataset, no thread, nothing derived from either. What survives is
+      what belongs to the visitor rather than to the work — the mode, the theme, the model, and
+      the session's token and cost totals, which were spent whatever is on screen now. */
+  reset: () => void;
   setModel: (model: ModelChoice) => void;
   setDraft: (draft: string) => void;
   setSuggestions: (dataset: string, questions: string[]) => void;
@@ -213,6 +217,26 @@ export const useApp = create<AppState>((set) => ({
   typesReviewed: false,
 
   setMode: (mode) => set({ mode }),
+  reset: () =>
+    set({
+      datasetHandle: null,
+      columns: [],
+      parseReport: null,
+      load: { status: 'idle' },
+      loadFailure: null,
+      viewState: { sort: null, filters: [], hidden: [] },
+      typesReviewed: false,
+      analyses: [],
+      activeAnalysisId: null,
+      pendingNotice: null,
+      request: null,
+      // Proposed for a Dataset that is no longer loaded, by a model that may no longer be the
+      // one answering.
+      suggestions: null,
+      draft: '',
+      // A reload's unfinished business, which a reset is the visitor abandoning.
+      restore: null,
+    }),
   setModel: (model) => set({ model }),
   setDraft: (draft) => set({ draft }),
   setSuggestions: (dataset, questions) => set({ suggestions: { for: dataset, questions } }),

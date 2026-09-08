@@ -16,6 +16,7 @@
     Analyses were not asked against makes every one of them meaningless, and that is where the
     in-flight Request is abandoned and the exchanges are cleared. */
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { Check } from 'lucide-react';
 import { useRef, type ReactNode } from 'react';
 import { SAMPLES } from '../data/samples';
 import { useApp } from '../store';
@@ -56,7 +57,7 @@ export function DatasetMenu({
                   }}
                 >
                   <span className="tick" aria-hidden="true">
-                    {isCurrent ? '✓' : ''}
+                    {isCurrent && <Check />}
                   </span>
                   <span className="label">{s.label}</span>
                   <span className="muted">{s.rowCount.toLocaleString()} rows</span>
