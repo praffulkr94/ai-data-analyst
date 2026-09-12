@@ -7,7 +7,10 @@ computes the answer.**
 answers sixteen recorded Questions through the same grammar, validator, worker and renderer a
 live key uses; only the transport is replayed.
 
-![The answer to "Which teams have hosted the most matches?" — a bar chart drawn from 49,520 rows](docs/screenshots/02-answer.png)
+![Picking a 49,520-row dataset, choosing a Question, and the chart that answers it](docs/screenshots/ask-to-chart.gif)
+
+*Ten seconds, unedited and unaccelerated: the parse is as long as it really is, and the Narration
+streams at the gaps a real reply arrives in.*
 
 A browser workspace for exploring a tabular Dataset by asking questions in English. The model
 translates a Question into a validated analysis specification; the application executes it and
@@ -32,8 +35,9 @@ ceiling on what can be asked; both are measured and written down below rather th
 
 | | |
 |---|---|
-| ![The dataset picker](docs/screenshots/01-picker.png)<br>**Start with a sample or drop a CSV.** Four built-in datasets, or any file — parsed in the tab, never uploaded. | ![The same analysis as a data table](docs/screenshots/03-table.png)<br>**Every chart is also a table.** The accessible representation is a product feature, and the chart test harness. |
-| ![A clarification card](docs/screenshots/05-clarification.png)<br>**An ambiguous Question is asked back.** The options are themselves Questions inside the grammar. | ![The dark theme](docs/screenshots/06-dark.png)<br>**Both themes are contrast-audited** by `npm run audit:contrast`, which exits non-zero on a regression. |
+| ![The dataset picker](docs/screenshots/01-picker.png)<br>**Start with a sample or drop a CSV.** Four built-in datasets, or any file — parsed in the tab, never uploaded. | ![A bar chart answering a question](docs/screenshots/02-answer.png)<br>**The answer is a chart plus a caption the application wrote.** The model supplied neither number. |
+| ![The same analysis as a data table](docs/screenshots/03-table.png)<br>**Every chart is also a table.** The accessible representation is a product feature, and the chart test harness. | ![A clarification card](docs/screenshots/05-clarification.png)<br>**An ambiguous Question is asked back.** The options are themselves Questions inside the grammar. |
+| ![The dark theme](docs/screenshots/06-dark.png)<br>**Both themes are contrast-audited** by `npm run audit:contrast`, which exits non-zero on a regression. | ![A scatter of 98,899 points](docs/screenshots/04-scatter.png)<br>**98,899 points, drawn to canvas** past the 5,000-point budget. The grid shape is honest: both measures are small integers, so the Dataset overplots. |
 
 ## Tech stack
 
@@ -320,7 +324,11 @@ above is estimated in their place:
 
 - The model comparison, prompt-cache verification, and re-recorded Fixtures — all need a live API
   key.
-- The 90-second screen recording that belongs at the top of this README — needs a person.
+- A narrated walkthrough of the parts the loop above does not reach — a Revision refining an
+  Analysis, a Repair after a failed validation, the model picker. The ten-second loop is
+  generated; a narrated recording still needs a person.
 
-The screenshots above are not hand-captured: `npm run screenshots` drives the real application in
-Demo mode with Playwright and rewrites all six, so a UI change invalidates them visibly.
+Neither the screenshots nor the loop above are hand-captured. `npm run screenshots` rewrites all
+six stills and `npm run demo:gif` re-records the loop, both by driving the real application in
+Demo mode with Playwright — so a UI change invalidates them visibly. The GIF encode needs ffmpeg
+on `PATH`; nothing else in the repository does.

@@ -42,7 +42,8 @@
     "test:e2e": "node scripts/e2e-run.mjs",
     "test:all": "vitest run",
     "audit:contrast": "node scripts/contrast-audit.mjs",
-    "screenshots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "demo:gif": "node scripts/demo-gif.mjs"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
