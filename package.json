@@ -29,7 +29,7 @@
   "bugs": {
     "url": "https://github.com/praffulkr94/ai-data-analyst/issues"
   },
-  "homepage": "https://github.com/praffulkr94/ai-data-analyst#readme",
+  "homepage": "https://ai-data-analyst-lake.vercel.app/",
   "private": true,
   "scripts": {
     "dev": "vite",

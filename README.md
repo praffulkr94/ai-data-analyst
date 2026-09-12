@@ -3,6 +3,10 @@
 **Ask a question about a table in plain English. The model writes the query; the application
 computes the answer.**
 
+**[Try it live](https://ai-data-analyst-lake.vercel.app/)** — no signup and no key. Demo mode
+answers sixteen recorded Questions through the same grammar, validator, worker and renderer a
+live key uses; only the transport is replayed.
+
 ![The answer to "Which teams have hosted the most matches?" — a bar chart drawn from 49,520 rows](docs/screenshots/02-answer.png)
 
 A browser workspace for exploring a tabular Dataset by asking questions in English. The model
@@ -317,7 +321,6 @@ above is estimated in their place:
 - The model comparison, prompt-cache verification, and re-recorded Fixtures — all need a live API
   key.
 - The 90-second screen recording that belongs at the top of this README — needs a person.
-- The deployed URL — needs credentials.
 
 The screenshots above are not hand-captured: `npm run screenshots` drives the real application in
 Demo mode with Playwright and rewrites all six, so a UI change invalidates them visibly.
