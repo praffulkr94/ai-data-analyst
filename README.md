@@ -1,5 +1,10 @@
 # AI Data Analyst
 
+**Ask a question about a table in plain English. The model writes the query; the application
+computes the answer.**
+
+![The answer to "Which teams have hosted the most matches?" — a bar chart drawn from 49,520 rows](docs/screenshots/02-answer.png)
+
 A browser workspace for exploring a tabular Dataset by asking questions in English. The model
 translates a Question into a validated analysis specification; the application executes it and
 draws the result. **The model never returns a number, a finding, or a claim about the data** — every
@@ -8,10 +13,41 @@ figure on screen was computed from the rows by code you can read.
 No backend. The rows are parsed and held in a Web Worker in the tab; they are never uploaded
 anywhere, and they are never sent to the model.
 
-> **Two things are missing from this README and are honestly missing.** The 90-second screen
-> recording that belongs at the top needs a person to record it, and the live URL needs deployment
-> credentials. Both are unticked items on the progress ledger in issue #1 rather than oversights.
-> Everything below is measured or runnable today.
+## Why it is built this way
+
+An LLM asked to read a table and report a figure will sometimes invent one, and nothing downstream
+can tell the difference. The premise here is to never put it in that position: the model is given
+the column names and their types — never the rows — and its only job is to choose, from a small
+grammar the application can execute, which query to run. Every number on screen is then computed
+locally and is reproducible by inspection.
+
+That constraint is the project. It buys a guarantee about correctness and privacy, and it costs a
+ceiling on what can be asked; both are measured and written down below rather than glossed.
+
+## What it looks like
+
+| | |
+|---|---|
+| ![The dataset picker](docs/screenshots/01-picker.png)<br>**Start with a sample or drop a CSV.** Four built-in datasets, or any file — parsed in the tab, never uploaded. | ![The same analysis as a data table](docs/screenshots/03-table.png)<br>**Every chart is also a table.** The accessible representation is a product feature, and the chart test harness. |
+| ![A clarification card](docs/screenshots/05-clarification.png)<br>**An ambiguous Question is asked back.** The options are themselves Questions inside the grammar. | ![The dark theme](docs/screenshots/06-dark.png)<br>**Both themes are contrast-audited** by `npm run audit:contrast`, which exits non-zero on a regression. |
+
+## Tech stack
+
+| | |
+|---|---|
+| **Application** | React 19, TypeScript 7, Vite 8 |
+| **State** | Zustand, with the Request lifecycle in a plain facade rather than the store |
+| **Model** | `@anthropic-ai/sdk` — streamed **tool use**, Claude Sonnet 5 and Haiku 4.5 behind one picker |
+| **Grammar & validation** | Zod 4 for the structure, a hand-written semantic validator for the Dataset |
+| **Data** | A Web Worker owning a columnar, typed-array ColumnStore; PapaParse for CSV |
+| **Charts** | `d3-scale` / `d3-shape` / `d3-array` / `d3-quadtree` with hand-rendered axes — no charting library |
+| **UI** | TanStack Table for the virtualized row grid, Radix for menus and tooltips, Lucide icons |
+| **Tests** | Vitest across three projects (Node, jsdom, real browser) and Playwright for e2e and benchmarks |
+
+The four pieces of deliberate complexity — the hand-rolled worker RPC, the d3 submodules, the
+columnar store and the absence of TanStack Query — are argued in
+[ADR-0013](docs/adr/0013-deliberate-complexity-is-spec-mandated.md) rather than left to be
+discovered.
 
 ## Running it
 
@@ -21,7 +57,7 @@ npx playwright install chromium     # for the browser tests and the bench driver
 npm run dev                         # http://localhost:5173
 ```
 
-**Demo mode is the default**, with no key: it answers a fixed repertoire of thirteen Questions by
+**Demo mode is the default**, with no key: it answers a fixed repertoire of sixteen Questions by
 replaying recorded Fixtures. Only the transport is replayed — the same Zod grammar, the same
 semantic validator, the same worker and the same renderer run as with a key, which is the whole
 argument for Fixtures over a proxy. The Fixtures are currently *hand-authored against the real
@@ -175,7 +211,7 @@ The comparison this README is supposed to carry — the same 20 Questions throug
 reporting spec-correctness rate, latency and cost — **has not been run**, because it needs a live
 API key and this repository has none. It is unticked on the ledger rather than estimated. Two
 smaller items wait on the same key: verifying that prompt caching actually reports
-`cache_read_input_tokens > 0`, and re-recording the thirteen Fixtures from the API instead of
+`cache_read_input_tokens > 0`, and re-recording the sixteen Fixtures from the API instead of
 hand-authoring them.
 
 What is in place and testable without a key:
@@ -229,7 +265,7 @@ Two modules carry the testable behaviour; everything else is wiring around them
 
 `DECISIONS.md` is the architecture and every decision behind it, `CONTEXT.md` is the vocabulary
 (Analysis, Revision, Request, ColumnStore, RowSlice — used consistently in code, tests and commits),
-and [`docs/adr/`](docs/adr/) holds twenty-four ADRs for the decisions that needed one.
+and [`docs/adr/`](docs/adr/) holds twenty-seven ADRs for the decisions that needed one.
 
 Four pieces of complexity are deliberate and spec-mandated rather than accidental: the hand-rolled
 worker RPC (not Comlink), d3 submodules with hand-rendered axes (not a charting library), the
@@ -241,7 +277,7 @@ simplification pass argues with the decision rather than quietly deleting it.
 ## Tests
 
 ```
-npm test              # 419 tests across the two seams — engine in Node, workspace in jsdom
+npm test              # 464 tests across the two seams — engine in Node, workspace in jsdom
 npm run test:all      # adds the browser project, which needs a real Worker
 npm run test:e2e      # two Playwright flows over canned SSE (needs the app running)
 npm run typecheck
@@ -275,9 +311,13 @@ categorical — and the excluded count is surfaced in the caption instead of bei
 
 ## Outstanding
 
-Named rather than faked. Each is a ledger item on issue #1:
+Named rather than faked. Each is a ledger item on issue #1 rather than an oversight, and nothing
+above is estimated in their place:
 
 - The model comparison, prompt-cache verification, and re-recorded Fixtures — all need a live API
   key.
-- The 90-second recording — needs a person.
+- The 90-second screen recording that belongs at the top of this README — needs a person.
 - The deployed URL — needs credentials.
+
+The screenshots above are not hand-captured: `npm run screenshots` drives the real application in
+Demo mode with Playwright and rewrites all six, so a UI change invalidates them visibly.

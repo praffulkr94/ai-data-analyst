@@ -1,7 +1,7 @@
 {
   "name": "ai-data-analyst",
   "version": "0.1.0",
-  "description": "",
+  "description": "Ask a question about a table in plain English. The model writes the query; the browser computes the answer — no backend, and the rows never leave the tab.",
   "directories": {
     "doc": "docs"
   },
@@ -9,9 +9,22 @@
     "type": "git",
     "url": "git+https://github.com/praffulkr94/ai-data-analyst.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "llm",
+    "anthropic",
+    "claude",
+    "tool-use",
+    "data-visualization",
+    "csv",
+    "web-worker",
+    "react",
+    "typescript",
+    "d3",
+    "zod",
+    "natural-language-query"
+  ],
+  "author": "praffulkr94",
+  "license": "MIT",
   "type": "module",
   "bugs": {
     "url": "https://github.com/praffulkr94/ai-data-analyst/issues"
@@ -28,7 +41,8 @@
     "test:browser": "vitest run --project browser",
     "test:e2e": "node scripts/e2e-run.mjs",
     "test:all": "vitest run",
-    "audit:contrast": "node scripts/contrast-audit.mjs"
+    "audit:contrast": "node scripts/contrast-audit.mjs",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
